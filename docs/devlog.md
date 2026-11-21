@@ -354,6 +354,12 @@ Carousel cards keep their fixed height but put the subtitle right under the titl
 
 - **Not seen on a phone.** Nothing in this section was installed or looked at; it was only built and unit-tested. The likely trouble spots are the Terminal transport row in English (`[ previous ]` and the rest may not fit a 360 dp screen), the mini-to-full transition in each look, the dock's progress line near the rounded corners, and Retro's shadow colour on Gruvbox.
 - Unit tests: 75 in Kotlin. Two of them are from other work committed meanwhile.
+- **Then checked on the OP7T:** every look on Settings → Appearance, Home and Now Playing, with a track playing from Home. They are clearly different from each other. Terminal's transport row fits on the 1080 px screen, its dock shows the two status lines with the live position, and Ukrainian renders in the mono font. Not checked: the mini-to-full animation frame by frame, light mode, the fixed palettes one by one.
+
+### Two queue fixes from the user
+
+- **"Some songs say Video."** Home cards were all marked as videos in the parser. They now read YouTube's video type; on the phone, a real live video says Video and the songs next to it say Song.
+- **"It includes the audio, then its video clip."** Signed in, YouTube sends a song together with its music video as a counterpart (the official app's Song/Video switch), and the parser queued both. Counterparts are skipped now. Tested with a JVM test shaped like the signed-in response; the saved fixtures are signed out and have none. Not yet seen in a radio queue on the phone.
 
 ### Known gaps
 
