@@ -91,7 +91,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         if (needsPairing && backStack.lastOrNull() != PairingRoute) backStack.add(PairingRoute)
     }
 
-    val inPairing = backStack.lastOrNull() == PairingRoute
+    val inPairing = backStack.lastOrNull() == PairingRoute || backStack.lastOrNull() == SignInRoute
     val currentTab = tabs.firstOrNull { it.route == backStack.firstOrNull() } ?: tabs.first()
     var playerExpanded by rememberSaveable { mutableStateOf(false) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
