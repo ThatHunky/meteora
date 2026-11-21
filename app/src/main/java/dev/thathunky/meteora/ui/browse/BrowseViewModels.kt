@@ -47,6 +47,7 @@ class SearchViewModel @Inject constructor(private val ytm: YtmClient) : ViewMode
 
     /** The query whose results are showing. It gets no suggestions: the list would cover the results. */
     private var submitted: String? = null
+    val submittedQuery: String? get() = submitted
 
     init {
         viewModelScope.launch {
@@ -76,7 +77,13 @@ class SearchViewModel @Inject constructor(private val ytm: YtmClient) : ViewMode
 
     fun setFilter(f: YtmClient.SearchFilter) {
         _filter.value = f
-        if (_results.value != null) submit()
+        // The query whose results are showing, not whatever has been typed since.
+        if (_results.value != null) submitted?.let { submit(it) }
+    }
+
+    /** From the failed state: the same query and filter again. */
+    fun retry() {
+        submitted?.let { submit(it) }
     }
 }
 

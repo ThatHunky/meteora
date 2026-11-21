@@ -98,12 +98,16 @@ fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = M
             is PairingStep.ShowCode -> Centered {
                 Text(stringResource(R.string.pair_code_title), style = MaterialTheme.typography.titleLarge)
                 MSurface(tone = Tone.Primary, shape = MaterialTheme.shapes.extraLarge) {
+                    // One line always: in the Terminal look's mono font, or on a narrow phone,
+                    // 64 sp wrapped the code onto two lines. It shrinks instead.
                     Text(
                         s.code.toCharArray().joinToString(" "),
-                        fontSize = 64.sp,
-                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Black),
                         color = surfaceContentColor(Tone.Primary),
-                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp),
+                        maxLines = 1,
+                        softWrap = false,
+                        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 28.sp, maxFontSize = 64.sp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
                     )
                 }
                 Text(stringResource(R.string.pair_code_body, s.name), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -166,7 +170,8 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
                 }
             }
         }
-        items(found, key = { it.name }) { pc ->
+        // Two PCs can carry the same name; a repeated lazy key crashes the list.
+        items(found.distinctBy { it.name to it.addresses }, key = { "${it.name}|${it.addresses.joinToString(",")}" }) { pc ->
             MSurface(
                 onClick = { onPick(pc) },
                 shape = MaterialTheme.shapes.large,

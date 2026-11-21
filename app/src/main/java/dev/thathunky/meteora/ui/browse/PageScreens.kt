@@ -75,22 +75,46 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.share.share
 import dev.thathunky.meteora.ytm.MusicItem
 
+/**
+ * Loading, failed (with Try again) or the content. The loading and failed states are centred in
+ * the space above the dock, [bottomPadding], so they are not hidden under the mini player.
+ */
 @Composable
-fun <T> Loaded(state: Load<T>, onRetry: (() -> Unit)? = null, content: @Composable (T) -> Unit) {
+fun <T> Loaded(state: Load<T>, onRetry: (() -> Unit)? = null, bottomPadding: Dp = 0.dp, content: @Composable (T) -> Unit) {
     when (state) {
-        Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MLoading() }
-        is Load.Failed -> Column(
-            Modifier.fillMaxSize().padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(stringResource(R.string.load_failed), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-            // Without this a failed page stays failed until the app restarts.
-            if (onRetry != null) {
-                MButton(stringResource(R.string.action_try_again), onRetry, kind = ButtonKind.Tonal)
-            }
-        }
+        Load.Loading -> Box(Modifier.fillMaxSize().padding(bottom = bottomPadding), contentAlignment = Alignment.Center) { MLoading() }
+        // Without Try again a failed page stays failed until the app restarts.
+        is Load.Failed -> MessageState(
+            stringResource(R.string.load_failed),
+            error = true,
+            action = onRetry?.let { stringResource(R.string.action_try_again) to it },
+            bottomPadding = bottomPadding,
+        )
         is Load.Ready -> content(state.value)
+    }
+}
+
+/** A centred line of text, and a button under it if there is something to do: empty and failed states. */
+@Composable
+fun MessageState(
+    text: String,
+    modifier: Modifier = Modifier,
+    error: Boolean = false,
+    action: Pair<String, () -> Unit>? = null,
+    bottomPadding: Dp = 0.dp,
+) {
+    Column(
+        modifier.fillMaxSize().padding(bottom = bottomPadding).padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (action != null) MButton(action.first, action.second, kind = ButtonKind.Tonal)
     }
 }
 
@@ -106,11 +130,11 @@ fun CollectionScreen(
     vm: CollectionViewModel = hiltViewModel(),
     actionsVm: ActionsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(id) { vm.load(id, isAlbum) }
+    LaunchedEffect(id, vm) { vm.load(id, isAlbum) }
     val page by vm.page.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
     val haptics = LocalHapticFeedback.current
-    Loaded(page, onRetry = { vm.load(id, isAlbum, force = true) }) { p ->
+    Loaded(page, onRetry = { vm.load(id, isAlbum, force = true) }, bottomPadding = bottomPadding) { p ->
         val pid = p.playlistId ?: if (!isAlbum) id else null
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
@@ -138,6 +162,17 @@ fun CollectionScreen(
                         if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
                         else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))
                     }
+                }
+            }
+            if (p.tracks.isEmpty()) {
+                item(key = "empty") {
+                    Text(
+                        stringResource(R.string.empty_collection),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    )
                 }
             }
             itemsIndexed(p.tracks, key = { i, t -> "$i:${t.videoId}" }) { i, t ->
@@ -175,9 +210,9 @@ fun ArtistScreen(
     vm: ArtistViewModel = hiltViewModel(),
     actionsVm: ActionsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(browseId) { vm.load(browseId) }
+    LaunchedEffect(browseId, vm) { vm.load(browseId) }
     val page by vm.page.collectAsStateWithLifecycle()
-    Loaded(page, onRetry = { vm.load(browseId, force = true) }) { p ->
+    Loaded(page, onRetry = { vm.load(browseId, force = true) }, bottomPadding = bottomPadding) { p ->
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.name, null, null, round = true)
@@ -208,7 +243,8 @@ fun ArtistScreen(
             p.shelves.forEachIndexed { si, shelf ->
                 item(key = "h$si") { SectionHeader(shelf.title) }
                 if (shelf.items.all { it is MusicItem.Song }) {
-                    items(shelf.items.take(5), key = { "s$si:${it.key()}" }) { item ->
+                    // distinctBy as in every other list: a repeated song would reuse a lazy key and crash.
+                    items(shelf.items.distinctBy { it.key() }.take(5), key = { "s$si:${it.key()}" }) { item ->
                         MusicRow(item, onClick = { opener.open(item) }, onLongClick = { onLongPress(item) })
                     }
                 } else {

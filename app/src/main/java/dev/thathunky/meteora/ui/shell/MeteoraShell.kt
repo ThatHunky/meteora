@@ -37,6 +37,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.activity.compose.BackHandler
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -88,7 +92,17 @@ private val tabs = listOf(
 
 @Composable
 fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewModel = hiltViewModel()) {
-    val backStack = rememberNavBackStack(HomeRoute)
+    // One back stack per tab, so switching tabs keeps each tab's opened pages, scroll positions
+    // and view models (Home no longer reloads, Search keeps its results). All are saveable.
+    val stacks: List<NavBackStack<NavKey>> = tabs.map { rememberNavBackStack(it.route) }
+    var tabIndex by rememberSaveable { mutableIntStateOf(0) }
+    val backStack = stacks[tabIndex]
+    // Read at call time, so callbacks made in an earlier composition still act on the current tab.
+    val push: (Route) -> Unit = { route ->
+        val s = stacks[tabIndex]
+        // A quick double tap would otherwise open the same page twice.
+        if (s.lastOrNull() != route) s.add(route)
+    }
     val connection by vm.connection.collectAsStateWithLifecycle()
     val hasPlayer by vm.hasTrack.collectAsStateWithLifecycle()
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
@@ -102,11 +116,11 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
 
     val needsPairing = connection == ConnectionState.Unpaired || connection == ConnectionState.Unauthorized
     LaunchedEffect(needsPairing) {
-        if (needsPairing && backStack.lastOrNull() != PairingRoute) backStack.add(PairingRoute)
+        if (needsPairing) push(PairingRoute)
     }
 
     val inPairing = backStack.lastOrNull() == PairingRoute || backStack.lastOrNull() == SignInRoute
-    val currentTab = tabs.firstOrNull { it.route == backStack.firstOrNull() } ?: tabs.first()
+    val currentTab = tabs[tabIndex]
     var playerExpanded by rememberSaveable { mutableStateOf(false) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
     var sheetFor by remember { mutableStateOf<MusicItem?>(null) }
@@ -126,13 +140,75 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
     val opener = Opener { item ->
         when (item) {
             is MusicItem.Song -> actions.play(item)
-            is MusicItem.Album -> backStack.add(AlbumRoute(item.browseId))
-            is MusicItem.Playlist -> backStack.add(PlaylistRoute(item.playlistId))
-            is MusicItem.Artist -> backStack.add(ArtistRoute(item.browseId))
+            is MusicItem.Album -> push(AlbumRoute(item.browseId))
+            is MusicItem.Playlist -> push(PlaylistRoute(item.playlistId))
+            is MusicItem.Artist -> push(ArtistRoute(item.browseId))
         }
     }
     val longPress: (MusicItem) -> Unit = { sheetFor = it }
-    val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) }
+    val goBack: () -> Unit = {
+        val s = stacks[tabIndex]
+        if (s.size > 1) s.removeAt(s.lastIndex)
+    }
+    // Pairing and sign-in are removed by key: popping "the last entry" would take the wrong page
+    // if something else had been pushed on top meanwhile, or empty a stack.
+    val leave: (Route) -> Unit = { route -> stacks.forEach { s -> if (s.size > 1) s.removeAll { it == route } } }
+
+    // Back on another tab's first page goes to Home, as in the official app, instead of leaving.
+    BackHandler(enabled = tabIndex != 0 && backStack.size == 1 && !playerExpanded) { tabIndex = 0 }
+
+    val provider = entryProvider<NavKey> {
+        entry<HomeRoute> {
+            HomeScreen(opener, longPress, onSignIn = { push(SignInRoute) }, contentBottom, header = {
+                if (connection !is ConnectionState.Connected && connection != ConnectionState.Local) ConnectionBanner(connection) { vm.reconnect() }
+            })
+        }
+        entry<SearchRoute> { SearchScreen(opener, longPress, contentBottom) }
+        entry<LibraryRoute> {
+            LibraryScreen(
+                opener, longPress,
+                onSignIn = { push(SignInRoute) },
+                onPlayLiked = { shuffle, ids ->
+                    if (shuffle) actions.shuffleCollection("LM", ids)
+                    else ids.firstOrNull()?.let { actions.playCollectionTrack("LM", it) }
+                },
+                bottomPadding = contentBottom,
+            )
+        }
+        entry<SignInRoute> { SignInScreen(onDone = { leave(SignInRoute) }) }
+        entry<AlbumRoute> { r -> CollectionScreen(r.browseId, isAlbum = true, opener, longPress, contentBottom) }
+        entry<PlaylistRoute> { r -> CollectionScreen(r.playlistId, isAlbum = false, opener, longPress, contentBottom) }
+        entry<ArtistRoute> { r -> ArtistScreen(r.browseId, opener, longPress, contentBottom) }
+        entry<SettingsRoute> { SettingsScreen(vm, push, contentBottom) }
+        entry<SettingsAppearanceRoute> { AppearanceSettingsScreen(goBack, contentBottom) }
+        entry<SettingsPlaybackRoute> { PlaybackSettingsScreen(vm, goBack, contentBottom) }
+        entry<SettingsAccountRoute> { AccountSettingsScreen(vm, push, goBack, contentBottom) }
+        entry<SettingsPcRoute> { PcSettingsScreen(vm, push, goBack, contentBottom) }
+        entry<SettingsAboutRoute> { AboutSettingsScreen(goBack, contentBottom) }
+        entry<PairingRoute> {
+            // Back to where pairing was opened from: Home on first start, Settings → PC on re-pair.
+            PairingScreen(
+                onDone = { leave(PairingRoute) },
+                onSkip = {
+                    vm.setTarget(dev.thathunky.meteora.data.PlaybackTarget.Phone)
+                    leave(PairingRoute)
+                },
+            )
+        }
+    }
+    // Each tab's entries keep their saved state and view models while another tab shows; they are
+    // dropped only when popped from their own stack. The tab is part of the content key, so the
+    // same album open in two tabs gets two states and two view models.
+    val entries = stacks.mapIndexed { i, stack ->
+        rememberDecoratedNavEntries(
+            backStack = stack,
+            entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()),
+            entryProvider = { key ->
+                val e = provider(key)
+                NavEntry(key, contentKey = "$i:${e.contentKey}", metadata = e.metadata) { e.Content() }
+            },
+        )
+    }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -140,13 +216,13 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 if (!inPairing) {
                     val items = tabs.map { NavItem(stringResource(it.label), it.icon) }
                     // With a track, the mini player row is the top of the dock and carries its corners.
-                    MeteoraNavBar(items, tabs.indexOf(currentTab), top = !hasPlayer, onSelect = { i ->
-                        val tab = tabs[i]
-                        if (tab != currentTab) {
-                            backStack.clear()
-                            backStack.add(tab.route)
-                        } else if (backStack.size > 1) {
-                            while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                    MeteoraNavBar(items, tabIndex, top = !hasPlayer, onSelect = { i ->
+                        if (i != tabIndex) {
+                            tabIndex = i
+                        } else {
+                            // The selected tab again: back to its first page.
+                            val s = stacks[i]
+                            while (s.size > 1) s.removeAt(s.lastIndex)
                         }
                     })
                 }
@@ -154,52 +230,9 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         ) { padding ->
             bottomBarHeight = padding.calculateBottomPadding()
             NavDisplay(
-                backStack = backStack,
-                onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+                entries = entries[tabIndex],
+                onBack = goBack,
                 modifier = Modifier.padding(padding),
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()),
-                entryProvider = entryProvider {
-                    entry<HomeRoute> {
-                        HomeScreen(opener, longPress, onSignIn = { backStack.add(SignInRoute) }, contentBottom, header = {
-                            if (connection !is ConnectionState.Connected && connection != ConnectionState.Local) ConnectionBanner(connection) { vm.reconnect() }
-                        })
-                    }
-                    entry<SearchRoute> { SearchScreen(opener, longPress, contentBottom) }
-                    entry<LibraryRoute> {
-                        LibraryScreen(
-                            opener, longPress,
-                            onSignIn = { backStack.add(SignInRoute) },
-                            onPlayLiked = { shuffle, ids ->
-                                if (shuffle) actions.shuffleCollection("LM", ids)
-                                else ids.firstOrNull()?.let { actions.playCollectionTrack("LM", it) }
-                            },
-                            bottomPadding = contentBottom,
-                        )
-                    }
-                    entry<SignInRoute> { SignInScreen(onDone = { backStack.removeAt(backStack.lastIndex) }) }
-                    entry<AlbumRoute> { r -> CollectionScreen(r.browseId, isAlbum = true, opener, longPress, contentBottom) }
-                    entry<PlaylistRoute> { r -> CollectionScreen(r.playlistId, isAlbum = false, opener, longPress, contentBottom) }
-                    entry<ArtistRoute> { r -> ArtistScreen(r.browseId, opener, longPress, contentBottom) }
-                    entry<SettingsRoute> { SettingsScreen(vm, backStack, contentBottom) }
-                    entry<SettingsAppearanceRoute> { AppearanceSettingsScreen(goBack, contentBottom) }
-                    entry<SettingsPlaybackRoute> { PlaybackSettingsScreen(vm, goBack, contentBottom) }
-                    entry<SettingsAccountRoute> { AccountSettingsScreen(vm, backStack, goBack, contentBottom) }
-                    entry<SettingsPcRoute> { PcSettingsScreen(vm, backStack, goBack, contentBottom) }
-                    entry<SettingsAboutRoute> { AboutSettingsScreen(goBack, contentBottom) }
-                    entry<PairingRoute> {
-                        PairingScreen(
-                            onDone = {
-                                backStack.clear()
-                                backStack.add(HomeRoute)
-                            },
-                            onSkip = {
-                                vm.setTarget(dev.thathunky.meteora.data.PlaybackTarget.Phone)
-                                backStack.clear()
-                                backStack.add(HomeRoute)
-                            },
-                        )
-                    }
-                },
             )
         }
         if (!inPairing) {
@@ -210,11 +243,11 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 // The player covers the pages: collapse it so the opened page shows.
                 onOpenAlbum = { id ->
                     playerExpanded = false
-                    backStack.add(AlbumRoute(id))
+                    push(AlbumRoute(id))
                 },
                 onOpenArtist = { id ->
                     playerExpanded = false
-                    backStack.add(ArtistRoute(id))
+                    push(ArtistRoute(id))
                 },
                 onRadio = actions::radioFromCurrent,
                 modifier = Modifier.fillMaxSize(),
@@ -233,8 +266,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     ItemAction.AddToQueue -> actions.addToQueue(item)
                     ItemAction.Radio -> actions.radio(item)
                     ItemAction.Share -> context.share(item)
-                    ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { backStack.add(AlbumRoute(it)) }
-                    ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { backStack.add(ArtistRoute(it)) }
+                    ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { push(AlbumRoute(it)) }
+                    ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { push(ArtistRoute(it)) }
                 }
             },
             onDismiss = { sheetFor = null },

@@ -39,7 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.thathunky.meteora.R
-import dev.thathunky.meteora.ui.components.MLoading
+import dev.thathunky.meteora.ui.components.SectionHeader
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.YtmClient
@@ -56,7 +61,18 @@ fun SearchScreen(
     val results by vm.results.collectAsStateWithLifecycle()
     val filter by vm.filter.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val look = LocalLook.current
+    // The field must not keep focus once the person has moved on: a focused field brings the
+    // keyboard back whenever the screen regains focus (back from a page, the player closed).
+    val dismissKeyboard: () -> Unit = {
+        focus.clearFocus(force = true)
+        keyboard?.hide()
+    }
+    val open: (MusicItem) -> Unit = { item ->
+        dismissKeyboard()
+        opener.open(item)
+    }
 
     // The view model decides when there are suggestions to show (none for the submitted query).
     LaunchedEffect(field) {
@@ -72,7 +88,7 @@ fun SearchScreen(
             shape = if (look.pills) RoundedCornerShape(28.dp) else RoundedCornerShape(look.cornerSmall),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             onKeyboardAction = {
-                focus.clearFocus()
+                dismissKeyboard()
                 vm.submit(field.text.toString())
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = look.screenPadding, vertical = 8.dp),
@@ -81,24 +97,30 @@ fun SearchScreen(
             items(YtmClient.SearchFilter.entries.toList()) { f ->
                 FilterChip(
                     selected = f == filter,
-                    onClick = { vm.setFilter(f) },
+                    onClick = {
+                        dismissKeyboard()
+                        vm.setFilter(f)
+                    },
                     label = { Text(stringResource(f.label())) },
                 )
             }
         }
 
         if (suggestions.isNotEmpty()) {
-            LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
+            val suggestionsState = rememberLazyListState()
+            HideKeyboardOnScroll(suggestionsState, dismissKeyboard)
+            LazyColumn(state = suggestionsState, contentPadding = PaddingValues(bottom = bottomPadding)) {
                 items(suggestions) { s ->
                     ListItem(
                         headlineContent = { Text(s) },
                         leadingContent = { Icon(Icons.Outlined.Search, null) },
                         trailingContent = { Icon(Icons.Outlined.NorthWest, null) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         modifier = Modifier.clickable {
                             // Submit first, so the text change below is already the submitted query.
                             vm.submit(s)
                             field.setTextAndPlaceCursorAtEnd(s)
-                            focus.clearFocus()
+                            dismissKeyboard()
                         },
                     )
                 }
@@ -107,30 +129,37 @@ fun SearchScreen(
         }
 
         when (val r = results) {
-            null -> Unit
-            Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MLoading() }
-            is Load.Failed -> Text(
-                stringResource(R.string.load_failed),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(24.dp),
-            )
-            is Load.Ready -> LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
-                r.value.top?.let { top ->
-                    item(key = "top") {
-                        Text(
-                            stringResource(R.string.top_result),
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(start = 16.dp, top = 12.dp),
-                        )
-                        MusicRow(top, onClick = { opener.open(top) }, onLongClick = { onLongPress(top) }, showType = true)
-                    }
+            null -> MessageState(stringResource(R.string.search_start), bottomPadding = bottomPadding)
+            else -> Loaded(r, onRetry = vm::retry, bottomPadding = bottomPadding) { found ->
+                val topKey = found.top?.key()
+                val rest = found.items.distinctBy { it.key() }.filter { it.key() != topKey }
+                if (found.top == null && rest.isEmpty()) {
+                    MessageState(stringResource(R.string.search_no_results, vm.submittedQuery.orEmpty()), bottomPadding = bottomPadding)
+                    return@Loaded
                 }
-                val topKey = r.value.top?.key()
-                items(r.value.items.distinctBy { it.key() }.filter { it.key() != topKey }, key = { it.key() }) { item ->
-                    MusicRow(item, onClick = { opener.open(item) }, onLongClick = { onLongPress(item) }, modifier = Modifier.animateItem(), showType = true)
+                val resultsState = rememberLazyListState()
+                HideKeyboardOnScroll(resultsState, dismissKeyboard)
+                LazyColumn(state = resultsState, contentPadding = PaddingValues(bottom = bottomPadding)) {
+                    found.top?.let { top ->
+                        item(key = "top") {
+                            SectionHeader(stringResource(R.string.top_result))
+                            MusicRow(top, onClick = { open(top) }, onLongClick = { onLongPress(top) }, showType = true)
+                        }
+                    }
+                    items(rest, key = { it.key() }) { item ->
+                        MusicRow(item, onClick = { open(item) }, onLongClick = { onLongPress(item) }, modifier = Modifier.animateItem(), showType = true)
+                    }
                 }
             }
         }
+    }
+}
+
+/** Scrolling a list means reading it, not typing: put the keyboard away. */
+@Composable
+private fun HideKeyboardOnScroll(state: LazyListState, hide: () -> Unit) {
+    LaunchedEffect(state) {
+        snapshotFlow { state.isScrollInProgress }.collect { if (it) hide() }
     }
 }
 

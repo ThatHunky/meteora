@@ -60,7 +60,9 @@ import dev.thathunky.meteora.ui.components.SegmentedChoice
 import dev.thathunky.meteora.ui.components.screenTitleStyle
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ui.settings.SettingsCategory
-import dev.thathunky.meteora.ui.settings.currentThemeName
+import dev.thathunky.meteora.ui.settings.currentAppearanceSummary
+import dev.thathunky.meteora.ui.settings.SettingsGroupTitle
+import androidx.compose.ui.text.style.TextOverflow
 import dev.thathunky.meteora.ui.settings.settingsCategories
 
 private fun SettingsCategory.route(): Route = when (this) {
@@ -90,16 +92,16 @@ private fun SettingsCategory.icon(): ImageVector = when (this) {
 /** The top-level list: one row per category with a line about its current state. */
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPadding: Dp) {
+fun SettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, bottomPadding: Dp) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     val target by vm.target.collectAsStateWithLifecycle()
     val signedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
-    val themeName = currentThemeName()
+    val appearance = currentAppearanceSummary()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp).padding(bottom = bottomPadding)) {
         PageTitle(stringResource(R.string.nav_settings))
         settingsCategories().forEach { c ->
             val summary = when (c) {
-                SettingsCategory.Appearance -> themeName
+                SettingsCategory.Appearance -> appearance
                 SettingsCategory.Playback ->
                     if (target == PlaybackTarget.Phone) stringResource(R.string.target_phone)
                     else pc?.name ?: stringResource(R.string.target_pc)
@@ -111,7 +113,7 @@ fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPa
                 headline = stringResource(c.title()),
                 supporting = summary,
                 leading = { Icon(c.icon(), contentDescription = null) },
-                modifier = Modifier.clickable { backStack.add(c.route()) },
+                modifier = Modifier.clickable { open(c.route()) },
             )
         }
     }
@@ -123,7 +125,7 @@ private fun SettingsPage(title: Int, onBack: () -> Unit, bottomPadding: Dp, cont
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             MIconButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back), onBack, text = stringResource(R.string.action_back))
-            Text(stringResource(title), style = screenTitleStyle(), modifier = Modifier.padding(start = 4.dp))
+            Text(stringResource(title), style = screenTitleStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp))
         }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = LocalLook.current.screenPadding).padding(bottom = 16.dp + bottomPadding),
@@ -146,9 +148,9 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
     val qualityMobile by vm.qualityMobile.collectAsStateWithLifecycle()
     val autoplay by vm.autoplay.collectAsStateWithLifecycle()
     SettingsPage(R.string.settings_playback, onBack, bottomPadding) {
-        ListItem(headlineContent = { Text(stringResource(R.string.play_on)) })
+        SettingsGroupTitle(stringResource(R.string.play_on), first = true)
         TargetSelector(target, pc?.name, vm::setTarget, Modifier.fillMaxWidth())
-        Text(stringResource(R.string.quality_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+        SettingsGroupTitle(stringResource(R.string.quality_title))
         Text(stringResource(R.string.quality_wifi), style = MaterialTheme.typography.labelLarge)
         QualitySelector(qualityWifi, vm::setQualityWifi, Modifier.fillMaxWidth())
         Text(stringResource(R.string.quality_mobile), style = MaterialTheme.typography.labelLarge)
@@ -171,15 +173,13 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack: () -> Unit, bottomPadding: Dp) {
+fun AccountSettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, onBack: () -> Unit, bottomPadding: Dp) {
     val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
     SettingsPage(R.string.ytm_account, onBack, bottomPadding) {
-        ListItem(
-            headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
-            overlineContent = { Text(stringResource(R.string.ytm_account)) },
-        )
+        // The page title already names the account; the state is what this page is about.
+        StatusBlock(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out))
         if (ytmSignedIn) MButton(stringResource(R.string.signout_action), vm::signOutYtm, kind = ButtonKind.Outlined)
-        else MButton(stringResource(R.string.signin_action), { backStack.add(SignInRoute) })
+        else MButton(stringResource(R.string.signin_action), { open(SignInRoute) })
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
@@ -191,15 +191,11 @@ fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, o
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun PcSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack: () -> Unit, bottomPadding: Dp) {
+fun PcSettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, onBack: () -> Unit, bottomPadding: Dp) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     SettingsPage(R.string.settings_pc, onBack, bottomPadding) {
-        ListItem(
-            headlineContent = { Text(pc?.name ?: stringResource(R.string.not_connected)) },
-            supportingContent = { Text(pc?.preferredOrder()?.joinToString(" · ").orEmpty()) },
-            overlineContent = { Text(stringResource(R.string.settings_pc)) },
-        )
-        MButton(stringResource(R.string.settings_repair), { backStack.add(PairingRoute) })
+        StatusBlock(pc?.name ?: stringResource(R.string.not_connected), pc?.preferredOrder()?.joinToString(" · "))
+        MButton(stringResource(R.string.settings_repair), { open(PairingRoute) })
         MButton(stringResource(R.string.settings_forget), vm::forgetPc, kind = ButtonKind.Outlined)
         Text(
             stringResource(R.string.settings_forget_note),
@@ -212,13 +208,27 @@ fun PcSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack
 @Composable
 fun AboutSettingsScreen(onBack: () -> Unit, bottomPadding: Dp) =
     SettingsPage(R.string.settings_about, onBack, bottomPadding) {
-        ListItem(headlineContent = { Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)) })
+        StatusBlock(stringResource(R.string.app_name),stringResource(R.string.settings_version, BuildConfig.VERSION_NAME))
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+
+/**
+ * The current state at the top of a sub-screen (signed in, the paired PC), aligned with the
+ * rest of the page; a ListItem there added its own 16 dp inset on top of the page's.
+ */
+@Composable
+private fun StatusBlock(headline: String, supporting: String? = null) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)) {
+        Text(headline, style = MaterialTheme.typography.titleMedium)
+        if (!supporting.isNullOrBlank()) {
+            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 /** Low / Normal / High, in the official app's order. */
 @Composable

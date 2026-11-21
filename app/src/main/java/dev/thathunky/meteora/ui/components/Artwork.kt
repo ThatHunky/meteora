@@ -58,13 +58,14 @@ private fun shapeFor(look: Look, kind: ArtKind, scalloped: Boolean, current: Boo
         else -> RoundedCornerShape(8.dp)
     }
     LookId.Retro -> RoundedCornerShape(2.dp)
+    // From the look's tokens, so Soft's corners follow them.
     LookId.Soft -> when (kind) {
         ArtKind.Artist -> CircleShape
-        ArtKind.Album, ArtKind.Mini -> if (scalloped) MaterialShapes.Cookie9Sided.toShape() else RoundedCornerShape(16.dp)
-        ArtKind.Hero -> if (scalloped) MaterialShapes.Cookie12Sided.toShape() else RoundedCornerShape(32.dp)
-        ArtKind.Card, ArtKind.Player -> RoundedCornerShape(32.dp)
-        ArtKind.Queue -> RoundedCornerShape(if (current) 28.dp else 16.dp)
-        else -> RoundedCornerShape(16.dp)
+        ArtKind.Album, ArtKind.Mini -> if (scalloped) MaterialShapes.Cookie9Sided.toShape() else RoundedCornerShape(look.cornerSmall)
+        ArtKind.Hero -> if (scalloped) MaterialShapes.Cookie12Sided.toShape() else RoundedCornerShape(look.cornerLarge)
+        ArtKind.Card, ArtKind.Player -> RoundedCornerShape(look.cornerLarge)
+        ArtKind.Queue -> RoundedCornerShape(if (current) look.cornerMedium else look.cornerSmall)
+        else -> RoundedCornerShape(look.cornerSmall)
     }
 }
 

@@ -57,6 +57,12 @@
     <string name="search_hint">Пісні, альбоми, виконавці</string>
     <string name="top_result">Найкращий результат</string>
     <string name="load_failed">Не вдалося завантажити. Перевірте з’єднання і спробуйте ще.</string>
+    <string name="search_start">Шукайте пісні, альбоми, виконавців і плейлисти.</string>
+    <string name="search_no_results">За запитом «%1$s» нічого не знайдено.</string>
+    <string name="empty_home">Тут поки нічого немає. Потягніть униз, щоб оновити.</string>
+    <string name="empty_liked">Тут з’являться пісні, які вам сподобались.</string>
+    <string name="empty_playlists">Тут з’являться ваші плейлисти.</string>
+    <string name="empty_collection">Тут немає треків.</string>
     <string name="filter_all">Усе</string>
     <string name="filter_songs">Пісні</string>
     <string name="filter_albums">Альбоми</string>
@@ -123,6 +129,8 @@
     <string name="style_flat">Плаский</string>
     <string name="style_retro">Ретро</string>
     <string name="style_soft">М’який</string>
+    <string name="appearance_artwork_fixed">Стиль «%1$s» задає власну форму.</string>
+    <string name="appearance_fixed_theme">Ця тема має власні режим і тло.</string>
     <!-- Settings categories -->
     <string name="settings_playback">Відтворення</string>
     <string name="settings_about">Про застосунок</string>

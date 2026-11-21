@@ -44,7 +44,7 @@ fun ColumnScope.VideoQualitySection(vm: VideoQualityViewModel = hiltViewModel())
         Choice(VideoQuality.High, stringResource(R.string.video_quality_high)),
         Choice(VideoQuality.Highest, stringResource(R.string.video_quality_highest)),
     )
-    Text(stringResource(R.string.video_quality), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+    SettingsGroupTitle(stringResource(R.string.video_quality))
     Text(stringResource(R.string.quality_wifi), style = MaterialTheme.typography.labelLarge)
     SegmentedChoice(options, wifi, vm::setWifi, Modifier.fillMaxWidth())
     Text(stringResource(R.string.quality_mobile), style = MaterialTheme.typography.labelLarge)

@@ -34,6 +34,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ui.theme.LookId
 
@@ -105,7 +108,40 @@ fun MRow(
     }
 }
 
+/**
+ * The height one two-line [MRow] takes, gap included, at the current font scale. For containers
+ * that must be given a height (the Home quick-picks grid): the look's row height alone is too
+ * small when the two lines of text are taller than it (Terminal's 48 dp, or a large font).
+ */
+@Composable
+fun rowSlotHeight(): androidx.compose.ui.unit.Dp {
+    val look = LocalLook.current
+    val type = MaterialTheme.typography
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val text = with(density) { type.bodyLarge.lineHeight.toDp() + type.bodyMedium.lineHeight.toDp() }
+    // ListItem pads 8 dp above and below; the plain row pads its text column by 4 dp.
+    val padding = if (look.id == LookId.Expressive) 16.dp else 8.dp
+    return maxOf(look.rowHeight, text + padding) + look.rowGap
+}
+
 data class Choice<T>(val value: T, val label: String, val icon: ImageVector? = null)
+
+/** A choice's label on one line: shrinks a little before it ellipsizes ("Як у системі" in a third of the width). */
+@Composable
+private fun ChoiceLabel(text: String, style: androidx.compose.ui.text.TextStyle, color: Color = Color.Unspecified) {
+    Text(
+        text,
+        style = style,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(
+            minFontSize = 10.sp,
+            maxFontSize = style.fontSize,
+            stepSize = 0.5.sp,
+        ),
+    )
+}
 
 /** A row of mutually exclusive options (mode, quality, target), drawn the look's way. */
 @Composable
@@ -136,18 +172,21 @@ fun <T> SegmentedChoice(
                         LookId.Flat -> RoundedCornerShape(8.dp).let { ToggleButtonShapes(it, it, it) }
                         else -> ToggleButtonShapes(CircleShape, CircleShape, CircleShape)
                     }
-                    ToggleButton(
-                        checked = selected == o.value,
-                        onCheckedChange = { if (it) onSelect(o.value) },
-                        enabled = enabled,
-                        shapes = shapes,
-                        modifier = Modifier.weight(1f).then(if (look.id == LookId.Soft) Modifier.heightIn(min = 52.dp) else Modifier),
-                    ) {
+                    val checked = selected == o.value
+                    val onChecked: (Boolean) -> Unit = { if (it) onSelect(o.value) }
+                    val mod = Modifier.weight(1f).then(if (look.id == LookId.Soft) Modifier.heightIn(min = 52.dp) else Modifier)
+                    val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
                         if (o.icon != null) {
                             Icon(o.icon, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text(o.label, maxLines = 1)
+                        ChoiceLabel(o.label, MaterialTheme.typography.labelLarge)
+                    }
+                    if (options.size > 2) {
+                        // The default 16 dp a side leaves too little for a label once there are three or more.
+                        ToggleButton(checked = checked, onCheckedChange = onChecked, modifier = mod, enabled = enabled, shapes = shapes, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), content = content)
+                    } else {
+                        ToggleButton(checked = checked, onCheckedChange = onChecked, modifier = mod, enabled = enabled, shapes = shapes, content = content)
                     }
                 }
             }
@@ -166,12 +205,10 @@ fun <T> SegmentedChoice(
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
+                    ChoiceLabel(
                         (if (on) "* " else "") + lookLabel(o.label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (on) scheme.surface else scheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        MaterialTheme.typography.labelLarge,
+                        if (on) scheme.surface else scheme.onSurface,
                     )
                 }
             }
@@ -192,13 +229,7 @@ fun <T> SegmentedChoice(
                         .padding(horizontal = 6.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        lookLabel(o.label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (on) scheme.onPrimary else scheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    ChoiceLabel(lookLabel(o.label), MaterialTheme.typography.labelLarge, if (on) scheme.onPrimary else scheme.onSurface)
                 }
             }
         }
