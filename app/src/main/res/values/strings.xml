@@ -10,6 +10,8 @@
     <string name="action_play">Play</string>
     <string name="action_pause">Pause</string>
     <string name="action_collapse">Collapse player</string>
+    <string name="type_song">Song</string>
+    <string name="type_video">Video</string>
     <string name="action_next">Next</string>
     <string name="action_previous">Previous</string>
     <string name="action_try_again">Try again</string>

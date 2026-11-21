@@ -119,12 +119,12 @@ fun SearchScreen(
                             style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.padding(start = 16.dp, top = 12.dp),
                         )
-                        MusicRow(top, onClick = { opener.open(top) }, onLongClick = { onLongPress(top) })
+                        MusicRow(top, onClick = { opener.open(top) }, onLongClick = { onLongPress(top) }, showType = true)
                     }
                 }
                 val topKey = r.value.top?.key()
                 items(r.value.items.distinctBy { it.key() }.filter { it.key() != topKey }, key = { it.key() }) { item ->
-                    MusicRow(item, onClick = { opener.open(item) }, onLongClick = { onLongPress(item) }, modifier = Modifier.animateItem())
+                    MusicRow(item, onClick = { opener.open(item) }, onLongClick = { onLongPress(item) }, modifier = Modifier.animateItem(), showType = true)
                 }
             }
         }

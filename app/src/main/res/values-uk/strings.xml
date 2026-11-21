@@ -9,6 +9,8 @@
     <string name="action_play">Відтворити</string>
     <string name="action_pause">Пауза</string>
     <string name="action_collapse">Згорнути програвач</string>
+    <string name="type_song">Пісня</string>
+    <string name="type_video">Відео</string>
     <string name="action_next">Далі</string>
     <string name="action_previous">Назад</string>
     <string name="action_try_again">Спробувати ще</string>

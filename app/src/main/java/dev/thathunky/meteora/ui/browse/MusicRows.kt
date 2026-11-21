@@ -51,14 +51,26 @@ fun MusicItem.subtitleText(): String = when (this) {
     is MusicItem.Playlist -> subtitle
 }
 
+/**
+ * The subtitle with the kind in front ("Song • …"), for places where kinds are mixed: a tap on
+ * a song plays it, a tap on an album opens it, and the two look alike. Albums, singles and
+ * playlists already name their kind in the subtitle YouTube sends.
+ */
+@Composable
+fun MusicItem.typedSubtitle(): String = when (this) {
+    is MusicItem.Song -> listOf(stringResource(if (isVideo) R.string.type_video else R.string.type_song), subtitleText())
+        .filter { it.isNotBlank() }.joinToString(" • ")
+    else -> subtitleText()
+}
+
 /** A list row for any item. Tap: songs play, collections open. Long-press: actions sheet. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MusicRow(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
+fun MusicRow(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier, showType: Boolean = false) {
     val haptics = LocalHapticFeedback.current
     ListItem(
         headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(item.subtitleText(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(if (showType) item.typedSubtitle() else item.subtitleText(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
             AsyncImage(
                 model = item.thumbnail,
@@ -107,7 +119,7 @@ fun MusicCard(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, mod
         Spacer(Modifier.height(8.dp))
         Text(item.title, style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(
-            item.subtitleText(),
+            item.typedSubtitle(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
