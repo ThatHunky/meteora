@@ -130,4 +130,11 @@
     <string name="video_quality_high">720p</string>
     <string name="video_quality_highest">1080p</string>
     <string name="video_quality_note">Для перемикача «Відео» на екрані «Зараз грає». Звук зберігає свою якість. Зміна діє з наступного відео.</string>
+    <string name="action_lyrics">Текст</string>
+    <string name="action_close_lyrics">Закрити текст</string>
+    <string name="lyrics_none">Для цього треку немає тексту</string>
+    <string name="lyrics_not_synced">Цей текст не синхронізований</string>
+    <string name="lyrics_source">Джерело: %s</string>
+    <string name="lyrics_error">Не вдалося завантажити текст</string>
+    <string name="action_retry">Спробувати ще</string>
 </resources>

@@ -131,4 +131,11 @@
     <string name="video_quality_high">720p</string>
     <string name="video_quality_highest">1080p</string>
     <string name="video_quality_note">For the Video switch in Now Playing. The sound keeps its own quality. A change applies from the next video.</string>
+    <string name="action_lyrics">Lyrics</string>
+    <string name="action_close_lyrics">Close lyrics</string>
+    <string name="lyrics_none">No lyrics for this track</string>
+    <string name="lyrics_not_synced">These lyrics are not synced</string>
+    <string name="lyrics_source">Source: %s</string>
+    <string name="lyrics_error">Could not load the lyrics</string>
+    <string name="action_retry">Try again</string>
 </resources>
