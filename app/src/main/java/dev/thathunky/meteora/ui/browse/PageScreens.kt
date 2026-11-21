@@ -134,7 +134,7 @@ fun CollectionScreen(
     val page by vm.page.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
     val haptics = LocalHapticFeedback.current
-    Loaded(page, onRetry = { vm.load(id, isAlbum, force = true) }) { p ->
+    Loaded(page, onRetry = { vm.load(id, isAlbum, force = true) }, bottomPadding = bottomPadding) { p ->
         val pid = p.playlistId ?: if (!isAlbum) id else null
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
@@ -162,6 +162,17 @@ fun CollectionScreen(
                         if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
                         else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))
                     }
+                }
+            }
+            if (p.tracks.isEmpty()) {
+                item(key = "empty") {
+                    Text(
+                        stringResource(R.string.empty_collection),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    )
                 }
             }
             itemsIndexed(p.tracks, key = { i, t -> "$i:${t.videoId}" }) { i, t ->
@@ -201,7 +212,7 @@ fun ArtistScreen(
 ) {
     LaunchedEffect(browseId, vm) { vm.load(browseId) }
     val page by vm.page.collectAsStateWithLifecycle()
-    Loaded(page, onRetry = { vm.load(browseId, force = true) }) { p ->
+    Loaded(page, onRetry = { vm.load(browseId, force = true) }, bottomPadding = bottomPadding) { p ->
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.name, null, null, round = true)

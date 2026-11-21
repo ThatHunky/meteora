@@ -14,6 +14,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import dev.thathunky.meteora.ui.components.SectionHeader
+import dev.thathunky.meteora.ui.theme.LocalLook
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -93,20 +110,31 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
     val theme = themeById(themeId)
     val systemDark = isSystemInDarkTheme()
     val fixed = theme is AppTheme.Fixed
+    val look = effectiveLook(theme, lookOverride)
+    val gutter = LocalLook.current.screenPadding
 
     // The sub-screen's header carries the "Appearance" title.
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.appearance_theme), style = MaterialTheme.typography.labelLarge)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        SettingsGroupTitle(stringResource(R.string.appearance_theme), first = true)
+        // Opens on the chosen theme (one card before it shows too), so it is never off-screen.
+        val cards = rememberLazyListState(initialFirstVisibleItemIndex = (AllThemes.indexOfFirst { it.id == theme.id } - 1).coerceAtLeast(0))
+        // Edge to edge, with the screen padding as content padding: cards run off the side of the
+        // screen, and the end fades while more are left, so it reads as a row that scrolls.
+        LazyRow(
+            state = cards,
+            contentPadding = PaddingValues(horizontal = gutter),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.bleed(gutter).fadeEnd(cards, 48.dp),
+        ) {
             items(AllThemes, key = { it.id }) { t ->
                 ThemeCard(t, effectiveLook(t, lookOverride), selected = t.id == theme.id, mode = mode, pureBlack = pureBlack, systemDark = systemDark) {
                     vm.setTheme(t.id)
                 }
             }
         }
-        Text(stringResource(R.string.appearance_style), style = MaterialTheme.typography.labelLarge)
+        SettingsGroupTitle(stringResource(R.string.appearance_style))
         StyleRow(lookOverride, vm::setLook)
-        Text(stringResource(R.string.appearance_mode), style = MaterialTheme.typography.labelLarge)
+        SettingsGroupTitle(stringResource(R.string.appearance_mode))
         // A fixed theme is the mode it was made for, so the choice has no effect then.
         Segmented(
             options = listOf(
@@ -119,18 +147,10 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
             enabled = !fixed,
         )
         val pureBlackEnabled = !fixed && isDark(theme, mode, systemDark)
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.appearance_pure_black)) },
-            trailingContent = { Switch(checked = pureBlack, onCheckedChange = null, enabled = pureBlackEnabled) },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.toggleable(
-                value = pureBlack,
-                enabled = pureBlackEnabled,
-                role = Role.Switch,
-                onValueChange = vm::setPureBlack,
-            ),
-        )
-        Text(stringResource(R.string.appearance_artwork), style = MaterialTheme.typography.labelLarge)
+        SettingsSwitchRow(stringResource(R.string.appearance_pure_black), pureBlack, vm::setPureBlack, enabled = pureBlackEnabled)
+        // Say why the two controls above do nothing, rather than only greying them out.
+        if (fixed) SettingsNote(stringResource(R.string.appearance_fixed_theme))
+        SettingsGroupTitle(stringResource(R.string.appearance_artwork))
         Segmented(
             options = listOf(
                 ArtworkShape.Rounded to stringResource(R.string.artwork_rounded),
@@ -139,10 +159,73 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
             selected = artwork,
             onSelect = vm::setArtworkShape,
             // Shown but fixed while the look decides the shape itself.
-            enabled = effectiveLook(theme, lookOverride).artworkSetting,
+            enabled = look.artworkSetting,
         )
+        if (!look.artworkSetting) SettingsNote(stringResource(R.string.appearance_artwork_fixed, stringResource(lookName(look.id))))
     }
 }
+
+/** A group title on a Settings sub-screen, in the look's section header style, aligned with the page's content. */
+@Composable
+fun SettingsGroupTitle(text: String, first: Boolean = false) =
+    SectionHeader(text, padding = PaddingValues(top = if (first) 4.dp else 16.dp))
+
+/** Small grey text under a control: what it does, or why it is disabled. */
+@Composable
+fun SettingsNote(text: String) =
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+/** A label and a switch, the whole row toggling it, aligned with the page's content (a ListItem adds its own inset). */
+@Composable
+fun SettingsSwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true, supporting: String? = null) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            val c = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = c)
+            if (supporting != null) SettingsNote(supporting)
+        }
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+/** The theme name and the look in force, for the Settings list: "Nord · Flat". */
+@Composable
+fun currentAppearanceSummary(vm: AppearanceViewModel = hiltViewModel()): String {
+    val id by vm.themeId.collectAsStateWithLifecycle()
+    val override by vm.look.collectAsStateWithLifecycle()
+    val theme = themeById(id)
+    return themeName(theme) + " · " + stringResource(lookName(effectiveLook(theme, override).id))
+}
+
+/** Lays the content out [by] wider on each side than its parent allows: edge to edge inside a padded column. */
+private fun Modifier.bleed(by: Dp): Modifier = layout { measurable, constraints ->
+    val extra = by.roundToPx() * 2
+    if (!constraints.hasBoundedWidth) return@layout measurable.measure(constraints).let { p -> layout(p.width, p.height) { p.place(0, 0) } }
+    val placeable = measurable.measure(constraints.copy(minWidth = constraints.maxWidth + extra, maxWidth = constraints.maxWidth + extra))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
+/** Fades the end edge while the row can still scroll on. Read at draw time, so scrolling only redraws. */
+private fun Modifier.fadeEnd(state: LazyListState, width: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            if (state.canScrollForward) {
+                val w = width.toPx()
+                drawRect(
+                    Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
+                    topLeft = Offset(size.width - w, 0f),
+                    size = Size(w, size.height),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
 
 /** A theme's display name; fixed themes' names are proper names and not translated. */
 @Composable
@@ -158,7 +241,7 @@ fun currentThemeName(vm: AppearanceViewModel = hiltViewModel()): String {
     return themeName(themeById(id))
 }
 
-private fun lookName(id: LookId?): Int = when (id) {
+fun lookName(id: LookId?): Int = when (id) {
     null -> R.string.style_from_theme
     LookId.Expressive -> R.string.style_expressive
     LookId.Terminal -> R.string.style_terminal
@@ -167,12 +250,15 @@ private fun lookName(id: LookId?): Int = when (id) {
     LookId.Soft -> R.string.style_soft
 }
 
-/** From theme, then the five looks, each label in its own look's title font. */
+/**
+ * From theme, then the five looks, each label in its own look's title font. Wrapped onto as many
+ * lines as needed: a sideways-scrolling row hid the last looks with no sign that they were there.
+ */
 @Composable
 private fun StyleRow(selected: LookId?, onSelect: (LookId?) -> Unit) {
     val options: List<LookId?> = listOf(null) + LookId.entries
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(options, key = { it?.name ?: "theme" }) { id ->
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { id ->
             FilterChip(
                 selected = selected == id,
                 onClick = { onSelect(id) },

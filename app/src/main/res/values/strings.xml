@@ -124,7 +124,6 @@
     <string name="style_soft">Soft</string>
     <string name="appearance_artwork_fixed">The %1$s style sets its own shape.</string>
     <string name="appearance_fixed_theme">This theme has its own mode and background.</string>
-    <string name="appearance_more_themes">Swipe for more themes</string>
     <!-- Settings categories -->
     <string name="settings_playback">Playback</string>
     <string name="settings_about">About</string>

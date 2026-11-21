@@ -123,7 +123,6 @@
     <string name="style_soft">М’який</string>
     <string name="appearance_artwork_fixed">Стиль «%1$s» задає власну форму.</string>
     <string name="appearance_fixed_theme">Ця тема має власні режим і тло.</string>
-    <string name="appearance_more_themes">Гортайте, щоб побачити більше тем</string>
     <!-- Settings categories -->
     <string name="settings_playback">Відтворення</string>
     <string name="settings_about">Про застосунок</string>

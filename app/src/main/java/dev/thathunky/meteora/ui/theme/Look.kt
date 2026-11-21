@@ -122,11 +122,13 @@ object Looks {
         textControls = false, morphs = false, expressiveMotion = false, artworkSetting = false,
     )
 
+    // Kept well apart from Expressive, its nearest neighbour: rounder corners, rows drawn as
+    // separate cards with real gaps, bigger art and wider margins, lighter and airier titles.
     val Soft = Look(
         id = LookId.Soft, typeface = Typeface.System, capsLabels = false, lowerLabels = false,
-        cornerSmall = 16.dp, cornerMedium = 24.dp, cornerLarge = 32.dp, pills = true,
+        cornerSmall = 20.dp, cornerMedium = 28.dp, cornerLarge = 36.dp, pills = true,
         outline = 0.dp, hardShadow = 0.dp, surface = SurfaceStyle.Tonal, gradients = 0.5f,
-        rowHeight = 76.dp, rowArt = 56.dp, rowGap = 4.dp, screenPadding = 20.dp,
+        rowHeight = 80.dp, rowArt = 60.dp, rowGap = 8.dp, screenPadding = 24.dp,
         progress = ProgressStyle.WavyThick, loading = LoadingStyle.Morphing, header = HeaderStyle.Large,
         nav = NavStyle.TallTabs, mini = MiniStyle.DockedLarge, miniSpace = 76.dp, pauseArt = PauseArt.Shrink,
         textControls = false, morphs = false, expressiveMotion = true, artworkSetting = true,
@@ -207,12 +209,14 @@ fun typographyFor(look: Look): Typography = when (look.id) {
             else -> s
         }
     }
-    // Medium weights and a slightly larger body.
-    LookId.Soft -> base.mapAll { s, title, _ ->
+    // Medium weights, a slightly larger body, and titles opened up (a little letter spacing and
+    // more line height) where Expressive's emphasized titles are tight and heavy.
+    LookId.Soft -> base.mapAll { s, title, label ->
         s.copy(
-            fontWeight = if (title) FontWeight.Medium else s.fontWeight,
+            fontWeight = if (title || label) FontWeight.Medium else s.fontWeight,
             fontSize = if (title) s.fontSize else s.fontSize.plus(1f),
-            lineHeight = if (title) s.lineHeight else s.lineHeight.plus(2f),
+            lineHeight = if (title) s.lineHeight.plus(4f) else s.lineHeight.plus(2f),
+            letterSpacing = if (title) 0.01.em else s.letterSpacing,
         )
     }
 }

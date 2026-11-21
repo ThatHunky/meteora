@@ -53,6 +53,8 @@ import dev.thathunky.meteora.ui.components.MButton
 import dev.thathunky.meteora.ui.components.PageTitle
 import dev.thathunky.meteora.ui.components.SectionHeader
 import dev.thathunky.meteora.ui.components.rowSlotHeight
+import dev.thathunky.meteora.ui.components.Choice
+import dev.thathunky.meteora.ui.components.SegmentedChoice
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.CollectionPage
 import dev.thathunky.meteora.ytm.MusicItem
@@ -83,7 +85,10 @@ class HomeViewModel @Inject constructor(private val ytm: YtmClient, auth: YtmAut
 
     fun refresh() = viewModelScope.launch {
         _refreshing.value = true
+        // A failed pull-to-refresh keeps the shelves that are showing instead of replacing them with an error.
+        val old = _home.value
         load()
+        if (_home.value is Load.Failed && old is Load.Ready) _home.value = old
         _refreshing.value = false
     }
 
@@ -138,11 +143,21 @@ fun HomeScreen(
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     val look = LocalLook.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
-        Loaded(home, onRetry = { vm.retry() }) { shelves ->
-            LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
-                item { header() }
-                item { PageTitle(stringResource(R.string.nav_home)) }
-                if (!signedIn) item { SignInPrompt(onSignIn) }
+        Loaded(home, onRetry = { vm.retry() }, bottomPadding = bottomPadding) { shelves ->
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding)) {
+                item(key = "header") { header() }
+                item(key = "title") { PageTitle(stringResource(R.string.nav_home)) }
+                if (!signedIn) item(key = "signin") { SignInPrompt(onSignIn) }
+                if (shelves.isEmpty()) {
+                    item(key = "empty") {
+                        // Inside the list, so pull-to-refresh still works from here.
+                        MessageState(
+                            stringResource(R.string.empty_home),
+                            Modifier.height(320.dp),
+                            action = stringResource(R.string.action_try_again) to { vm.retry() },
+                        )
+                    }
+                }
                 shelves.forEachIndexed { i, shelf ->
                     item(key = "h$i:${shelf.title}") { SectionHeader(shelf.title) }
                     item(key = "s$i:${shelf.title}") {
@@ -180,19 +195,32 @@ fun LibraryScreen(
 ) {
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     if (!signedIn) {
-        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) { SignInPrompt(onSignIn) }
+        Box(Modifier.fillMaxSize().padding(bottom = bottomPadding).padding(24.dp), contentAlignment = Alignment.Center) { SignInPrompt(onSignIn) }
         return
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val liked by vm.liked.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
+    val look = LocalLook.current
     Column(Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.library_liked)) })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.filter_playlists)) })
-        }
+        // The same title as Home and Settings, and the look's own toggle row instead of a
+        // Material tab row, which drew the same in every look.
+        PageTitle(stringResource(R.string.nav_library))
+        SegmentedChoice(
+            options = listOf(
+                Choice(0, stringResource(R.string.library_liked)),
+                Choice(1, stringResource(R.string.filter_playlists)),
+            ),
+            selected = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(horizontal = look.screenPadding, vertical = 8.dp),
+        )
         when (tab) {
-            0 -> Loaded(liked, onRetry = vm::reload) { page ->
+            0 -> Loaded(liked, onRetry = vm::reload, bottomPadding = bottomPadding) { page ->
+                if (page.tracks.isEmpty()) {
+                    MessageState(stringResource(R.string.empty_liked), bottomPadding = bottomPadding)
+                    return@Loaded
+                }
                 LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                     item {
                         Row(Modifier.fillMaxWidth().padding(LocalLook.current.screenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -216,7 +244,11 @@ fun LibraryScreen(
                     }
                 }
             }
-            else -> Loaded(playlists, onRetry = vm::reload) { items ->
+            else -> Loaded(playlists, onRetry = vm::reload, bottomPadding = bottomPadding) { items ->
+                if (items.isEmpty()) {
+                    MessageState(stringResource(R.string.empty_playlists), bottomPadding = bottomPadding)
+                    return@Loaded
+                }
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(152.dp),
                     contentPadding = PaddingValues(start = LocalLook.current.screenPadding, end = LocalLook.current.screenPadding, top = 16.dp, bottom = bottomPadding),
