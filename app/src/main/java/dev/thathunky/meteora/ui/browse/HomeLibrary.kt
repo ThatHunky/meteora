@@ -143,6 +143,7 @@ fun HomeScreen(
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     val look = LocalLook.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
+        if (home is Load.Failed && dev.thathunky.meteora.ui.downloads.OfflineHomeNote()) return@PullToRefreshBox
         Loaded(home, onRetry = { vm.retry() }, bottomPadding = bottomPadding) { shelves ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding)) {
                 item(key = "header") { header() }
@@ -210,6 +211,7 @@ fun LibraryScreen(
             options = listOf(
                 Choice(0, stringResource(R.string.library_liked)),
                 Choice(1, stringResource(R.string.filter_playlists)),
+                Choice(2, stringResource(R.string.library_downloads)),
             ),
             selected = tab,
             onSelect = { tab = it },
@@ -244,6 +246,7 @@ fun LibraryScreen(
                     }
                 }
             }
+            2 -> dev.thathunky.meteora.ui.downloads.DownloadsTab(bottomPadding)
             else -> Loaded(playlists, onRetry = vm::reload, bottomPadding = bottomPadding) { items ->
                 if (items.isEmpty()) {
                     MessageState(stringResource(R.string.empty_playlists), bottomPadding = bottomPadding)

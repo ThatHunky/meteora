@@ -48,6 +48,21 @@ class MusicActions @Inject constructor(
         else if (playlistId != null) router.play(PlayIntent.Collection(playlistId, videoId)) else videoId?.let { router.play(PlayIntent.SongRadio(it)) }
     }
 
+    /** The long-press sheet's Download. */
+    fun download(item: MusicItem) {
+        downloads.downloadItem(item)
+    }
+
+    /** The long-press sheet's Remove download. */
+    fun removeDownload(item: MusicItem) {
+        when (item) {
+            is MusicItem.Song -> downloads.removeSong(item.videoId)
+            is MusicItem.Album -> downloads.index.collectionFor(item.playlistId, item.browseId)?.let { downloads.removeCollection(it.id) }
+            is MusicItem.Playlist -> downloads.index.collectionFor(item.playlistId, item.browseId)?.let { downloads.removeCollection(it.id) }
+            is MusicItem.Artist -> Unit
+        }
+    }
+
     /** Song tap = song + radio; collection = play from the top (optionally from a track). */
     fun play(item: MusicItem, startVideoId: String? = null) {
         val offlineKey = when (item) {

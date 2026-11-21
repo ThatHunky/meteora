@@ -523,6 +523,7 @@ private fun FullPlayer(
 
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                dev.thathunky.meteora.ui.downloads.TrackDownloadButton(track)
                 MIconToggle(
                     checked = track.like == LikeStatus.Dislike,
                     onCheckedChange = { vm.toggleDislike() },

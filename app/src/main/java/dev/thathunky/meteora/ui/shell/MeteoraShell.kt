@@ -175,6 +175,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 bottomPadding = contentBottom,
             )
         }
+        entry<DownloadsRoute> { dev.thathunky.meteora.ui.downloads.DownloadsScreen(contentBottom) }
         entry<SignInRoute> { SignInScreen(onDone = { leave(SignInRoute) }) }
         entry<AlbumRoute> { r -> CollectionScreen(r.browseId, isAlbum = true, opener, longPress, contentBottom) }
         entry<PlaylistRoute> { r -> CollectionScreen(r.playlistId, isAlbum = false, opener, longPress, contentBottom) }
@@ -255,6 +256,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         }
     }
 
+    dev.thathunky.meteora.ui.downloads.DownloadsPremiumHost()
+    dev.thathunky.meteora.ui.downloads.OpenDownloadsEffect { push(DownloadsRoute) }
     sheetFor?.let { item ->
         ItemActionsSheet(
             item = item,
@@ -266,6 +269,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     ItemAction.AddToQueue -> actions.addToQueue(item)
                     ItemAction.Radio -> actions.radio(item)
                     ItemAction.Share -> context.share(item)
+                    ItemAction.Download -> actions.download(item)
+                    ItemAction.RemoveDownload -> actions.removeDownload(item)
                     ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { push(AlbumRoute(it)) }
                     ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { push(ArtistRoute(it)) }
                 }

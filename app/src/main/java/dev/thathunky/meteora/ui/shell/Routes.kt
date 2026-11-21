@@ -23,6 +23,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object SignInRoute : Route
 
+@Serializable data object DownloadsRoute : Route
+
 // Settings sub-screens, pushed over SettingsRoute so Settings stays the selected tab.
 @Serializable data object SettingsAppearanceRoute : Route
 

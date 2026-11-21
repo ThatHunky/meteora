@@ -158,6 +158,7 @@ fun CollectionScreen(
                         icon = Icons.Outlined.Shuffle,
                         modifier = Modifier.weight(1f).height(56.dp),
                     )
+                    dev.thathunky.meteora.ui.downloads.CollectionDownloadButton(p, pid ?: id, if (isAlbum) id else "VL${id.removePrefix("VL")}", isAlbum)
                     ShareButton {
                         if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
                         else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))

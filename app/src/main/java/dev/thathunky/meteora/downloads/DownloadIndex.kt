@@ -82,6 +82,13 @@ class DownloadIndex(private val store: DownloadStore) {
         return _songs.value.values.filter { it.state == DownloadState.Queued }.sortedBy { it.addedAtMs }
     }
 
+    /** The downloaded collection with playlist id [playlistId] or page [browseId], if any. */
+    fun collectionFor(playlistId: String?, browseId: String?): DownloadCollection? {
+        ensureLoaded()
+        val all = _collections.value
+        return playlistId?.let { all[it] ?: all[it.removePrefix("VL")] } ?: browseId?.let { b -> all.values.firstOrNull { it.browseId == b } }
+    }
+
     /** One song's state for its button. */
     fun status(videoId: String): Flow<DownloadStatus> =
         songs.map { it[videoId] }.distinctUntilChanged().combineProgress(videoId)

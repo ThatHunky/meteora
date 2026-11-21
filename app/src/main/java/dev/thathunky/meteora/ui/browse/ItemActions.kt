@@ -11,20 +11,24 @@ sealed interface ItemAction {
     data object GoToAlbum : ItemAction
     data object GoToArtist : ItemAction
     data object Share : ItemAction
+    data object Download : ItemAction
+    data object RemoveDownload : ItemAction
 }
 
-/** What the long-press sheet offers for [item], in the official app's order. */
-fun itemActions(item: MusicItem): List<ItemAction> = when (item) {
+/** What the long-press sheet offers for [item], in the official app's order. [downloaded]: it is in the downloads. */
+fun itemActions(item: MusicItem, downloaded: Boolean = false): List<ItemAction> = when (item) {
     is MusicItem.Song -> buildList {
         add(ItemAction.PlayNext)
         add(ItemAction.AddToQueue)
         add(ItemAction.Radio)
+        add(if (downloaded) ItemAction.RemoveDownload else ItemAction.Download)
         if (item.album?.browseId != null) add(ItemAction.GoToAlbum)
         if (item.artists.any { it.browseId != null }) add(ItemAction.GoToArtist)
         add(ItemAction.Share)
     }
     is MusicItem.Album, is MusicItem.Playlist -> listOf(
-        ItemAction.Play, ItemAction.Shuffle, ItemAction.PlayNext, ItemAction.AddToQueue, ItemAction.Radio, ItemAction.Share,
+        ItemAction.Play, ItemAction.Shuffle, ItemAction.PlayNext, ItemAction.AddToQueue, ItemAction.Radio,
+        if (downloaded) ItemAction.RemoveDownload else ItemAction.Download, ItemAction.Share,
     )
     is MusicItem.Artist -> listOf(ItemAction.Shuffle, ItemAction.Radio, ItemAction.Share)
 }

@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material.icons.outlined.Share
@@ -140,6 +142,8 @@ private fun ItemAction.label(): Pair<Int, ImageVector> = when (this) {
     ItemAction.GoToAlbum -> R.string.action_go_album to Icons.Outlined.Album
     ItemAction.GoToArtist -> R.string.action_go_artist to Icons.Outlined.Person
     ItemAction.Share -> R.string.action_share to Icons.Outlined.Share
+    ItemAction.Download -> R.string.action_download to Icons.Outlined.Download
+    ItemAction.RemoveDownload -> R.string.action_remove_download to Icons.Outlined.Delete
 }
 
 @Composable
@@ -158,7 +162,7 @@ fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss:
             },
             colors = rowColors,
         )
-        itemActions(item).forEach { action ->
+        itemActions(item, dev.thathunky.meteora.ui.downloads.rememberDownloaded(item)).forEach { action ->
             val (label, icon) = action.label()
             ListItem(
                 headlineContent = { Text(stringResource(label)) },
