@@ -118,6 +118,21 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.thathunky.meteora.R
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import dev.thathunky.meteora.ui.components.ArtKind
+import dev.thathunky.meteora.ui.components.ArtworkFrame
+import dev.thathunky.meteora.ui.components.IconKind
+import dev.thathunky.meteora.ui.components.MIconButton
+import dev.thathunky.meteora.ui.components.MIconToggle
+import dev.thathunky.meteora.ui.components.MProgress
+import dev.thathunky.meteora.ui.components.dockRow
+import dev.thathunky.meteora.ui.theme.LocalLook
+import dev.thathunky.meteora.ui.theme.LookId
+import dev.thathunky.meteora.ui.theme.MiniStyle
 import dev.thathunky.meteora.companion.RepeatMode
 import dev.thathunky.meteora.data.ConnectionState
 import dev.thathunky.meteora.domain.LikeStatus
@@ -178,14 +193,29 @@ private fun MiniPlayer(
     anim: AnimatedVisibilityScope,
 ) = with(scope) {
     val track = s.track ?: return@with
+    val look = LocalLook.current
+    val scheme = MaterialTheme.colorScheme
     var dragY by remember { mutableFloatStateOf(0f) }
     var dragX by remember { mutableFloatStateOf(0f) }
-    HorizontalFloatingToolbar(
-        expanded = true,
-        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-        modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(50))
+    val duration = track.durationSec ?: 0.0
+    // Changes every frame while playing; read only in the draw lambda and, once a second, the time text.
+    val live = rememberLiveProgress(s)
+    val terminal = look.mini == MiniStyle.StatusLine
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(look.miniSpace)
+            // The top of the dock: its corners and hairline, the tabs right below.
+            .dockRow(top = true)
+            // A 2 dp progress line along the top edge; decorative, so no semantics.
+            .drawWithContent {
+                drawContent()
+                if (!terminal && duration > 0) {
+                    val w = (if (look.id == LookId.Retro) 3.dp else 2.dp).toPx()
+                    val f = (live.value / duration).toFloat().coerceIn(0f, 1f)
+                    drawRect(scheme.primary, size = Size(size.width * f, w))
+                }
+            }
             .clickable(onClick = onExpand)
             // Thresholds in dp, so a swipe is the same distance on every screen density.
             .pointerInput(Unit) {
@@ -206,39 +236,65 @@ private fun MiniPlayer(
                     onDragCancel = { dragX = 0f },
                     onHorizontalDrag = { _, d -> dragX += d },
                 )
-            },
-        leadingContent = {
-            AsyncImage(
-                model = track.artworkUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .sharedElement(rememberSharedContentState("art"), anim)
-                    .size(44.dp)
-                    .clip(
-                        if (dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped) MaterialShapes.Cookie9Sided.toShape()
-                        else RoundedCornerShape(10.dp),
-                    ),
-            )
-        },
-        trailingContent = {
-            IconButton(onClick = vm::next) { Icon(Icons.Filled.SkipNext, stringResource(R.string.action_next)) }
-        },
+            }
+            .padding(horizontal = if (terminal) 0.dp else look.screenPadding - 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            Modifier.widthIn(max = 180.dp).padding(horizontal = 8.dp)
-                .sharedBounds(rememberSharedContentState("title"), anim),
-        ) {
-            Text(track.title, style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        FilledIconButton(onClick = vm::playPause, shapes = IconButtonDefaults.shapes()) {
-            Icon(
-                if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
-            )
+        CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
+            val playLabel = stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play)
+            if (terminal) {
+                // A status line: "▶ title - artist" and "0:25/4:20", no artwork (Now Playing fades its art in).
+                Box(
+                    Modifier.size(48.dp).clickable(onClickLabel = playLabel, onClick = vm::playPause).semantics { contentDescription = playLabel },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (s.isPlaying) "▶" else "‖", style = MaterialTheme.typography.titleMedium, color = scheme.primary)
+                }
+                Text(
+                    "${track.title} - ${track.artist}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).sharedBounds(rememberSharedContentState("title"), anim),
+                )
+                StatusTime(live, duration, Modifier.padding(horizontal = 12.dp))
+            } else {
+                ArtworkFrame(
+                    track.artworkUrl,
+                    ArtKind.Mini,
+                    Modifier.sharedElement(rememberSharedContentState("art"), anim).size(if (look.mini == MiniStyle.DockedLarge) 52.dp else 44.dp),
+                )
+                // All the width the controls leave; the title scrolls when it does not fit.
+                Column(
+                    Modifier.weight(1f).padding(horizontal = 12.dp)
+                        .sharedBounds(rememberSharedContentState("title"), anim),
+                ) {
+                    Text(track.title, style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 1, modifier = Modifier.basicMarquee())
+                    Text(track.artist, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                MIconButton(
+                    if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    playLabel,
+                    onClick = vm::playPause,
+                    kind = IconKind.Filled,
+                )
+                MIconButton(Icons.Filled.SkipNext, stringResource(R.string.action_next), onClick = vm::next)
+            }
         }
     }
+}
+
+/** "0:25/4:20", recomposed once a second, not every frame. */
+@Composable
+private fun StatusTime(live: State<Double>, duration: Double, modifier: Modifier) {
+    val sec by remember(live) { derivedStateOf { live.value.toInt() } }
+    Text(
+        "${formatTime(sec.toDouble())}/${formatTime(duration)}",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = modifier,
+    )
 }
 
 /** What Now Playing can open or start from the current track; the shell owns navigation. */
@@ -279,6 +335,7 @@ private fun FullPlayer(
     }
 
     val scheme = MaterialTheme.colorScheme
+    val look = LocalLook.current
     Box(
         Modifier
             .fillMaxSize()
@@ -291,7 +348,11 @@ private fun FullPlayer(
                 shape = RoundedCornerShape((32 * back).dp)
                 clip = back > 0f
             }
-            .background(Brush.verticalGradient(listOf(scheme.primaryContainer, scheme.surface, scheme.surface)))
+            // Full strength in Expressive, half in Soft, none (a flat background) in the others.
+            .then(
+                if (look.gradients > 0f) Modifier.background(Brush.verticalGradient(listOf(lerp(scheme.surface, scheme.primaryContainer, look.gradients), scheme.surface, scheme.surface)))
+                else Modifier.background(scheme.surface),
+            )
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {
@@ -308,11 +369,11 @@ private fun FullPlayer(
         // Not inside a Surface, so set the content color ourselves (otherwise text is black).
         CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp),
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = look.screenPadding + 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onCollapse) { Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse)) }
+                MIconButton(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse), onClick = onCollapse)
                 Spacer(Modifier.weight(1f))
                 val pcName = (connection as? ConnectionState.Connected)?.pcName
                 val knownPc by vm.pcName.collectAsStateWithLifecycle()
@@ -365,7 +426,10 @@ private fun FullPlayer(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue)) }
+                MIconButton(
+                    Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue),
+                    onClick = { showQueue = true }, text = stringResource(R.string.queue),
+                )
                 TrackMenu(track, links)
             }
 
@@ -375,31 +439,18 @@ private fun FullPlayer(
                 MaterialTheme.motionScheme.slowSpatialSpec(),
                 label = "artMorph",
             )
-            val morph = remember { Morph(MaterialShapes.Square, MaterialShapes.Cookie12Sided) }
-            // Rounded shows the whole cover and marks pause by size instead of by cutting.
-            val scalloped = dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped
-            val rounded = remember { RoundedCornerShape(28.dp) }
             // The art takes the space the controls leave, so it shrinks on short or landscape
             // screens instead of pushing the controls off the bottom.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                AsyncImage(
-                    model = track.artworkUrl,
+                ArtworkFrame(
+                    track.artworkUrl,
+                    ArtKind.Player,
+                    // Terminal's mini player has no art to fly from, so the art just fades in with the player.
+                    (if (look.mini == MiniStyle.StatusLine) Modifier else Modifier.sharedElement(rememberSharedContentState("art"), anim))
+                        .aspectRatio(1f),
                     contentDescription = track.album,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .sharedElement(rememberSharedContentState("art"), anim)
-                        .aspectRatio(1f)
-                        // Read in the layer block: the morph redraws the art without recomposing the player.
-                        .graphicsLayer {
-                            clip = true
-                            if (scalloped) {
-                                shape = MorphShape(morph, morphProgress.value)
-                            } else {
-                                shape = rounded
-                                val k = 0.88f + 0.12f * morphProgress.value
-                                scaleX = k; scaleY = k
-                            }
-                        },
+                    // Read in the layer block: pause redraws the art without recomposing the player.
+                    playing = { morphProgress.value },
                 )
             }
 
@@ -416,18 +467,25 @@ private fun FullPlayer(
 
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconToggleButton(checked = track.like == LikeStatus.Dislike, onCheckedChange = { vm.toggleDislike() }) {
-                    Icon(if (track.like == LikeStatus.Dislike) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown, stringResource(R.string.dislike))
-                }
-                IconToggleButton(
+                MIconToggle(
+                    checked = track.like == LikeStatus.Dislike,
+                    onCheckedChange = { vm.toggleDislike() },
+                    icon = Icons.Outlined.ThumbDown,
+                    checkedIcon = Icons.Filled.ThumbDown,
+                    contentDescription = stringResource(R.string.dislike),
+                    text = stringResource(R.string.dislike),
+                )
+                MIconToggle(
                     checked = track.like == LikeStatus.Like,
                     onCheckedChange = {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                         vm.toggleLike()
                     },
-                ) {
-                    Icon(if (track.like == LikeStatus.Like) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, stringResource(R.string.like))
-                }
+                    icon = Icons.Outlined.ThumbUp,
+                    checkedIcon = Icons.Filled.ThumbUp,
+                    contentDescription = stringResource(R.string.like),
+                    text = stringResource(R.string.like),
+                )
             }
 
             SeekBar(s, vm)
@@ -438,32 +496,35 @@ private fun FullPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconToggleButton(checked = s.shuffle, onCheckedChange = { vm.toggleShuffle() }) {
-                    Icon(Icons.Outlined.Shuffle, stringResource(R.string.shuffle))
-                }
-                FilledTonalIconButton(onClick = vm::previous, shapes = IconButtonDefaults.shapes(), modifier = Modifier.size(64.dp)) {
-                    Icon(Icons.Filled.SkipPrevious, stringResource(R.string.action_previous), Modifier.size(32.dp))
-                }
-                FilledIconButton(
+                // Shuffle and repeat keep their icons in Terminal too: their words would not fit the row.
+                MIconToggle(s.shuffle, { vm.toggleShuffle() }, Icons.Outlined.Shuffle, stringResource(R.string.shuffle))
+                // Text controls size to their words; the icon forms keep today's sizes.
+                val side = if (look.textControls) Modifier.height(56.dp) else Modifier.size(64.dp)
+                MIconButton(
+                    Icons.Filled.SkipPrevious, stringResource(R.string.action_previous), onClick = vm::previous,
+                    kind = IconKind.Tonal, text = stringResource(R.string.action_previous), iconSize = 32.dp, modifier = side,
+                )
+                MIconButton(
+                    if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
                         vm.playPause()
                     },
-                    shapes = IconButtonDefaults.shapes(),
-                    modifier = Modifier.size(width = 112.dp, height = 80.dp),
-                ) {
-                    Icon(
-                        if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
-                        Modifier.size(40.dp),
-                    )
-                }
-                FilledTonalIconButton(onClick = vm::next, shapes = IconButtonDefaults.shapes(), modifier = Modifier.size(64.dp)) {
-                    Icon(Icons.Filled.SkipNext, stringResource(R.string.action_next), Modifier.size(32.dp))
-                }
-                IconToggleButton(checked = s.repeat == RepeatMode.All || s.repeat == RepeatMode.One, onCheckedChange = { vm.cycleRepeat() }) {
-                    Icon(if (s.repeat == RepeatMode.One) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat, stringResource(R.string.repeat))
-                }
+                    kind = IconKind.Filled,
+                    text = if (s.isPlaying) "‖" else "▶",
+                    iconSize = 40.dp,
+                    modifier = if (look.textControls) Modifier.height(56.dp) else Modifier.size(width = 112.dp, height = 80.dp),
+                )
+                MIconButton(
+                    Icons.Filled.SkipNext, stringResource(R.string.action_next), onClick = vm::next,
+                    kind = IconKind.Tonal, text = stringResource(R.string.action_next), iconSize = 32.dp, modifier = side,
+                )
+                MIconToggle(
+                    s.repeat == RepeatMode.All || s.repeat == RepeatMode.One, { vm.cycleRepeat() },
+                    if (s.repeat == RepeatMode.One) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
+                    stringResource(R.string.repeat),
+                )
             }
 
             Spacer(Modifier.height(12.dp))
@@ -483,7 +544,7 @@ private fun TrackMenu(track: Track, links: TrackLinks) {
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+        MIconButton(Icons.Outlined.MoreVert, stringResource(R.string.action_more), onClick = { open = true })
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_radio)) },
@@ -618,11 +679,7 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
                 },
             contentAlignment = Alignment.Center,
         ) {
-            LinearWavyProgressIndicator(
-                progress = shown,
-                amplitude = { amplitude },
-                modifier = Modifier.fillMaxWidth().height(14.dp),
-            )
+            MProgress(progress = shown, amplitude = { amplitude })
         }
         Row(Modifier.fillMaxWidth()) {
             Text(formatTime(shownSeconds.toDouble()), style = MaterialTheme.typography.labelMedium)

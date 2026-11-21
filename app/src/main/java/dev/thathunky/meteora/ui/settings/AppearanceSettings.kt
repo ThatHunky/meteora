@@ -56,6 +56,8 @@ import dev.thathunky.meteora.ui.theme.SurfaceStyle
 import dev.thathunky.meteora.ui.theme.effectiveLook
 import dev.thathunky.meteora.ui.theme.titleFontFor
 import dev.thathunky.meteora.ui.components.hardShadow
+import dev.thathunky.meteora.ui.components.Choice
+import dev.thathunky.meteora.ui.components.SegmentedChoice
 import androidx.compose.material3.FilterChip
 import dev.thathunky.meteora.ui.theme.ThemeMode
 import dev.thathunky.meteora.ui.theme.ThemeStore
@@ -257,24 +259,7 @@ private fun ThemeCard(t: AppTheme, look: Look, selected: Boolean, mode: ThemeMod
     }
 }
 
-/** A connected button group, in the pattern of QualitySelector in MeteoraShell.kt. */
+/** The look's segmented row, with plain labels. */
 @Composable
-private fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, enabled: Boolean = true) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-        options.forEachIndexed { i, (value, label) ->
-            ToggleButton(
-                checked = selected == value,
-                onCheckedChange = { if (it) onSelect(value) },
-                enabled = enabled,
-                shapes = when (i) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(label, maxLines = 1)
-            }
-        }
-    }
-}
+private fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, enabled: Boolean = true) =
+    SegmentedChoice(options.map { (v, l) -> Choice(v, l) }, selected, onSelect, enabled = enabled)

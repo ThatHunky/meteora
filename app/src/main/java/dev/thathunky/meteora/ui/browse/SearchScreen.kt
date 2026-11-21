@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.MLoading
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.YtmClient
 
@@ -54,6 +56,7 @@ fun SearchScreen(
     val results by vm.results.collectAsStateWithLifecycle()
     val filter by vm.filter.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
+    val look = LocalLook.current
 
     // The view model decides when there are suggestions to show (none for the submitted query).
     LaunchedEffect(field) {
@@ -66,15 +69,15 @@ fun SearchScreen(
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             lineLimits = TextFieldLineLimits.SingleLine,
-            shape = RoundedCornerShape(28.dp),
+            shape = if (look.pills) RoundedCornerShape(28.dp) else RoundedCornerShape(look.cornerSmall),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             onKeyboardAction = {
                 focus.clearFocus()
                 vm.submit(field.text.toString())
             },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = look.screenPadding, vertical = 8.dp),
         )
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = look.screenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(YtmClient.SearchFilter.entries.toList()) { f ->
                 FilterChip(
                     selected = f == filter,
@@ -105,7 +108,7 @@ fun SearchScreen(
 
         when (val r = results) {
             null -> Unit
-            Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+            Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MLoading() }
             is Load.Failed -> Text(
                 stringResource(R.string.load_failed),
                 color = MaterialTheme.colorScheme.error,

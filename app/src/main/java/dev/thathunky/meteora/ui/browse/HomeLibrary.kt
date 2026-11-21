@@ -48,6 +48,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.ButtonKind
+import dev.thathunky.meteora.ui.components.MButton
+import dev.thathunky.meteora.ui.components.PageTitle
+import dev.thathunky.meteora.ui.components.SectionHeader
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.CollectionPage
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.Shelf
@@ -130,33 +135,23 @@ fun HomeScreen(
     val home by vm.home.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
+    val look = LocalLook.current
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
         Loaded(home, onRetry = { vm.retry() }) { shelves ->
             LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                 item { header() }
-                item {
-                    Text(
-                        stringResource(R.string.nav_home),
-                        style = MaterialTheme.typography.displaySmallEmphasized,
-                        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp),
-                    )
-                }
+                item { PageTitle(stringResource(R.string.nav_home)) }
                 if (!signedIn) item { SignInPrompt(onSignIn) }
                 shelves.forEachIndexed { i, shelf ->
-                    item(key = "h$i:${shelf.title}") {
-                        Text(
-                            shelf.title,
-                            style = MaterialTheme.typography.titleLargeEmphasized,
-                            modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
-                        )
-                    }
+                    item(key = "h$i:${shelf.title}") { SectionHeader(shelf.title) }
                     item(key = "s$i:${shelf.title}") {
                         if (shelf.items.all { it is MusicItem.Song } && shelf.items.size > 4) {
                             // "Quick picks": a 4-row grid of songs that scrolls sideways.
                             LazyHorizontalGrid(
                                 rows = GridCells.Fixed(4),
-                                modifier = Modifier.height(72.dp * 4),
-                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                // Four rows at the look's row height (72 dp in Expressive, as before).
+                                modifier = Modifier.height((look.rowHeight + look.rowGap) * 4),
+                                contentPadding = PaddingValues(horizontal = look.screenPadding / 2),
                             ) {
                                 gridItems(shelf.items.distinctBy { it.key() }, key = { it.key() }) { item ->
                                     MusicRow(item, { opener.open(item) }, { onLongPress(item) }, Modifier.width(320.dp))
@@ -198,25 +193,20 @@ fun LibraryScreen(
             0 -> Loaded(liked, onRetry = vm::reload) { page ->
                 LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                     item {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
+                        Row(Modifier.fillMaxWidth().padding(LocalLook.current.screenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MButton(
+                                stringResource(R.string.action_play),
                                 onClick = { onPlayLiked(false, page.tracks.map { it.videoId }) },
-                                shapes = ButtonDefaults.shapes(),
+                                icon = Icons.Filled.PlayArrow,
                                 modifier = Modifier.weight(1.4f).height(56.dp),
-                            ) {
-                                Icon(Icons.Filled.PlayArrow, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.action_play))
-                            }
-                            FilledTonalButton(
+                            )
+                            MButton(
+                                stringResource(R.string.shuffle),
                                 onClick = { onPlayLiked(true, page.tracks.map { it.videoId }) },
-                                shapes = ButtonDefaults.shapes(),
+                                kind = ButtonKind.Tonal,
+                                icon = Icons.Outlined.Shuffle,
                                 modifier = Modifier.weight(1f).height(56.dp),
-                            ) {
-                                Icon(Icons.Outlined.Shuffle, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.shuffle))
-                            }
+                            )
                         }
                     }
                     itemsIndexed(page.tracks, key = { i, t -> "$i:${t.videoId}" }) { _, t ->
@@ -227,7 +217,7 @@ fun LibraryScreen(
             else -> Loaded(playlists, onRetry = vm::reload) { items ->
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(152.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),
+                    contentPadding = PaddingValues(start = LocalLook.current.screenPadding, end = LocalLook.current.screenPadding, top = 16.dp, bottom = bottomPadding),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
@@ -249,6 +239,6 @@ private fun SignInPrompt(onSignIn: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onSignIn, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.signin_action)) }
+        MButton(stringResource(R.string.signin_action), onSignIn)
     }
 }

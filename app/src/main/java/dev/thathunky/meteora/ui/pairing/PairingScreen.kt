@@ -52,6 +52,15 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.thathunky.meteora.R
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.Color
+import dev.thathunky.meteora.ui.components.ButtonKind
+import dev.thathunky.meteora.ui.components.MButton
+import dev.thathunky.meteora.ui.components.MLoading
+import dev.thathunky.meteora.ui.components.MSurface
+import dev.thathunky.meteora.ui.components.Tone
+import dev.thathunky.meteora.ui.components.surfaceContentColor
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.companion.discovery.DiscoveredPc
 
 @Composable
@@ -76,26 +85,23 @@ fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = M
         when (s) {
             PairingStep.Choose -> ChooseStep(found, vm::pair, vm::pairManual, onSkip)
             is PairingStep.Probing -> Centered {
-                LoadingIndicator(Modifier.size(96.dp))
+                MLoading(Modifier.size(96.dp))
                 Text(stringResource(R.string.pair_probing, s.name), style = MaterialTheme.typography.titleMedium)
             }
             is PairingStep.WaitingForAuthToggle -> Centered {
-                ContainedLoadingIndicator(Modifier.size(96.dp))
+                MLoading(Modifier.size(96.dp), contained = true)
                 Text(stringResource(R.string.pair_enable_auth_title), style = MaterialTheme.typography.headlineSmallEmphasized, textAlign = TextAlign.Center)
                 Text(stringResource(R.string.pair_enable_auth_body), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = vm::cancel) { Text(stringResource(android.R.string.cancel)) }
+                MButton(stringResource(android.R.string.cancel), vm::cancel, kind = ButtonKind.Outlined)
             }
             is PairingStep.ShowCode -> Centered {
                 Text(stringResource(R.string.pair_code_title), style = MaterialTheme.typography.titleLarge)
-                Card(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                ) {
+                MSurface(tone = Tone.Primary, shape = MaterialTheme.shapes.extraLarge) {
                     Text(
                         s.code.toCharArray().joinToString(" "),
                         fontSize = 64.sp,
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = surfaceContentColor(Tone.Primary),
                         modifier = Modifier.padding(horizontal = 32.dp, vertical = 20.dp),
                     )
                 }
@@ -109,8 +115,8 @@ fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = M
                 if (s.attempt > 0) {
                     Text(stringResource(R.string.pair_code_retry), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
                 }
-                LoadingIndicator()
-                OutlinedButton(onClick = vm::cancel) { Text(stringResource(android.R.string.cancel)) }
+                MLoading()
+                MButton(stringResource(android.R.string.cancel), vm::cancel, kind = ButtonKind.Outlined)
             }
             is PairingStep.Failed -> Centered {
                 Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
@@ -126,12 +132,12 @@ fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = M
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                 )
-                Button(onClick = vm::cancel) { Text(stringResource(R.string.action_try_again)) }
+                MButton(stringResource(R.string.action_try_again), vm::cancel)
             }
             is PairingStep.Done -> Centered {
                 Icon(Icons.Outlined.TaskAlt, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(stringResource(R.string.pair_done, s.name), style = MaterialTheme.typography.headlineSmallEmphasized, textAlign = TextAlign.Center)
-                Button(onClick = onDone, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.action_continue)) }
+                MButton(stringResource(R.string.action_continue), onDone)
             }
         }
     }
@@ -142,7 +148,7 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
     val manualState = rememberTextFieldState()
     val manual = manualState.text.toString()
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        Modifier.fillMaxSize().padding(horizontal = LocalLook.current.screenPadding),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
@@ -154,23 +160,23 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
         if (found.isEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    LoadingIndicator(Modifier.size(40.dp))
+                    MLoading(Modifier.size(40.dp))
                     Text(stringResource(R.string.pair_searching), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         items(found, key = { it.name }) { pc ->
-            Card(
+            MSurface(
                 onClick = { onPick(pc) },
                 shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 modifier = Modifier.animateItem(),
             ) {
                 ListItem(
                     headlineContent = { Text(pc.name, style = MaterialTheme.typography.titleMediumEmphasized) },
                     supportingContent = { Text(pc.addresses.joinToString(" · ")) },
                     leadingContent = { Icon(Icons.Outlined.Computer, null) },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    // Transparent, so the surface's own fill or outline shows.
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent, headlineColor = LocalContentColor.current, supportingColor = LocalContentColor.current, leadingIconColor = LocalContentColor.current),
                 )
             }
         }
@@ -187,14 +193,12 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            Button(onClick = { onManual(manual) }, enabled = manual.isNotBlank(), shapes = ButtonDefaults.shapes()) {
-                Text(stringResource(R.string.action_connect))
-            }
+            MButton(stringResource(R.string.action_connect), { onManual(manual) }, enabled = manual.isNotBlank())
             Spacer(Modifier.height(32.dp))
         }
         item {
             Spacer(Modifier.height(16.dp))
-            androidx.compose.material3.TextButton(onClick = onSkip) { Text(stringResource(R.string.pair_skip)) }
+            MButton(stringResource(R.string.pair_skip), onSkip, kind = ButtonKind.Text)
             Text(
                 stringResource(R.string.pair_skip_note),
                 style = MaterialTheme.typography.bodySmall,

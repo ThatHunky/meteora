@@ -49,6 +49,15 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.data.PlaybackTarget
 import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.ui.settings.AppearanceSection
+import dev.thathunky.meteora.ui.components.ButtonKind
+import dev.thathunky.meteora.ui.components.Choice
+import dev.thathunky.meteora.ui.components.MButton
+import dev.thathunky.meteora.ui.components.MIconButton
+import dev.thathunky.meteora.ui.components.MRow
+import dev.thathunky.meteora.ui.components.PageTitle
+import dev.thathunky.meteora.ui.components.SegmentedChoice
+import dev.thathunky.meteora.ui.components.screenTitleStyle
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ui.settings.SettingsCategory
 import dev.thathunky.meteora.ui.settings.currentThemeName
 import dev.thathunky.meteora.ui.settings.settingsCategories
@@ -86,11 +95,7 @@ fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPa
     val signedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
     val themeName = currentThemeName()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp).padding(bottom = bottomPadding)) {
-        Text(
-            stringResource(R.string.nav_settings),
-            style = MaterialTheme.typography.displaySmallEmphasized,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-        )
+        PageTitle(stringResource(R.string.nav_settings))
         settingsCategories().forEach { c ->
             val summary = when (c) {
                 SettingsCategory.Appearance -> themeName
@@ -101,10 +106,10 @@ fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPa
                 SettingsCategory.Pc -> pc?.name ?: stringResource(R.string.not_connected)
                 SettingsCategory.About -> stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)
             }
-            ListItem(
-                headlineContent = { Text(stringResource(c.title())) },
-                supportingContent = { Text(summary, maxLines = 1) },
-                leadingContent = { Icon(c.icon(), contentDescription = null) },
+            MRow(
+                headline = stringResource(c.title()),
+                supporting = summary,
+                leading = { Icon(c.icon(), contentDescription = null) },
                 modifier = Modifier.clickable { backStack.add(c.route()) },
             )
         }
@@ -116,11 +121,11 @@ fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPa
 private fun SettingsPage(title: Int, onBack: () -> Unit, bottomPadding: Dp, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
-            Text(stringResource(title), style = MaterialTheme.typography.titleLargeEmphasized, modifier = Modifier.padding(start = 4.dp))
+            MIconButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back), onBack, text = stringResource(R.string.action_back))
+            Text(stringResource(title), style = screenTitleStyle(), modifier = Modifier.padding(start = 4.dp))
         }
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 16.dp + bottomPadding),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = LocalLook.current.screenPadding).padding(bottom = 16.dp + bottomPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content,
         )
@@ -170,8 +175,8 @@ fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, o
             headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
             overlineContent = { Text(stringResource(R.string.ytm_account)) },
         )
-        if (ytmSignedIn) OutlinedButton(onClick = vm::signOutYtm) { Text(stringResource(R.string.signout_action)) }
-        else Button(onClick = { backStack.add(SignInRoute) }, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.signin_action)) }
+        if (ytmSignedIn) MButton(stringResource(R.string.signout_action), vm::signOutYtm, kind = ButtonKind.Outlined)
+        else MButton(stringResource(R.string.signin_action), { backStack.add(SignInRoute) })
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
@@ -191,10 +196,8 @@ fun PcSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack
             supportingContent = { Text(pc?.preferredOrder()?.joinToString(" · ").orEmpty()) },
             overlineContent = { Text(stringResource(R.string.settings_pc)) },
         )
-        Button(onClick = { backStack.add(PairingRoute) }, shapes = ButtonDefaults.shapes()) {
-            Text(stringResource(R.string.settings_repair))
-        }
-        OutlinedButton(onClick = vm::forgetPc) { Text(stringResource(R.string.settings_forget)) }
+        MButton(stringResource(R.string.settings_repair), { backStack.add(PairingRoute) })
+        MButton(stringResource(R.string.settings_forget), vm::forgetPc, kind = ButtonKind.Outlined)
         Text(
             stringResource(R.string.settings_forget_note),
             style = MaterialTheme.typography.bodySmall,
@@ -214,66 +217,36 @@ fun AboutSettingsScreen(onBack: () -> Unit, bottomPadding: Dp) =
         )
     }
 
-/** Low / Normal / High, in the official app's order, as a connected button group like [TargetSelector]. */
+/** Low / Normal / High, in the official app's order. */
 @Composable
 private fun QualitySelector(
     quality: StreamQuality,
     onQuality: (StreamQuality) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    val options = listOf(
-        StreamQuality.Low to stringResource(R.string.quality_low),
-        StreamQuality.Normal to stringResource(R.string.quality_normal),
-        StreamQuality.High to stringResource(R.string.quality_high),
-    )
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-        options.forEachIndexed { i, (q, label) ->
-            ToggleButton(
-                checked = quality == q,
-                onCheckedChange = { if (it) onQuality(q) },
-                shapes = when (i) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(label, maxLines = 1)
-            }
-        }
-    }
-}
+) = SegmentedChoice(
+    options = listOf(
+        Choice(StreamQuality.Low, stringResource(R.string.quality_low)),
+        Choice(StreamQuality.Normal, stringResource(R.string.quality_normal)),
+        Choice(StreamQuality.High, stringResource(R.string.quality_high)),
+    ),
+    selected = quality,
+    onSelect = onQuality,
+    modifier = modifier,
+)
 
-/** PC / This phone, as a connected button group. */
+/** PC / This phone. */
 @Composable
 fun TargetSelector(
     target: PlaybackTarget,
     pcName: String?,
     onTarget: (PlaybackTarget) -> Unit,
     modifier: Modifier = Modifier,
-) {
-    val options = listOf(
-        PlaybackTarget.Pc to (pcName ?: stringResource(R.string.target_pc)),
-        PlaybackTarget.Phone to stringResource(R.string.target_phone),
-    )
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-        options.forEachIndexed { i, (t, label) ->
-            ToggleButton(
-                checked = target == t,
-                onCheckedChange = { if (it) onTarget(t) },
-                shapes = when (i) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(
-                    if (t == PlaybackTarget.Pc) Icons.Outlined.Computer else Icons.Outlined.PhoneAndroid,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(label, maxLines = 1)
-            }
-        }
-    }
-}
+) = SegmentedChoice(
+    options = listOf(
+        Choice(PlaybackTarget.Pc, pcName ?: stringResource(R.string.target_pc), Icons.Outlined.Computer),
+        Choice(PlaybackTarget.Phone, stringResource(R.string.target_phone), Icons.Outlined.PhoneAndroid),
+    ),
+    selected = target,
+    onSelect = onTarget,
+    modifier = modifier,
+)

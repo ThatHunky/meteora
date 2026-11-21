@@ -29,6 +29,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.MLinearLoading
 import dev.thathunky.meteora.ytm.YtmAuthStore
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -62,7 +63,7 @@ fun SignInScreen(onDone: () -> Unit, vm: SignInViewModel = hiltViewModel()) {
             modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 12.dp),
         )
         Box(Modifier.fillMaxWidth()) {
-            if (loading) LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+            if (loading) MLinearLoading(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         }
         AndroidView(
             modifier = Modifier.fillMaxSize(),

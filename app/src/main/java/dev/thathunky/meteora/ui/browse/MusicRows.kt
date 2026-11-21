@@ -39,8 +39,12 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import androidx.compose.ui.platform.LocalDensity
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.ArtKind
+import dev.thathunky.meteora.ui.components.ArtworkFrame
+import dev.thathunky.meteora.ui.components.MRow
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.MusicItem
 import kotlinx.coroutines.launch
 
@@ -68,26 +72,20 @@ fun MusicItem.typedSubtitle(): String = when (this) {
 @Composable
 fun MusicRow(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier, showType: Boolean = false) {
     val haptics = LocalHapticFeedback.current
-    ListItem(
-        headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(if (showType) item.typedSubtitle() else item.subtitleText(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingContent = {
-            AsyncImage(
-                model = item.thumbnail,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(52.dp).clip(
-                    when (item) {
-                        is MusicItem.Artist -> CircleShape
-                        is MusicItem.Album ->
-                            if (dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped) MaterialShapes.Cookie9Sided.toShape()
-                            else RoundedCornerShape(10.dp)
-                        else -> RoundedCornerShape(10.dp)
-                    },
-                ),
+    MRow(
+        headline = item.title,
+        supporting = if (showType) item.typedSubtitle() else item.subtitleText(),
+        leading = {
+            ArtworkFrame(
+                item.thumbnail,
+                when (item) {
+                    is MusicItem.Artist -> ArtKind.Artist
+                    is MusicItem.Album -> ArtKind.Album
+                    else -> ArtKind.Song
+                },
+                Modifier.size(LocalLook.current.rowArt),
             )
         },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = modifier.combinedClickable(
             onClick = onClick,
             onLongClick = {
@@ -112,23 +110,24 @@ fun MusicCard(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, mod
             },
         ),
     ) {
-        AsyncImage(
-            model = item.thumbnail,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(152.dp).clip(if (item is MusicItem.Artist) CircleShape else RoundedCornerShape(20.dp)),
-        )
+        ArtworkFrame(item.thumbnail, if (item is MusicItem.Artist) ArtKind.Artist else ArtKind.Card, Modifier.size(152.dp))
         Spacer(Modifier.height(8.dp))
-        // Always two lines tall: a carousel is as tall as its tallest visible card, so cards of
-        // different heights made everything below jump while it scrolled sideways.
-        Text(item.title, style = MaterialTheme.typography.titleSmallEmphasized, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(
-            item.typedSubtitle(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // A fixed height for two title lines and the subtitle: a carousel is as tall as its
+        // tallest visible card, so cards of different heights made everything below jump while
+        // it scrolled sideways. The subtitle sits right under the title; spare room goes below it.
+        val titleStyle = MaterialTheme.typography.titleSmallEmphasized
+        val subStyle = MaterialTheme.typography.bodySmall
+        val block = with(LocalDensity.current) { titleStyle.lineHeight.toDp() * 2 + subStyle.lineHeight.toDp() }
+        Column(Modifier.height(block)) {
+            Text(item.title, style = titleStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                item.typedSubtitle(),
+                style = subStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -152,7 +151,7 @@ fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss:
             headlineContent = { Text(item.title, style = MaterialTheme.typography.titleMediumEmphasized) },
             supportingContent = { Text(item.subtitleText(), maxLines = 1) },
             leadingContent = {
-                AsyncImage(item.thumbnail, null, contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)))
+                ArtworkFrame(item.thumbnail, ArtKind.Sheet, Modifier.size(56.dp))
             },
         )
         itemActions(item).forEach { action ->

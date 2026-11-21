@@ -57,6 +57,9 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.MeteoraNavBar
+import dev.thathunky.meteora.ui.components.NavItem
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.data.ConnectionState
 import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.ui.browse.ActionsViewModel
@@ -83,9 +86,6 @@ private val tabs = listOf(
     Tab(SettingsRoute, R.string.nav_settings, Icons.Outlined.Settings),
 )
 
-/** Room left under scrolling content for the floating mini player. */
-private val MiniPlayerSpace = 88.dp
-
 @Composable
 fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewModel = hiltViewModel()) {
     val backStack = rememberNavBackStack(HomeRoute)
@@ -110,7 +110,9 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
     var playerExpanded by rememberSaveable { mutableStateOf(false) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
     var sheetFor by remember { mutableStateOf<MusicItem?>(null) }
-    val contentBottom = if (hasPlayer) MiniPlayerSpace else 0.dp
+    // The mini player is drawn over the content, right on top of the tabs (one dock), so content
+    // leaves its row free. The tabs themselves are already in the Scaffold's padding.
+    val contentBottom = if (hasPlayer) LocalLook.current.miniSpace else 0.dp
     // PlayerHost draws nothing without a track. Without this, a player that was open when the
     // track went away would come back full-screen on the next track.
     // After a pause, because a hand-off between PC and phone has no track for a moment.
@@ -136,23 +138,17 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         Scaffold(
             bottomBar = {
                 if (!inPairing) {
-                    ShortNavigationBar {
-                        tabs.forEach { tab ->
-                            ShortNavigationBarItem(
-                                selected = tab == currentTab,
-                                onClick = {
-                                    if (tab != currentTab) {
-                                        backStack.clear()
-                                        backStack.add(tab.route)
-                                    } else if (backStack.size > 1) {
-                                        while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                                    }
-                                },
-                                icon = { Icon(tab.icon, contentDescription = null) },
-                                label = { Text(stringResource(tab.label)) },
-                            )
+                    val items = tabs.map { NavItem(stringResource(it.label), it.icon) }
+                    // With a track, the mini player row is the top of the dock and carries its corners.
+                    MeteoraNavBar(items, tabs.indexOf(currentTab), top = !hasPlayer, onSelect = { i ->
+                        val tab = tabs[i]
+                        if (tab != currentTab) {
+                            backStack.clear()
+                            backStack.add(tab.route)
+                        } else if (backStack.size > 1) {
+                            while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                         }
-                    }
+                    })
                 }
             },
         ) { padding ->
@@ -248,8 +244,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
 
 @Composable
 private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
-    androidx.compose.material3.Card(
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    dev.thathunky.meteora.ui.components.MSurface(
+        tone = dev.thathunky.meteora.ui.components.Tone.Error,
         modifier = Modifier.padding(16.dp),
     ) {
         androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -260,11 +256,11 @@ private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
                         else -> R.string.pc_offline
                     },
                 ),
-                color = MaterialTheme.colorScheme.onErrorContainer,
+                color = dev.thathunky.meteora.ui.components.surfaceContentColor(dev.thathunky.meteora.ui.components.Tone.Error),
                 modifier = Modifier.weight(1f),
             )
             if (connection is ConnectionState.Offline) {
-                androidx.compose.material3.TextButton(onClick = onRetry) { Text(stringResource(R.string.action_reconnect)) }
+                dev.thathunky.meteora.ui.components.MButton(stringResource(R.string.action_reconnect), onRetry, kind = dev.thathunky.meteora.ui.components.ButtonKind.Text)
             }
         }
     }

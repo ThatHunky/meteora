@@ -30,8 +30,9 @@ enum class SurfaceStyle { Tonal, Outline, HardShadow }
 enum class ProgressStyle { Wavy, Blocks, ThinLine, ThickBar, WavyThick }
 enum class LoadingStyle { Morphing, TextSpinner, ThinCircle, Squares }
 enum class HeaderStyle { Emphasized, Hash, SmallCaps, SerifRule, Large }
-enum class NavStyle { ShortBar, StatusLine, IconsLine, Boxes, LargeBar }
-enum class MiniStyle { FloatingPill, StatusLine, FlatBar, Boxed, LargePill }
+// The tabs row and the mini player row of the bottom dock.
+enum class NavStyle { Tabs, StatusLine, IconsLine, Boxes, TallTabs }
+enum class MiniStyle { Docked, StatusLine, FlatBar, Boxed, DockedLarge }
 
 /** What the full player's artwork does on pause. */
 enum class PauseArt { Shrink, Nothing, Dim }
@@ -67,7 +68,7 @@ data class Look(
     val header: HeaderStyle,
     val nav: NavStyle,
     val mini: MiniStyle,
-    /** Room the mini player takes above the nav bar, which scrolling content leaves free. */
+    /** Height of the docked mini player row; scrolling content leaves this much free above the tabs. */
     val miniSpace: Dp,
     val pauseArt: PauseArt,
     /** Controls with a text form (prev, next, like, queue) are drawn as text. */
@@ -86,7 +87,7 @@ object Looks {
         outline = 0.dp, hardShadow = 0.dp, surface = SurfaceStyle.Tonal, gradients = 1f,
         rowHeight = 72.dp, rowArt = 52.dp, rowGap = 0.dp, screenPadding = 16.dp,
         progress = ProgressStyle.Wavy, loading = LoadingStyle.Morphing, header = HeaderStyle.Emphasized,
-        nav = NavStyle.ShortBar, mini = MiniStyle.FloatingPill, miniSpace = 88.dp, pauseArt = PauseArt.Shrink,
+        nav = NavStyle.Tabs, mini = MiniStyle.Docked, miniSpace = 64.dp, pauseArt = PauseArt.Shrink,
         textControls = false, morphs = true, expressiveMotion = true, artworkSetting = true,
     )
 
@@ -117,7 +118,7 @@ object Looks {
         outline = 2.dp, hardShadow = 3.dp, surface = SurfaceStyle.HardShadow, gradients = 0f,
         rowHeight = 72.dp, rowArt = 52.dp, rowGap = 0.dp, screenPadding = 16.dp,
         progress = ProgressStyle.ThickBar, loading = LoadingStyle.Squares, header = HeaderStyle.SerifRule,
-        nav = NavStyle.Boxes, mini = MiniStyle.Boxed, miniSpace = 84.dp, pauseArt = PauseArt.Nothing,
+        nav = NavStyle.Boxes, mini = MiniStyle.Boxed, miniSpace = 68.dp, pauseArt = PauseArt.Nothing,
         textControls = false, morphs = false, expressiveMotion = false, artworkSetting = false,
     )
 
@@ -127,7 +128,7 @@ object Looks {
         outline = 0.dp, hardShadow = 0.dp, surface = SurfaceStyle.Tonal, gradients = 0.5f,
         rowHeight = 76.dp, rowArt = 56.dp, rowGap = 4.dp, screenPadding = 20.dp,
         progress = ProgressStyle.WavyThick, loading = LoadingStyle.Morphing, header = HeaderStyle.Large,
-        nav = NavStyle.LargeBar, mini = MiniStyle.LargePill, miniSpace = 104.dp, pauseArt = PauseArt.Shrink,
+        nav = NavStyle.TallTabs, mini = MiniStyle.DockedLarge, miniSpace = 76.dp, pauseArt = PauseArt.Shrink,
         textControls = false, morphs = false, expressiveMotion = true, artworkSetting = true,
     )
 

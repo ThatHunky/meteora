@@ -42,6 +42,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.thathunky.meteora.R
+import androidx.compose.foundation.layout.PaddingValues
+import dev.thathunky.meteora.ui.components.ArtKind
+import dev.thathunky.meteora.ui.components.ArtworkFrame
+import dev.thathunky.meteora.ui.components.MIconButton
+import dev.thathunky.meteora.ui.components.MRow
+import dev.thathunky.meteora.ui.components.SectionHeader
+import dev.thathunky.meteora.ui.theme.LocalLook
+import dev.thathunky.meteora.ui.theme.LookId
 import dev.thathunky.meteora.domain.PlaybackState
 import dev.thathunky.meteora.domain.QueueEntry
 import sh.calvin.reorderable.ReorderableItem
@@ -52,6 +60,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val haptics = LocalHapticFeedback.current
+    val look = LocalLook.current
 
     // Local copy so the list moves under the finger; re-synced from every PC update.
     var items by remember { mutableStateOf(s.queue.withIndex().toList()) }
@@ -65,11 +74,7 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
-        Text(
-            stringResource(R.string.queue),
-            style = MaterialTheme.typography.titleLargeEmphasized,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
+        SectionHeader(stringResource(R.string.queue), padding = PaddingValues(horizontal = 24.dp, vertical = 8.dp))
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(items, key = { _, it -> "${it.index}:${it.value.videoId}" }) { position, entry ->
                 ReorderableItem(reorder, key = "${entry.index}:${entry.value.videoId}") { isDragging ->
@@ -91,19 +96,16 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                         },
                     ) {
                         val current = entry.index == s.selectedIndex
-                        ListItem(
-                            headlineContent = { Text(entry.value.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${entry.value.artist} · ${entry.value.duration}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            leadingContent = {
-                                AsyncImage(
-                                    model = entry.value.artworkUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(if (current) 24.dp else 8.dp)),
-                                )
+                        MRow(
+                            headline = entry.value.title,
+                            supporting = "${entry.value.artist} · ${entry.value.duration}",
+                            leading = {
+                                ArtworkFrame(entry.value.artworkUrl, ArtKind.Queue, Modifier.size(if (look.id == LookId.Expressive) 48.dp else look.rowArt), current = current)
                             },
-                            trailingContent = {
-                                IconButton(
+                            trailing = {
+                                MIconButton(
+                                    Icons.Outlined.DragHandle,
+                                    stringResource(R.string.reorder),
                                     onClick = {},
                                     modifier = Modifier.draggableHandle(
                                         onDragStarted = {
@@ -117,15 +119,14 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                                             if (from != null && to >= 0 && to != from.index) vm.move(from.value.videoId, from.index, to)
                                         },
                                     ),
-                                ) { Icon(Icons.Outlined.DragHandle, stringResource(R.string.reorder)) }
+                                )
                             },
-                            colors = ListItemDefaults.colors(
-                                containerColor = when {
-                                    isDragging -> MaterialTheme.colorScheme.surfaceContainerHighest
-                                    current -> MaterialTheme.colorScheme.secondaryContainer
-                                    else -> MaterialTheme.colorScheme.surfaceContainerLow
-                                },
-                            ),
+                            highlight = when {
+                                isDragging -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                current -> MaterialTheme.colorScheme.secondaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceContainerLow
+                            },
+                            marked = current,
                             modifier = Modifier.fillMaxWidth().clickable { vm.playAt(entry.value.videoId, position) },
                         )
                     }
@@ -141,13 +142,11 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                     )
                 }
                 itemsIndexed(s.automix, key = { i, it -> "automix:$i:${it.videoId}" }) { _, e ->
-                    ListItem(
-                        headlineContent = { Text(e.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text(e.artist, maxLines = 1) },
-                        leadingContent = {
-                            AsyncImage(e.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
-                        },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    MRow(
+                        headline = e.title,
+                        supporting = e.artist,
+                        leading = { ArtworkFrame(e.artworkUrl, ArtKind.Small, Modifier.size(40.dp)) },
+                        highlight = MaterialTheme.colorScheme.surfaceContainerLow,
                     )
                 }
             }
