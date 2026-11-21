@@ -64,7 +64,34 @@ Settings → Playback (or a new Downloads category in `ui/settings/SettingsCateg
 
 ### D5. Smart downloads
 
-A switch and a size slider. Keeps the most recent Liked songs and Home's "Listen again", interleaved without duplicates, up to the size. Refreshes nightly through WorkManager (charging, unmetered, storage not low) and from "Refresh now". A refresh checks Premium, queues what is missing as smart downloads, and removes smart downloads no longer wanted. Manual downloads are never touched; a song that is both is manual. It stops adding when free space falls under 500 MB, and stops early with a report if lookups start failing (the yt-dlp fallback is far too slow for this).
+A switch, a size slider and "Refresh now". Refreshes nightly through WorkManager (charging, unmetered, storage not low). A refresh checks Premium, builds the wanted list below, queues what is missing as smart downloads and removes smart downloads that dropped out. Manual downloads are never touched; a song that is both is manual. It stops adding when free space falls under 500 MB, and stops early with a report if lookups start failing (the yt-dlp fallback is far too slow for this).
+
+**The wanted list** (asked for by the user: "can we get some sort of algo?"). The old rule, recent likes interleaved with "Listen again", ignored what is actually played on this phone.
+
+*Listening log.* New table next to the download index: one row per video id with `plays` (listened past half its length, or 4 minutes), `skips` (left in the first 30 seconds by Next), `lastPlayedMs`, and the track's metadata. Written by `LocalEngine` on media item transitions, phone target only. It never leaves the phone and has a "Clear listening history" row in Settings.
+
+*Score per song.* Everything is a pure function with JVM tests.
+
+- Habit: `plays * 0.5^(daysSinceLastPlayed / 30)`: a play counts half after a month.
+- Skips: minus `1.5 * skips * 0.5^(daysSinceLastPlayed / 30)`; a song skipped more often than played scores zero here.
+- Liked: plus 3, and plus up to 2 more for being among the 50 most recent likes (linear by position).
+- "Listen again" on Home: plus 2 at the first position falling to 0 at the last.
+
+*Three shares of the size*, so the set is not only old favourites:
+
+- 60 % **favourites**: the highest scores.
+- 25 % **recent likes**: newest liked songs not already in.
+- 15 % **fresh**: from the account's personal mix (the first "mix" or "Supermix" playlist on Home; skip this share and give it to favourites when there is none), songs with no plays on this phone.
+
+A share that cannot be filled passes its room to favourites. At most two songs in a row by one artist in the fresh share.
+
+*Stability*, so the phone does not re-download every night:
+
+- A song already downloaded stays unless its place is taken by one scoring at least 20 % higher.
+- At most 20 % of the set is replaced in one refresh.
+- Nothing played in the last 14 days is removed.
+
+Settings shows, under the switch, one line of what the last refresh did ("Kept 92, added 8, removed 8") and when.
 
 ## Strings
 
