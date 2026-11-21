@@ -38,7 +38,8 @@ class LyricsViewModel @Inject constructor(private val repository: LyricsReposito
         if (!force && key == lastKey && _ui.value?.second != LyricsUi.Failed) return
         lastKey = key
         job?.cancel()
-        _ui.value = track.videoId to LyricsUi.Loading
+        // Asking again for the same track (the setting or the length changed): keep what is shown meanwhile.
+        if (_ui.value?.first != track.videoId || _ui.value?.second == LyricsUi.Failed) _ui.value = track.videoId to LyricsUi.Loading
         job = viewModelScope.launch {
             val result = try {
                 repository.lyrics(track)?.takeIf { it.lines.isNotEmpty() }?.let(LyricsUi::Found) ?: LyricsUi.None

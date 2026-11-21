@@ -8,8 +8,8 @@ enum class LyricsProvider { YouTube, LrcLib }
 
 /**
  * A track's lyrics. [synced]: every line has a start time, in order. [source] is the sentence
- * YouTube sends ("Source: Musixmatch", already localised), shown as it is; null for LRCLIB, whose
- * line the UI writes itself.
+ * YouTube sends, shown as it is: "Source: Musixmatch", "Джерело: Musixmatch" with `hl=uk`
+ * (probed). Null for LRCLIB, whose line the UI writes itself.
  */
 data class Lyrics(
     val lines: List<LyricLine>,

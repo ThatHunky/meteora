@@ -75,7 +75,8 @@ private const val FOLLOW_PAUSE_MS = 4_000L
 @Composable
 fun LyricsScreen(s: PlaybackState, player: PlayerViewModel, onClose: () -> Unit, vm: LyricsViewModel = hiltViewModel()) {
     val track = s.track ?: return
-    LaunchedEffect(track.videoId) { vm.load(track) }
+    // The length may arrive just after the track starts; LRCLIB needs it (the view model skips repeats).
+    LaunchedEffect(track.videoId, track.durationSec > 0) { vm.load(track) }
     BackHandler(onBack = onClose)
     val ui by vm.ui.collectAsStateWithLifecycle()
     val state = ui?.takeIf { it.first == track.videoId }?.second ?: LyricsUi.Loading

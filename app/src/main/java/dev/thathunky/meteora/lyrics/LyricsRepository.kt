@@ -48,13 +48,20 @@ class LyricsRepository(
     private val fromYoutube = Lru()
     private val fromLrclib = Lru()
 
-    /** Changes when the answer for [track] may change: another track, or LRCLIB turned on or off. */
-    fun answerKey(track: Track): String = "${track.videoId}:${lrclib != null && lrclibEnabled()}"
+    /**
+     * Changes when the answer for [track] may change: another track, LRCLIB turned on or off, or,
+     * with LRCLIB on, the track's length becoming known (LRCLIB is not asked without it).
+     */
+    fun answerKey(track: Track): String {
+        val useLrclib = lrclib != null && lrclibEnabled()
+        return "${track.videoId}:$useLrclib:${useLrclib && track.durationSec > 0}"
+    }
 
     /** Null: the track has no lyrics. Throws when YouTube could not be asked. */
     suspend fun lyrics(track: Track): Lyrics? {
         val yt = cached(fromYoutube, track) { youtube.find(track) }
-        if (yt?.synced == true || lrclib == null || !lrclibEnabled()) return yt
+        // An unknown length (0 right after a track starts) is not an LRCLIB "none": ask once it is known.
+        if (yt?.synced == true || lrclib == null || !lrclibEnabled() || track.durationSec <= 0) return yt
         val other = try {
             cached(fromLrclib, track) { lrclib.find(track) }
         } catch (e: CancellationException) {

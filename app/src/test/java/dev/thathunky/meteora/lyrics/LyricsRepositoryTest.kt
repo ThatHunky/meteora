@@ -82,6 +82,17 @@ class LyricsRepositoryTest {
         assertEquals(1, ytCalls)
     }
 
+    @Test fun `an unknown length does not ask lrclib and is not kept as none`() = runTest {
+        var asked = 0
+        val repo = LyricsRepository({ plain }, { asked++; lrcTimed }, { true })
+        val early = track(durationSec = 0.0)
+        assertEquals(plain, repo.lyrics(early))
+        assertEquals(0, asked)
+        assertTrue(repo.answerKey(early) != repo.answerKey(track()))
+        assertEquals(lrcTimed, repo.lyrics(track()))
+        assertEquals(1, asked)
+    }
+
     @Test fun `the cache keeps the last tracks only`() = runTest {
         var calls = 0
         val repo = LyricsRepository({ calls++; plain })
