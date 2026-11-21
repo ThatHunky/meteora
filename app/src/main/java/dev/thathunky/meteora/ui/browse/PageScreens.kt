@@ -75,22 +75,46 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.share.share
 import dev.thathunky.meteora.ytm.MusicItem
 
+/**
+ * Loading, failed (with Try again) or the content. The loading and failed states are centred in
+ * the space above the dock, [bottomPadding], so they are not hidden under the mini player.
+ */
 @Composable
-fun <T> Loaded(state: Load<T>, onRetry: (() -> Unit)? = null, content: @Composable (T) -> Unit) {
+fun <T> Loaded(state: Load<T>, onRetry: (() -> Unit)? = null, bottomPadding: Dp = 0.dp, content: @Composable (T) -> Unit) {
     when (state) {
-        Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MLoading() }
-        is Load.Failed -> Column(
-            Modifier.fillMaxSize().padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(stringResource(R.string.load_failed), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-            // Without this a failed page stays failed until the app restarts.
-            if (onRetry != null) {
-                MButton(stringResource(R.string.action_try_again), onRetry, kind = ButtonKind.Tonal)
-            }
-        }
+        Load.Loading -> Box(Modifier.fillMaxSize().padding(bottom = bottomPadding), contentAlignment = Alignment.Center) { MLoading() }
+        // Without Try again a failed page stays failed until the app restarts.
+        is Load.Failed -> MessageState(
+            stringResource(R.string.load_failed),
+            error = true,
+            action = onRetry?.let { stringResource(R.string.action_try_again) to it },
+            bottomPadding = bottomPadding,
+        )
         is Load.Ready -> content(state.value)
+    }
+}
+
+/** A centred line of text, and a button under it if there is something to do: empty and failed states. */
+@Composable
+fun MessageState(
+    text: String,
+    modifier: Modifier = Modifier,
+    error: Boolean = false,
+    action: Pair<String, () -> Unit>? = null,
+    bottomPadding: Dp = 0.dp,
+) {
+    Column(
+        modifier.fillMaxSize().padding(bottom = bottomPadding).padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (action != null) MButton(action.first, action.second, kind = ButtonKind.Tonal)
     }
 }
 

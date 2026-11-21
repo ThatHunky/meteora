@@ -50,6 +50,12 @@
     <string name="search_hint">Songs, albums, artists</string>
     <string name="top_result">Top result</string>
     <string name="load_failed">Couldn’t load this. Check your connection and try again.</string>
+    <string name="search_start">Search for songs, albums, artists and playlists.</string>
+    <string name="search_no_results">Nothing found for “%1$s”.</string>
+    <string name="empty_home">Nothing to show here yet. Pull down to refresh.</string>
+    <string name="empty_liked">Songs you like will show up here.</string>
+    <string name="empty_playlists">Your playlists will show up here.</string>
+    <string name="empty_collection">There are no tracks here.</string>
     <string name="filter_all">All</string>
     <string name="filter_songs">Songs</string>
     <string name="filter_albums">Albums</string>
@@ -116,6 +122,9 @@
     <string name="style_flat">Flat</string>
     <string name="style_retro">Retro</string>
     <string name="style_soft">Soft</string>
+    <string name="appearance_artwork_fixed">The %1$s style sets its own shape.</string>
+    <string name="appearance_fixed_theme">This theme has its own mode and background.</string>
+    <string name="appearance_more_themes">Swipe for more themes</string>
     <!-- Settings categories -->
     <string name="settings_playback">Playback</string>
     <string name="settings_about">About</string>

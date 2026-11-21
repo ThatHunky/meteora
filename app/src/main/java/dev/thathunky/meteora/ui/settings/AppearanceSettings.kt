@@ -204,7 +204,8 @@ private fun ThemeCard(t: AppTheme, look: Look, selected: Boolean, mode: ThemeMod
     Column(
         Modifier
             .width(112.dp)
-            .clip(shape)
+            // Only the ripple's bounds: the preview's own 24–28 dp corners cut into the name below it.
+            .clip(MaterialTheme.shapes.small)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = listOfNotNull(name, author).joinToString(", ") }
             .padding(bottom = 4.dp),

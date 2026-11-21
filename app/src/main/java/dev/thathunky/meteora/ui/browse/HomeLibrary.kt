@@ -52,6 +52,7 @@ import dev.thathunky.meteora.ui.components.ButtonKind
 import dev.thathunky.meteora.ui.components.MButton
 import dev.thathunky.meteora.ui.components.PageTitle
 import dev.thathunky.meteora.ui.components.SectionHeader
+import dev.thathunky.meteora.ui.components.rowSlotHeight
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.CollectionPage
 import dev.thathunky.meteora.ytm.MusicItem
@@ -149,8 +150,9 @@ fun HomeScreen(
                             // "Quick picks": a 4-row grid of songs that scrolls sideways.
                             LazyHorizontalGrid(
                                 rows = GridCells.Fixed(4),
-                                // Four rows at the look's row height (72 dp in Expressive, as before).
-                                modifier = Modifier.height((look.rowHeight + look.rowGap) * 4),
+                                // Four rows as tall as a row really is: the look's row height
+                                // alone cut off the fourth row in Terminal and at large font sizes.
+                                modifier = Modifier.height(rowSlotHeight() * 4),
                                 contentPadding = PaddingValues(horizontal = look.screenPadding / 2),
                             ) {
                                 gridItems(shelf.items.distinctBy { it.key() }, key = { it.key() }) { item ->

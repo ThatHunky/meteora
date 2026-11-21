@@ -146,19 +146,24 @@ private fun ItemAction.label(): Pair<Int, ImageVector> = when (this) {
 fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
+    // ListItem paints the surface colour by default, which showed as bands across the sheet's own
+    // (container) colour, starkest on pure black. Transparent rows take the sheet's colour.
+    val rowColors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         ListItem(
-            headlineContent = { Text(item.title, style = MaterialTheme.typography.titleMediumEmphasized) },
-            supportingContent = { Text(item.subtitleText(), maxLines = 1) },
+            headlineContent = { Text(item.title, style = MaterialTheme.typography.titleMediumEmphasized, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            supportingContent = { Text(item.typedSubtitle(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             leadingContent = {
                 ArtworkFrame(item.thumbnail, ArtKind.Sheet, Modifier.size(56.dp))
             },
+            colors = rowColors,
         )
         itemActions(item).forEach { action ->
             val (label, icon) = action.label()
             ListItem(
                 headlineContent = { Text(stringResource(label)) },
                 leadingContent = { Icon(icon, null) },
+                colors = rowColors,
                 modifier = Modifier.combinedClickable(onClick = {
                     onAction(action)
                     // Slide the sheet away before removing it, instead of cutting it off.
