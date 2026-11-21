@@ -418,14 +418,17 @@ class LocalEngine @Inject constructor(
                 // Offline is not the track's fault: wait and try the same track again. Skipping
                 // here would burn through the whole queue while there is no network.
                 isNetworkError(error) -> retryWhenBackOnline(p, error)
-                // In video mode, suspect the picture first: the sound on its own may well play.
-                dropVideo(p) -> Unit
+                // No picture to be had: play the sound alone at once.
+                isVideoUnavailable(error) && dropVideo(p) -> Unit
                 // Most likely an expired or IP-bound URL: resolve again once, then skip the track.
                 id != null && retried.add(id) -> {
                     // A failed web music URL (no Premium, or it wants a token) retries on the anonymous path.
                     resolver.invalidate(id, pinned[id]?.let { resolver.cached(id, it) }?.source)
+                    p.currentMediaItem?.toLocalSong()?.videoPlan?.let { resolver.invalidateVideo(it.videoId) }
                     p.prepare()
                 }
+                // Failed again in video mode: the sound on its own may well play.
+                dropVideo(p) -> Unit
                 else -> {
                     _errors.tryEmit(error)
                     if (p.hasNextMediaItem() && ++failedInARow < MAX_FAILED_IN_A_ROW) {
@@ -439,6 +442,9 @@ class LocalEngine @Inject constructor(
             publish()
         }
     }
+
+    private fun isVideoUnavailable(error: PlaybackException): Boolean =
+        generateSequence(error.cause) { it.cause }.any { it is VideoUnavailableException }
 
     private fun isNetworkError(error: PlaybackException): Boolean =
         error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
@@ -502,6 +508,18 @@ class LocalEngine @Inject constructor(
         }
         p.addMediaItems(0, loaded.songs.subList(0, start).map(::mediaItem))
         p.addMediaItems(loaded.songs.subList(start + 1, loaded.songs.size).map(::mediaItem))
+        // The queue's copy of the playing song knows more (its music-video counterpart). Same URI
+        // (audio mode, or no picture either way): only the metadata is updated, playback goes on.
+        // Otherwise it now has a picture to show: restart it with one at the same position.
+        val richer = mediaItem(loaded.songs[start])
+        val i = p.currentMediaItemIndex
+        if (richer.localConfiguration?.uri == p.currentMediaItem?.localConfiguration?.uri) {
+            p.replaceMediaItem(i, richer)
+        } else {
+            val position = p.currentPosition
+            p.replaceMediaItem(i, richer)
+            p.seekTo(i, position)
+        }
         publish()
         return true
     }
@@ -613,6 +631,8 @@ class LocalEngine @Inject constructor(
         retried.clear()
         pinned.clear()
         pinnedVideo.clear()
+        // A new queue gives pictures that failed before another chance (the network may have changed).
+        noVideo.clear()
         failedInARow = 0
         networkAttempts = 0
         networkRetry?.cancel()
