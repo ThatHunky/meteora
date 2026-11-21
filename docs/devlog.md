@@ -66,7 +66,7 @@ The full player's title came out almost black on a dark background. The full pla
 
 Sign‑in uses a WebView with `; wv` removed from its user agent. When it lands on `music.youtube.com` with a `SAPISID` cookie, the cookies are encrypted with a Keystore key, and each later request is signed with `SAPISIDHASH`. The mini player was drawn over Google's sign‑in page, so the sign‑in screen now hides it.
 
-The user signed in on the phone; Meteora never touched the password. Google didn't block it, and Home switched to the personal "Listen again" shelf, with liked songs in Library. S2 ✅.
+The user signed in on the phone; Meteora never touched the password. Google didn't block it, and Home switched to the personal "Listen again" shelf, with liked songs in Library. S2 ✅. Playing liked songs *on the PC* is not confirmed: the screen was asleep when I tapped Play, and the PC then showed a different track.
 
 ## "Can this be a standalone client?" (21:09 →)
 
@@ -88,7 +88,7 @@ It was also far too slow, and unreliable on this phone:
 | warm | 15.4 s, 17.1 s, 18.1 s |
 | later | `[Errno 7] No address associated with hostname`, while ping from the same phone worked |
 
-The DNS failures come from Python's own DNS lookups, which this phone sends through AdGuard Private DNS, and they happen often. A 15‑second wait after tapping a song isn't usable.
+The DNS failures come from Python's own lookups and happen often. My guess is the phone's AdGuard Private DNS, but I haven't confirmed it. A 15‑second wait after tapping a song isn't usable.
 
 ### Doing it the way YouTube's own apps do
 
@@ -101,7 +101,6 @@ One `/player` request as the visionOS client, with a visitor ID from `sw.js_data
 
 | Check | Result |
 |---|---|
-| `/player` call | ~0.2 s from the PC |
 | ranged read | 206 |
 | seek into the middle | 206 in 0.08 s |
 | full file | 6 MB in 0.13 s |
@@ -117,16 +116,19 @@ On the phone it takes **113–515 ms** instead of 15 s. yt-dlp stays as the fall
 - **Switching:** it moves the queue and position and pauses the other side. It's in Settings and in the "Playing on …" chip in the player.
 - **System integration:** the media session swaps its player when you switch, volume keys go to the phone's own volume in phone mode, and pairing can be skipped with "Use without a PC".
 
-### Checked on the OP7T (21:30–21:33)
+### Checked on the OP7T (21:30–21:40)
 
 - **PC → phone:** the PC was paused on *The Chain* at 0:49. After switching to *This phone* and pressing play, the phone resolved the track in 515 ms and played from 0:49.
 - **Next track:** resolved in 113 ms. Playback continued with the screen off for 45 s, with a foreground media notification.
 - **Search:** "nothing else matters", tap the top result: the Metallica radio played on the phone in 121 ms, and the full player showed "Playing on this phone".
+- **Liked songs on the phone:** played in order from "End of It" (the signed-in `next` call with `LM`). Seeking near the end rolled over to the next track by itself, and a `next` sent through the media session, as the notification does, skipped again.
 - **Phone → PC:** pause, then switch back. The media session went back to the PC player with remote volume 0–100.
 
 ### Known gaps
 
-- **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC.
+- **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play. Mobile data is untested too, because turning Wi‑Fi off cuts the adb link.
+- **Release build:** not built yet.
+- **Signed-out streams:** audio URLs are fetched without your cookies, so age-restricted or private tracks may not play.
 - **Like buttons:** they show "not liked" until you press them; the current like status isn't read from YouTube yet.
 - **Share sheet:** PC only.
 - **Debug APK:** 104 MB, mostly the unshrunk debug build with the full icon set; yt-dlp adds ~18 MB. A release build will be much smaller.

@@ -95,7 +95,9 @@ class PlaybackRouter @Inject constructor(
                     val connected = withTimeoutOrNull(6_000) { pc.connection.first { it is ConnectionState.Connected } }
                     if (connected == null) return@launch
                     val playlist = local.currentPlaylistId
-                    pc.send(Command.ChangeVideo(track.videoId, playlist ?: "RDAMVM${track.videoId}"))
+                    // changeVideo on the PC's already-loaded video is a no-op (S1): just resume it.
+                    if (pc.state.value?.track?.videoId == track.videoId) pc.send(Command.Play)
+                    else pc.send(Command.ChangeVideo(track.videoId, playlist ?: "RDAMVM${track.videoId}"))
                     if (position > 5) {
                         withTimeoutOrNull(8_000) { pc.state.first { it?.track?.videoId == track.videoId && it.isPlaying } }
                         pc.send(Command.SeekTo(position))
