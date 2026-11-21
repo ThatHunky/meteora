@@ -258,6 +258,8 @@ Parsing: renderers such as `musicCarouselShelfRenderer`, `musicTwoRowItemRendere
 - **Networking:** its own, on `reqwest` and `tokio`.
 - **Licence:** GPL‑3.0, compatible with Meteora.
 
+**Like status in a queue response (signed in, probed 2026‑11‑21):** `playlistPanelVideoRenderer` items have no `likeStatus`. Each has a `toggleMenuServiceItemRenderer` whose `defaultIcon.iconType` is `UNFAVORITE` when the track is liked and `FAVORITE` when it is not (signed out, always `FAVORITE`). `playerOverlays.playerOverlayRenderer…likeButtonRenderer` gives `likeStatus` (`LIKE` / `DISLIKE` / `INDIFFERENT`) and `target.videoId` for the current track only. `like/like`, `like/dislike` and `like/removelike` with `{"target":{"videoId":…}}` change it; confirmed by reading the overlay back.
+
 **Queues:** `POST music.youtube.com/youtubei/v1/next` with `{videoId?, playlistId, isAudioOnly, enablePersistentPlaylistPanel}`.
 - **Response:** `playlistPanelVideoRenderer` items, with `selected:true` on the starting track.
 - **Radio** (`RDAMVM<id>`) returns 50 tracks plus `nextRadioContinuationData`.

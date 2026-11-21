@@ -1,5 +1,6 @@
 package dev.thathunky.meteora.ytm
 
+import dev.thathunky.meteora.domain.LikeStatus
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -23,5 +24,30 @@ class WatchQueueTest {
         assertNotNull(first.thumbnail)
         assertNotNull("radio continues", q.continuation)
         q.songs.forEach { assertEquals(11, it.videoId.length); assertTrue(it.title.isNotBlank()) }
+    }
+
+    @Test fun signedOutNothingIsLiked() {
+        // Signed out, every item still has the liked-songs toggle, in its "add" state.
+        val q = YtmParser.watchQueue(root)
+        assertEquals(q.songs.map { it.videoId }.toSet(), q.likes.keys)
+        assertTrue(q.likes.values.all { it == LikeStatus.Indifferent })
+    }
+
+    /** The shape seen signed in on 2026-11-21: a liked-songs toggle per item, the overlay for the current one. */
+    @Test fun likesFromTogglesAndOverlay() {
+        fun item(id: String, defaultIcon: String, toggledIcon: String) = """{"playlistPanelVideoRenderer":{"videoId":"$id","title":{"runs":[{"text":"T"}]},
+            "menu":{"menuRenderer":{"items":[
+              {"toggleMenuServiceItemRenderer":{"defaultIcon":{"iconType":"BOOKMARK_BORDER"},"toggledIcon":{"iconType":"BOOKMARK"}}},
+              {"toggleMenuServiceItemRenderer":{"defaultIcon":{"iconType":"$defaultIcon"},"toggledIcon":{"iconType":"$toggledIcon"}}}]}}}}"""
+        val q = YtmParser.watchQueue(
+            Json.parseToJsonElement(
+                """{"contents":[${item("aaaaaaaaaaa", "UNFAVORITE", "FAVORITE")},${item("bbbbbbbbbbb", "FAVORITE", "UNFAVORITE")},${item("ccccccccccc", "FAVORITE", "UNFAVORITE")}],
+                "playerOverlays":{"playerOverlayRenderer":{"actions":[{"likeButtonRenderer":{"target":{"videoId":"ccccccccccc"},"likeStatus":"DISLIKE"}}]}}}""",
+            ),
+        )
+        assertEquals(
+            mapOf("aaaaaaaaaaa" to LikeStatus.Like, "bbbbbbbbbbb" to LikeStatus.Indifferent, "ccccccccccc" to LikeStatus.Dislike),
+            q.likes,
+        )
     }
 }

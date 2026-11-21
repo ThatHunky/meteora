@@ -121,6 +121,8 @@ class LocalEngine @Inject constructor(
     private var extending = false
     private var unshuffled: List<String>? = null
     private val likes = HashMap<String, LikeStatus>()
+    /** Tracks the user rated in this session; YouTube's answer no longer overrides these. */
+    private val ratedHere = HashSet<String>()
     private val retried = HashSet<String>()
     /** videoId → tier it was first opened with. Written on the loader thread. */
     private val pinned = ConcurrentHashMap<String, StreamQuality>()
@@ -317,23 +319,42 @@ class LocalEngine @Inject constructor(
             is PlayIntent.Collection -> ytm.watchQueue(intent.startVideoId, intent.playlistId)
             PlayIntent.LikedSongs -> ytm.watchQueue(playlistId = "LM")
         }.also { playlistId = (intent as? PlayIntent.Collection)?.playlistId ?: (intent as? PlayIntent.SongRadio)?.let { "RDAMVM${it.videoId}" } ?: "LM" }
-            .let { q -> Loaded(q.songs.map { it.toLocal() }, q.startIndex, q.continuation, shuffle) }
+            .let { q -> Loaded(q.songs.map { it.toLocal() }, q.startIndex, q.continuation, shuffle, q.likes) }
 
     /** One-off stream setup, done when the phone becomes the target instead of on the first tap. */
     fun prewarm() = resolver.prewarm()
 
     /** Start on [songs] right away (e.g. a hand-off from the PC). */
-    fun setQueue(songs: List<LocalSong>, startIndex: Int, positionMs: Long = 0, playWhenReady: Boolean = true, source: String? = null) {
+    fun setQueue(
+        songs: List<LocalSong>,
+        startIndex: Int,
+        positionMs: Long = 0,
+        playWhenReady: Boolean = true,
+        source: String? = null,
+        likes: Map<String, LikeStatus> = emptyMap(),
+    ) {
         loadJob?.cancel()
         songs.getOrNull(startIndex)?.let { resolver.warm(it.videoId) }
         scope.launch(Dispatchers.Main) {
+            mergeLikes(likes)
             playlistId = source
             radioContinuation = null
             apply(Loaded(songs, startIndex, null, false), positionMs, playWhenReady)
         }
     }
 
-    private data class Loaded(val songs: List<LocalSong>, val start: Int, val continuation: String?, val shuffle: Boolean)
+    private data class Loaded(
+        val songs: List<LocalSong>,
+        val start: Int,
+        val continuation: String?,
+        val shuffle: Boolean,
+        val likes: Map<String, LikeStatus> = emptyMap(),
+    )
+
+    /** Take YouTube's like statuses, except for tracks rated here since: ours is newer. Main thread. */
+    private fun mergeLikes(fromYouTube: Map<String, LikeStatus>) {
+        for ((id, status) in fromYouTube) if (id !in ratedHere) likes[id] = status
+    }
 
     private fun load(fetch: suspend () -> Loaded) {
         loadJob?.cancel()
@@ -350,6 +371,7 @@ class LocalEngine @Inject constructor(
             resolver.warm(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId)
             withContext(Dispatchers.Main) {
                 radioContinuation = loaded.continuation
+                mergeLikes(loaded.likes)
                 if (!putQueueAround(loaded)) apply(loaded, 0, true)
             }
         }
@@ -388,7 +410,10 @@ class LocalEngine @Inject constructor(
     /** Add a whole album / playlist via its watch queue. */
     fun insertCollection(playlistId: String, next: Boolean) = scope.launch {
         runCatching { ytm.watchQueue(playlistId = playlistId) }
-            .onSuccess { q -> insert(q.songs.map { it.toLocal() }, next) }
+            .onSuccess { q ->
+                withContext(Dispatchers.Main) { mergeLikes(q.likes) }
+                insert(q.songs.map { it.toLocal() }, next)
+            }
             .onFailure { _errors.tryEmit(it) }
     }
 
@@ -404,6 +429,7 @@ class LocalEngine @Inject constructor(
                 extending = false
                 if (more == null) return@withContext
                 radioContinuation = more.continuation
+                mergeLikes(more.likes)
                 val have = (0 until p.mediaItemCount).map { p.getMediaItemAt(it).mediaId }.toSet()
                 val fresh = more.songs.filter { it.videoId !in have }.map { it.toLocal() }
                 if (fresh.isNotEmpty()) p.addMediaItems(fresh.map(::mediaItem))
@@ -486,11 +512,16 @@ class LocalEngine @Inject constructor(
         val now = likes[id] ?: LikeStatus.Indifferent
         val next = if (now == target) LikeStatus.Indifferent else target
         likes[id] = next
+        ratedHere.add(id)
         publish()
         scope.launch {
             runCatching { ytm.rate(id, next) }.onFailure {
-                likes[id] = now
-                withContext(Dispatchers.Main) { publish() }
+                // YouTube did not take it: show the old status again, and let its answer count again.
+                withContext(Dispatchers.Main) {
+                    likes[id] = now
+                    ratedHere.remove(id)
+                    publish()
+                }
                 _errors.tryEmit(it)
             }
         }

@@ -268,6 +268,17 @@ RustyPipe, a Rust client for YouTube Music, looked like a shortcut. It is not: i
 - **APKs by Telegram.** A script on the VPS sends a file through the user's admin bot. The first build went out at 23:15.
 - **README.** A short placeholder until the user writes the real one.
 
+## Likes weren't synced (23:35 → 23:55)
+
+The user: "I think likes aren't synced." In phone mode the like button always started as "not liked", whatever YouTube knew. It was on the gaps list from the afternoon; pressing it did reach YouTube, but nothing was ever read back.
+
+- **Where the status is.** A second debug probe asked for a signed-in queue (`next`) response and logged only counts and key paths. No queue item carries a `likeStatus`. The player overlay does, for the current track only. What every item does have is a liked-songs toggle in its menu, and its default icon is the action on offer: `UNFAVORITE` ("remove from liked songs") means the track is liked. In the Duality radio, 23 of 78 items were in that state.
+- **The fix.** The queue parser now returns a like status per track from those toggles, with the overlay's answer on top for the current track, since it is the only place a dislike shows. The player takes those when a queue loads, when a radio extends and on a hand-off from the PC. A track rated in Meteora keeps Meteora's value until the app restarts, so an older answer from YouTube can't undo it.
+- **Checked on the OP7T.** Duality, liked on YouTube, opens with the like button filled. Un-liking it in Meteora and asking YouTube again gave `INDIFFERENT`; liking it again gave `LIKE`.
+- **Still missing:** a dislike on a track that is not the first of its queue is not known until it is rated here. Lists (search, album pages) show no like state at all.
+
+Seen along the way: after tapping a search result the search field keeps focus, so the keyboard comes back over the mini player when the app returns to the front. Not fixed.
+
 ### Known gaps
 
 - **Solver in a WebView:** slow (about half a second a track) and heavy; the Rust core is meant to replace it.
@@ -276,7 +287,7 @@ RustyPipe, a Rust client for YouTube Music, looked like a shortcut. It is not: i
 - **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play.
 - **Release build:** not built yet.
 - **Signed-out streams:** audio URLs are fetched without your cookies, so age-restricted or private tracks may not play.
-- **Like buttons:** they show "not liked" until you press them; the current like status isn't read from YouTube yet.
+
 - **Share sheet:** PC only.
 - **Debug APK:** 104 MB, mostly the unshrunk debug build with the full icon set; yt-dlp adds ~18 MB. A release build will be much smaller.
 - **License:** yt-dlp comes through `youtubedl-android`, which is GPL‑3.0. That matches the plan's GPL‑3.0 choice.

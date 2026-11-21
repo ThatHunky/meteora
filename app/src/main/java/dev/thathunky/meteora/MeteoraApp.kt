@@ -28,6 +28,7 @@ class MeteoraApp : Application() {
         fun okHttp(): OkHttpClient
         fun auth(): YtmAuthProvider
         fun resolver(): StreamResolver
+        fun ytm(): dev.thathunky.meteora.ytm.YtmClient
     }
 
     override fun onCreate() {
@@ -45,5 +46,15 @@ class MeteoraApp : Application() {
             }
         }
         ContextCompat.registerReceiver(this, receiver, IntentFilter("dev.thathunky.meteora.PROBE"), ContextCompat.RECEIVER_EXPORTED)
+        // adb shell am broadcast -a dev.thathunky.meteora.PROBE_LIKES -p dev.thathunky.meteora [--es v <videoId>] [--es list <playlistId>]
+        val likes = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val deps = EntryPointAccessors.fromApplication(this@MeteoraApp, ProbeDeps::class.java)
+                val v = intent.getStringExtra("v")
+                val list = intent.getStringExtra("list")
+                CoroutineScope(Dispatchers.IO).launch { dev.thathunky.meteora.ytm.LikeProbe.run(deps.ytm(), v, list) }
+            }
+        }
+        ContextCompat.registerReceiver(this, likes, IntentFilter("dev.thathunky.meteora.PROBE_LIKES"), ContextCompat.RECEIVER_EXPORTED)
     }
 }

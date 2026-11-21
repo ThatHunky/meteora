@@ -87,7 +87,9 @@ class PlaybackRouter @Inject constructor(
                         ?: songs.indexOfFirst { it.videoId == track.videoId }.coerceAtLeast(0)
                     val position = (s.progressAt(android.os.SystemClock.elapsedRealtime()) * 1000).toLong()
                     if (wasPlaying) pc.send(Command.Pause)
-                    local.setQueue(songs, idx, position, playWhenReady = wasPlaying, source = s.playlistId)
+                    // The PC knows the current track's like status; the rest of the queue stays unknown.
+                    val likes = if (track.like == dev.thathunky.meteora.domain.LikeStatus.Unknown) emptyMap() else mapOf(track.videoId to track.like)
+                    local.setQueue(songs, idx, position, playWhenReady = wasPlaying, source = s.playlistId, likes = likes)
                 }
                 PlaybackTarget.Pc -> {
                     val s = local.state.value ?: return@launch

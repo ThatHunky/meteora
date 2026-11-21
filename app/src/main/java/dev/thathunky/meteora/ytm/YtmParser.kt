@@ -1,5 +1,6 @@
 package dev.thathunky.meteora.ytm
 
+import dev.thathunky.meteora.domain.LikeStatus
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -93,7 +94,34 @@ object YtmParser {
         val selected = root.findAll("playlistPanelVideoRenderer").indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
         val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
             ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
-        return WatchQueue(songs, selected.coerceAtLeast(0), continuation)
+        return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root))
+    }
+
+    /**
+     * Like status per queued track. Signed in, each item's menu has a liked-songs toggle whose
+     * default icon is the action on offer: `UNFAVORITE` ("remove from liked songs") means the
+     * track is liked. The player overlay gives the full status, dislike included, but only for
+     * the current track. Seen on a signed-in response on 2026-11-21; signed out there is neither.
+     */
+    private fun queueLikes(root: JsonElement): Map<String, LikeStatus> {
+        val likes = HashMap<String, LikeStatus>()
+        for (r in root.findAll("playlistPanelVideoRenderer")) {
+            val videoId = r.str("videoId") ?: continue
+            val icon = r.findAll("toggleMenuServiceItemRenderer").firstNotNullOfOrNull { t ->
+                t["defaultIcon"].str("iconType")?.takeIf { it == "FAVORITE" || it == "UNFAVORITE" }
+            } ?: continue
+            likes[videoId] = if (icon == "UNFAVORITE") LikeStatus.Like else LikeStatus.Indifferent
+        }
+        val overlay = root.findAll("playerOverlayRenderer").firstOrNull()?.findAll("likeButtonRenderer")?.firstOrNull()
+        val current = overlay?.get("target").str("videoId")
+        val status = when (overlay?.str("likeStatus")) {
+            "LIKE" -> LikeStatus.Like
+            "DISLIKE" -> LikeStatus.Dislike
+            "INDIFFERENT" -> LikeStatus.Indifferent
+            else -> null
+        }
+        if (current != null && status != null) likes[current] = status
+        return likes
     }
 
     // ---- item renderers ----

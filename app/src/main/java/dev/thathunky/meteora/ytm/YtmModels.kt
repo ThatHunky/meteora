@@ -69,4 +69,10 @@ data class ArtistPage(
 )
 
 /** A watch queue from the `next` endpoint; [startIndex] is the item the player starts on. */
-data class WatchQueue(val songs: List<MusicItem.Song>, val startIndex: Int, val continuation: String?)
+/** [likes]: video id → like status, for the tracks the response says it for (signed in only). */
+data class WatchQueue(
+    val songs: List<MusicItem.Song>,
+    val startIndex: Int,
+    val continuation: String?,
+    val likes: Map<String, dev.thathunky.meteora.domain.LikeStatus> = emptyMap(),
+)
