@@ -287,9 +287,57 @@ Seen along the way: after tapping a search result the search field keeps focus, 
 - **Now Playing** has an overflow menu (Start radio, Share, Go to album, Go to artist), and the artist and album in the subtitle open their pages.
 - **Checked:** build and unit tests only. Nothing here was tried on a phone yet.
 
+## Three agents at once (23:20 → 00:00)
+
+The user kept asking for things faster than one line of work could deliver them, so three Opus agents ran side by side, each from its own plan: the Rust core in the main checkout, and the parity slice and theming each in a separate git worktree so their half-finished edits couldn't break each other's builds. I merged them in turn and checked each on the OP7T.
+
+### Rust core, first slice
+
+Plan: [rust-core-plan.md](rust-core-plan.md). Format picking, URL handling and the signature solver now live in `rust/meteora-core`, built for arm64 by a Gradle task. Rust does no networking.
+
+- **Getting QuickJS to build for Android** took five tries before the agent started. The `rquickjs` crate ships no Android bindings; generating them failed on a missing `stdbool.h`, then on "Unversioned target triples are not supported". `cargo-ndk` was dropping the extra compiler arguments, so the recipe uses plain `cargo` with the NDK paths set by hand. It is written into the plan.
+- **First result on the phone: no faster.** A solve took about 450 ms, the same as the WebView. The solver's entry point re-evaluates the whole preprocessed player, about 4 MB of JavaScript, on every call. I changed the glue to evaluate it once and keep the two functions it defines, which is what the solver does internally anyway.
+- **After that**, on the OP7T on High quality:
+
+  | | WebView solver | Rust solver |
+  |---|---|---|
+  | One solve | 450–980 ms | 5–9 ms |
+  | Stream lookup | 600–1200 ms | 127–154 ms |
+  | Tap to sound | 1.3–1.7 s | about 1.0 s |
+  | App memory while playing (PSS) | 246 MB | 232 MB |
+  | WebView renderer process | 152 MB | none |
+
+- **The cost:** preparing a new player script takes 6.3 s on the phone, once per app start, in the background. A High track tapped inside that window waits for it. Keeping the prepared script on disk would remove that; not done.
+- The library is 1.8 MB. The plan had guessed 0.5 MB from a one-function test.
+
+### Closer to the official client
+
+Plan: [parity-plan.md](parity-plan.md). The first slice added Start radio for albums, playlists and artists, a long-press menu for every kind of item, share links, autoplay after an album or playlist, and an overflow menu and tappable artist in Now Playing.
+
+- The agent checked the two things the plan had marked unverified, with anonymous requests: `RDAMPL<playlistId>` is the radio of a collection, and a collection's queue response names what plays after it, one level deeper than I had written.
+- **Checked on the phone:** the album menu lists Play, Shuffle, Play next, Add to queue, Start radio, Share; Start radio on an album loaded a 62‑track queue and played; Share opened the system sheet with the link and "title – artist", without Meteora's own "Play on PC" target.
+- **Not checked:** autoplay at the end of an album, the Settings switch for it, radio through YTMDesktop on the PC, and the tappable artist line.
+- **Left out on purpose:** the user also asked to share a track as a file into Telegram. That sends out a copy of the recording, so only links are shared.
+
+### Themes, and less of the cover cut off
+
+Plan: [theming-plan.md](theming-plan.md). The user forwarded a friend's request from a group chat (N7Art): black background, `#eeeeee` and `#aaaaaa` text, white accents, "vim style", with the moonfly scheme as the reference. And the user's own complaint: the cookie shape "cuts way too much of the album cover".
+
+- **Themes:** Album art (still the default), System colours and Meteora are built from a seed as before. Eight are fixed palettes: Mono (N7Art's, credited in Settings), Moonfly on black, Catppuccin Mocha and Latte, Gruvbox, Nord, Rosé Pine and Tokyo Night. The agent took every palette from the scheme's own repository, not from memory, and the source is noted next to each.
+- **Options:** light / dark / system for the seed-based themes, a pure black background, and status bar icons that follow the app's theme.
+- **Artwork:** the default is now a rounded square showing the whole cover; play and pause show as size (full while playing, 88 % paused). The old cookie is still there as "Scalloped".
+- **Checked on the phone:** the Appearance section, Mono applied (black, white accents, mode selector greyed out), and the rounded cover in Now Playing. Not checked: the other fixed themes one by one, light mode, and the status bar icons on a light phone.
+
+### Two small ones from the user's own testing
+
+- **"Sometimes you think it's an album and the song starts playing."** Cards and search rows now say Song or Video in front, as the official client does; albums, singles and playlists already named their kind.
+- **"Notice how the list jumps"**, with a screen recording. Frames from it showed Home's rows shifting up and down while a carousel scrolled sideways: a card with a two-line title is taller, and a carousel is as tall as its tallest visible card. Cards now always reserve two title lines. Four swipes on the phone left the headers below at the same position.
+
+Unit tests after the merges: 62 in Kotlin, 31 in Rust.
+
 ### Known gaps
 
-- **Solver in a WebView:** slow (about half a second a track) and heavy; the Rust core is meant to replace it.
+- **Solver:** preparing a new player script takes about 6 s after each app start.
 - **High without Premium:** a signed-in account without Premium was not tried. It may pay one failed open per track before falling back.
 - **Web path after a failure:** a video that fails once on the web path stays on the anonymous path until the app restarts, and a "confirm you're not a bot" answer turns the web path off for the session.
 - **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play.

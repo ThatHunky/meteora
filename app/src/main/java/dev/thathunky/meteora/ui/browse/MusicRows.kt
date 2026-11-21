@@ -119,7 +119,9 @@ fun MusicCard(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, mod
             modifier = Modifier.size(152.dp).clip(if (item is MusicItem.Artist) CircleShape else RoundedCornerShape(20.dp)),
         )
         Spacer(Modifier.height(8.dp))
-        Text(item.title, style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Always two lines tall: a carousel is as tall as its tallest visible card, so cards of
+        // different heights made everything below jump while it scrolled sideways.
+        Text(item.title, style = MaterialTheme.typography.titleSmallEmphasized, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(
             item.typedSubtitle(),
             style = MaterialTheme.typography.bodySmall,

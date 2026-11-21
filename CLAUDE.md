@@ -28,6 +28,17 @@ adb -s <serial> install -r app\build\outputs\apk\debug\app-debug.apk
 
 With `-q` a passing run prints nothing; test counts are in `app\build\test-results\testDebugUnitTest\*.xml`. There is no lint, Spotless or detekt task configured (PLAN.md mentions them; they were never added).
 
+The Rust core (`rust/meteora-core`) is built for arm64 by the Gradle task `cargoBuildArm64` as part of the app build. Its own tests run on the PC:
+
+```powershell
+$env:METEORA_PLAYER_JS = "<path to a real YouTube base.js>"   # optional: enables the real-player solver test
+cargo test --manifest-path rust\meteora-core\Cargo.toml
+```
+
+The Android build of the QuickJS binding needs specific compiler settings; they are in `app/build.gradle.kts` and explained in `docs/rust-core-plan.md` ("Build integration").
+
+When two pieces of work would touch the same files, give each implementing agent its own git worktree (`isolation: "worktree"`), have it commit on its branch, and merge the branches into `main` afterwards. A worktree needs `local.properties` copied in.
+
 Stream timing shows in logcat under the tags `InnerTubeStreams` (resolve time, tier, itag, bitrate) and `LocalEngine` (queue load time, "playing N ms after the tap").
 
 ## Toolchain
@@ -39,7 +50,9 @@ Deliberately bleeding edge (PLAN.md Q3): AGP 9.5, Kotlin 2.4, Compose BOM alpha,
 One player UI drives two playback targets. Everything goes through `data/PlaybackRouter`, which picks the target and exposes a single `StateFlow<PlaybackState?>` (`domain/Playback.kt`) that all player screens read.
 
 - **PC target:** `data/PlayerRepository` owns the connection to YTMDesktop. `companion/CompanionClient` is REST, `companion/RealtimeClient` is the Socket.IO state stream, and `companion/CommandThrottler` keeps to the server's 2 commands per second (discrete commands queue, seek and volume keep only their latest value). The repository is ref-counted with `acquire()` / `release()`.
-- **Phone target:** `playback/LocalEngine` wraps ExoPlayer. Queue items are `meteora://<videoId>`; a `ResolvingDataSource` asks `stream/StreamResolver` for the real URL when ExoPlayer opens an item. `StreamResolver` tries `InnerTubeStreams` (one `/player` call as the visionOS client, about 0.1 s) and falls back to `YtDlpStreams` (bundled yt-dlp, about 15 s).
+- **Phone target:** `playback/LocalEngine` wraps ExoPlayer. Queue items are `meteora://<videoId>`; a `ResolvingDataSource` asks `stream/StreamResolver` for the real URL when ExoPlayer opens an item. `StreamResolver` tries `WebMusicStreams` (signed in, High quality only: the 256 kbps formats, whose signature is solved in the Rust core), then `InnerTubeStreams` (one `/player` call as the visionOS client, about 0.1 s), then `YtDlpStreams` (bundled yt-dlp, about 15 s).
+- **Rust core:** `core/MeteoraCore` is the JNI door to `rust/meteora-core`. Kotlin does all HTTP; Rust picks formats, parses pages, builds stream URLs and runs YouTube's signature JavaScript on QuickJS. Stream logic is tested with `cargo test`, not in Kotlin.
+- **Themes:** `ui/theme/Themes.kt` lists them (seed-based and fixed palettes) and `ThemeStore` keeps the choice; the artwork shape comes from `LocalArtworkShape`.
 - **Commands:** the UI sends `companion/Command` values either way. `LocalEngine.handle()` maps them onto ExoPlayer; the PC path serialises them to JSON.
 - **Media session:** `playback/MeteoraSessionService` hosts one session and swaps its player when the target changes: `RemotePlayer` (a `SimpleBasePlayer` that plays nothing and mirrors the PC) or the engine's ExoPlayer.
 - **Browsing:** `ytm/YtmClient` calls InnerTube as the `WEB_REMIX` client, signed with `SAPISIDHASH` from cookies captured in `ui/signin` and stored encrypted (`ytm/YtmAuthStore`, `data/SecureStore`). `ytm/YtmParser` searches responses for known renderers instead of following fixed paths, because YouTube rearranges its JSON.
