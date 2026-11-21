@@ -115,4 +115,9 @@
     <string name="style_flat">Плаский</string>
     <string name="style_retro">Ретро</string>
     <string name="style_soft">М’який</string>
+    <!-- Settings categories -->
+    <string name="settings_playback">Відтворення</string>
+    <string name="settings_about">Про застосунок</string>
+    <string name="settings_version">Версія %1$s</string>
+    <string name="action_back">Назад</string>
 </resources>

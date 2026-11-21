@@ -92,8 +92,8 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
     val systemDark = isSystemInDarkTheme()
     val fixed = theme is AppTheme.Fixed
 
+    // The sub-screen's header carries the "Appearance" title.
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.appearance_title), style = MaterialTheme.typography.titleSmall)
         Text(stringResource(R.string.appearance_theme), style = MaterialTheme.typography.labelLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(AllThemes, key = { it.id }) { t ->
@@ -142,6 +142,20 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
     }
 }
 
+/** A theme's display name; fixed themes' names are proper names and not translated. */
+@Composable
+fun themeName(t: AppTheme): String = when (t) {
+    is AppTheme.Fixed -> t.name
+    is AppTheme.Dynamic -> t.nameRes?.let { stringResource(it) } ?: "Meteora"
+}
+
+/** The current theme's name, for the Settings list. */
+@Composable
+fun currentThemeName(vm: AppearanceViewModel = hiltViewModel()): String {
+    val id by vm.themeId.collectAsStateWithLifecycle()
+    return themeName(themeById(id))
+}
+
 private fun lookName(id: LookId?): Int = when (id) {
     null -> R.string.style_from_theme
     LookId.Expressive -> R.string.style_expressive
@@ -177,10 +191,7 @@ private fun StyleRow(selected: LookId?, onSelect: (LookId?) -> Unit) {
 private fun ThemeCard(t: AppTheme, look: Look, selected: Boolean, mode: ThemeMode, pureBlack: Boolean, systemDark: Boolean, onClick: () -> Unit) {
     // Dynamic themes preview as they would look right now, album art included.
     val preview = schemeFor(t, isDark(t, mode, systemDark), pureBlack, LocalAlbumSeed.current)
-    val name = when (t) {
-        is AppTheme.Fixed -> t.name
-        is AppTheme.Dynamic -> t.nameRes?.let { stringResource(it) } ?: "Meteora"
-    }
+    val name = themeName(t)
     val author = (t as? AppTheme.Fixed)?.author?.let { stringResource(R.string.theme_by, it) }
     // The card previews the look too: its corner, its surface and its font.
     val shape = RoundedCornerShape(if (look.id == LookId.Expressive) 16.dp else look.cornerMedium)

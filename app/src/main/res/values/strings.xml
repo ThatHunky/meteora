@@ -116,4 +116,9 @@
     <string name="style_flat">Flat</string>
     <string name="style_retro">Retro</string>
     <string name="style_soft">Soft</string>
+    <!-- Settings categories -->
+    <string name="settings_playback">Playback</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="action_back">Back</string>
 </resources>

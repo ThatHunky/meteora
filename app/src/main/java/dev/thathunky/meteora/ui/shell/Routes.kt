@@ -22,3 +22,14 @@ import kotlinx.serialization.Serializable
 @Serializable data class ArtistRoute(val browseId: String) : Route
 
 @Serializable data object SignInRoute : Route
+
+// Settings sub-screens, pushed over SettingsRoute so Settings stays the selected tab.
+@Serializable data object SettingsAppearanceRoute : Route
+
+@Serializable data object SettingsPlaybackRoute : Route
+
+@Serializable data object SettingsAccountRoute : Route
+
+@Serializable data object SettingsPcRoute : Route
+
+@Serializable data object SettingsAboutRoute : Route

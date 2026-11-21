@@ -130,6 +130,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         }
     }
     val longPress: (MusicItem) -> Unit = { sheetFor = it }
+    val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -183,17 +184,12 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     entry<AlbumRoute> { r -> CollectionScreen(r.browseId, isAlbum = true, opener, longPress, contentBottom) }
                     entry<PlaylistRoute> { r -> CollectionScreen(r.playlistId, isAlbum = false, opener, longPress, contentBottom) }
                     entry<ArtistRoute> { r -> ArtistScreen(r.browseId, opener, longPress, contentBottom) }
-                    entry<SettingsRoute> {
-                        val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
-                        val target by vm.target.collectAsStateWithLifecycle()
-                        val qualityWifi by vm.qualityWifi.collectAsStateWithLifecycle()
-                        val qualityMobile by vm.qualityMobile.collectAsStateWithLifecycle()
-                        val autoplay by vm.autoplay.collectAsStateWithLifecycle()
-                        SettingsScreen(
-                            pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm, target, vm::setTarget,
-                            qualityWifi, vm::setQualityWifi, qualityMobile, vm::setQualityMobile, autoplay, vm::setAutoplay, contentBottom,
-                        )
-                    }
+                    entry<SettingsRoute> { SettingsScreen(vm, backStack, contentBottom) }
+                    entry<SettingsAppearanceRoute> { AppearanceSettingsScreen(goBack, contentBottom) }
+                    entry<SettingsPlaybackRoute> { PlaybackSettingsScreen(vm, goBack, contentBottom) }
+                    entry<SettingsAccountRoute> { AccountSettingsScreen(vm, backStack, goBack, contentBottom) }
+                    entry<SettingsPcRoute> { PcSettingsScreen(vm, backStack, goBack, contentBottom) }
+                    entry<SettingsAboutRoute> { AboutSettingsScreen(goBack, contentBottom) }
                     entry<PairingRoute> {
                         PairingScreen(
                             onDone = {
@@ -251,77 +247,6 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
 }
 
 @Composable
-private fun SettingsScreen(
-    name: String?,
-    addresses: List<String>?,
-    backStack: NavBackStack<NavKey>,
-    onForget: () -> Unit,
-    ytmSignedIn: Boolean,
-    onSignOut: () -> Unit,
-    target: dev.thathunky.meteora.data.PlaybackTarget,
-    onTarget: (dev.thathunky.meteora.data.PlaybackTarget) -> Unit,
-    qualityWifi: StreamQuality,
-    onQualityWifi: (StreamQuality) -> Unit,
-    qualityMobile: StreamQuality,
-    onQualityMobile: (StreamQuality) -> Unit,
-    autoplay: Boolean,
-    onAutoplay: (Boolean) -> Unit,
-    bottomPadding: Dp,
-) {
-    // Scrolls, and leaves room for the mini player, so the last rows are reachable on short screens.
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).padding(bottom = bottomPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        dev.thathunky.meteora.ui.settings.AppearanceSection()
-        ListItem(headlineContent = { Text(stringResource(R.string.play_on)) })
-        TargetSelector(target, name, onTarget, Modifier.fillMaxWidth())
-        Text(stringResource(R.string.quality_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-        Text(stringResource(R.string.quality_wifi), style = MaterialTheme.typography.labelLarge)
-        QualitySelector(qualityWifi, onQualityWifi, Modifier.fillMaxWidth())
-        Text(stringResource(R.string.quality_mobile), style = MaterialTheme.typography.labelLarge)
-        QualitySelector(qualityMobile, onQualityMobile, Modifier.fillMaxWidth())
-        Text(
-            stringResource(R.string.quality_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.autoplay_title)) },
-            supportingContent = { Text(stringResource(R.string.autoplay_note)) },
-            trailingContent = { androidx.compose.material3.Switch(checked = autoplay, onCheckedChange = null) },
-            modifier = Modifier.toggleable(value = autoplay, role = Role.Switch, onValueChange = onAutoplay),
-        )
-        ListItem(
-            headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
-            overlineContent = { Text(stringResource(R.string.ytm_account)) },
-        )
-        if (ytmSignedIn) OutlinedButton(onClick = onSignOut) { Text(stringResource(R.string.signout_action)) }
-        else Button(onClick = { backStack.add(SignInRoute) }, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.signin_action)) }
-        ListItem(
-            headlineContent = { Text(name ?: stringResource(R.string.not_connected)) },
-            supportingContent = { Text(addresses?.joinToString(" · ").orEmpty()) },
-            overlineContent = { Text(stringResource(R.string.settings_pc)) },
-        )
-        Button(onClick = { backStack.add(PairingRoute) }, shapes = ButtonDefaults.shapes()) {
-            Text(stringResource(R.string.settings_repair))
-        }
-        OutlinedButton(onClick = onForget) { Text(stringResource(R.string.settings_forget)) }
-        Text(
-            stringResource(R.string.settings_forget_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            stringResource(R.string.disclaimer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-    }
-}
-
-@Composable
 private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
     androidx.compose.material3.Card(
         colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
@@ -340,70 +265,6 @@ private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
             )
             if (connection is ConnectionState.Offline) {
                 androidx.compose.material3.TextButton(onClick = onRetry) { Text(stringResource(R.string.action_reconnect)) }
-            }
-        }
-    }
-}
-
-/** Low / Normal / High, in the official app's order, as a connected button group like [TargetSelector]. */
-@Composable
-private fun QualitySelector(
-    quality: StreamQuality,
-    onQuality: (StreamQuality) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val options = listOf(
-        StreamQuality.Low to stringResource(R.string.quality_low),
-        StreamQuality.Normal to stringResource(R.string.quality_normal),
-        StreamQuality.High to stringResource(R.string.quality_high),
-    )
-    androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = Arrangement.spacedBy(androidx.compose.material3.ButtonGroupDefaults.ConnectedSpaceBetween)) {
-        options.forEachIndexed { i, (q, label) ->
-            androidx.compose.material3.ToggleButton(
-                checked = quality == q,
-                onCheckedChange = { if (it) onQuality(q) },
-                shapes = when (i) {
-                    0 -> androidx.compose.material3.ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> androidx.compose.material3.ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> androidx.compose.material3.ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(label, maxLines = 1)
-            }
-        }
-    }
-}
-
-/** PC / This phone, as a connected button group. */
-@Composable
-fun TargetSelector(
-    target: dev.thathunky.meteora.data.PlaybackTarget,
-    pcName: String?,
-    onTarget: (dev.thathunky.meteora.data.PlaybackTarget) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val options = listOf(
-        dev.thathunky.meteora.data.PlaybackTarget.Pc to (pcName ?: stringResource(R.string.target_pc)),
-        dev.thathunky.meteora.data.PlaybackTarget.Phone to stringResource(R.string.target_phone),
-    )
-    androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = Arrangement.spacedBy(androidx.compose.material3.ButtonGroupDefaults.ConnectedSpaceBetween)) {
-        options.forEachIndexed { i, (t, label) ->
-            androidx.compose.material3.ToggleButton(
-                checked = target == t,
-                onCheckedChange = { if (it) onTarget(t) },
-                shapes = when (i) {
-                    0 -> androidx.compose.material3.ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    else -> androidx.compose.material3.ButtonGroupDefaults.connectedTrailingButtonShapes()
-                },
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(
-                    if (t == dev.thathunky.meteora.data.PlaybackTarget.Pc) Icons.Outlined.Computer else Icons.Outlined.PhoneAndroid,
-                    contentDescription = null,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(label, maxLines = 1)
             }
         }
     }
