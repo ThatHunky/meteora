@@ -124,9 +124,32 @@ On the phone it takes **113–515 ms** instead of 15 s. yt-dlp stays as the fall
 - **Liked songs on the phone:** played in order from "End of It" (the signed-in `next` call with `LM`). Seeking near the end rolled over to the next track by itself, and a `next` sent through the media session, as the notification does, skipped again.
 - **Phone → PC:** pause, then switch back. The media session went back to the PC player with remote volume 0–100.
 
+### A second phone, on mobile data (21:42–21:45)
+
+Testing mobile data on the OP7T would have cut my adb link, so the user lent me a Pixel 9 Pro (Android 37, lifecell SIM):
+
+- **Pairing over wireless adb:** with the pairing code from the Pixel's Wireless debugging screen.
+- **Install and setup:** the debug APK went on. Meteora found the PC by itself, but I chose "Use without a PC", so this phone plays on its own.
+- **Sign-in:** the user signed in to Google on the Pixel. Again no block, and "Drive" by Deftones was playing within a minute.
+
+Turning Wi‑Fi off kills adb, so a script on the Pixel ran the test itself and wrote a log:
+
+1. Turn Wi‑Fi off; the only network left is LTE.
+2. Wait 30 s while "Drive" keeps playing.
+3. Press the media *next* key.
+4. Wait 15 s, save the log, turn Wi‑Fi back on.
+
+Results:
+
+- **On LTE:** "Drive" kept playing with no errors, and the user heard it carry on.
+- **Next track:** loaded over LTE in **889 ms**, against 0.1–0.5 s on Wi‑Fi.
+- **Not exercised:** a Wi‑Fi stream link failing on mobile data mid-song. Its link may be tied to the Wi‑Fi IP, but ExoPlayer buffers about 50 s ahead, which likely covered the 30‑second gap. The app's recovery (fetch a fresh link once, then skip) didn't run.
+- **Script gap:** my lines that read the playback status came back empty on this Pixel, so the 889 ms log line is the evidence the skip happened.
+- **Lesson:** after Wi‑Fi comes back, wireless debugging returns on a new port (39939 → 38693). My watcher kept knocking on the old one; `adb mdns services` shows the new port.
+
 ### Known gaps
 
-- **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play. Mobile data is untested too, because turning Wi‑Fi off cuts the adb link.
+- **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play.
 - **Release build:** not built yet.
 - **Signed-out streams:** audio URLs are fetched without your cookies, so age-restricted or private tracks may not play.
 - **Like buttons:** they show "not liked" until you press them; the current like status isn't read from YouTube yet.
