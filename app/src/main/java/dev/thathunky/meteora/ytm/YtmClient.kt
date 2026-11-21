@@ -10,7 +10,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import dev.thathunky.meteora.domain.Lyrics
 import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -100,27 +102,63 @@ class YtmClient(
 
     suspend fun browse(browseId: String): JsonElement = post("browse", buildJsonObject { put("browseId", browseId) })
 
-    private suspend fun post(endpoint: String, body: JsonObject): JsonElement {
-        ensureClientVersion()
+    /** The lyrics tab's browse id for [videoId] (one `next` call), or null when the response has none. */
+    suspend fun lyricsId(videoId: String): String? = YtmParser.lyricsId(nextRaw(videoId))
+
+    /**
+     * Lyrics behind a [lyricsId]. Timed ones only come to the Android music client, asked signed
+     * out (docs/api-notes.md › Lyrics); if that call fails, the web client's plain text.
+     * Null: the track has no lyrics. Throws when neither call gets an answer.
+     */
+    suspend fun lyrics(browseId: String): Lyrics? {
+        val body = buildJsonObject { put("browseId", browseId) }
+        val android = try {
+            post("browse", body, android = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        return YtmParser.lyrics(android ?: post("browse", body))
+    }
+
+    private suspend fun post(endpoint: String, body: JsonObject, android: Boolean = false): JsonElement {
+        if (!android) ensureClientVersion()
         val locale = Locale.getDefault()
+        val version = if (android) ANDROID_MUSIC_VERSION else clientVersion
         val full = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
-                    put("clientName", "WEB_REMIX")
-                    put("clientVersion", clientVersion)
+                    if (android) {
+                        put("clientName", "ANDROID_MUSIC")
+                        put("clientVersion", version)
+                        put("androidSdkVersion", 30)
+                        put("osName", "Android")
+                        put("osVersion", "11")
+                    } else {
+                        put("clientName", "WEB_REMIX")
+                        put("clientVersion", version)
+                    }
                     put("hl", if (locale.language == "uk") "uk" else "en")
                     put("gl", locale.country.ifBlank { "UA" })
                 }
             }
             body.forEach { (k, v) -> put(k, v) }
         }
-        val authHeaders = auth.headers()
+        // The Android client is always asked signed out: never with the account's cookies.
+        val authHeaders = if (android) null else auth.headers()
         val res = http.post("$BASE/$endpoint?prettyPrint=false") {
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Origin, ORIGIN)
-            header(HttpHeaders.Referrer, "$ORIGIN/")
-            header(HttpHeaders.UserAgent, USER_AGENT)
-            header("X-Goog-Api-Format-Version", "1")
+            if (android) {
+                header(HttpHeaders.UserAgent, ANDROID_MUSIC_USER_AGENT)
+                header("X-YouTube-Client-Name", "21")
+                header("X-YouTube-Client-Version", version)
+            } else {
+                header(HttpHeaders.Referrer, "$ORIGIN/")
+                header(HttpHeaders.UserAgent, USER_AGENT)
+                header("X-Goog-Api-Format-Version", "1")
+            }
             authHeaders?.forEach { (k, v) -> header(k, v) }
             setBody(full.toString())
         }
@@ -153,5 +191,8 @@ class YtmClient(
         private const val BASE = "$ORIGIN/youtubei/v1"
         const val FALLBACK_CLIENT_VERSION = "1.20261117.06.00"
         const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+        /** Probed 2026-11-22; version 5.01 got HTTP 400, so an old version is refused. */
+        const val ANDROID_MUSIC_VERSION = "7.27.52"
+        private const val ANDROID_MUSIC_USER_AGENT = "com.google.android.apps.youtube.music/$ANDROID_MUSIC_VERSION (Linux; U; Android 11) gzip"
     }
 }
