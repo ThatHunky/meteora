@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
@@ -52,6 +54,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.thathunky.meteora.R
 import dev.thathunky.meteora.data.ConnectionState
+import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.ui.browse.ActionsViewModel
 import dev.thathunky.meteora.ui.browse.ArtistScreen
 import dev.thathunky.meteora.ui.browse.CollectionScreen
@@ -65,6 +68,7 @@ import dev.thathunky.meteora.ui.signin.SignInScreen
 import dev.thathunky.meteora.ui.pairing.PairingScreen
 import dev.thathunky.meteora.ui.player.PlayerHost
 import dev.thathunky.meteora.ytm.MusicItem
+import kotlinx.coroutines.delay
 
 private data class Tab(val route: Route, @StringRes val label: Int, val icon: ImageVector)
 
@@ -82,7 +86,7 @@ private val MiniPlayerSpace = 88.dp
 fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewModel = hiltViewModel()) {
     val backStack = rememberNavBackStack(HomeRoute)
     val connection by vm.connection.collectAsStateWithLifecycle()
-    val playback by vm.playback.collectAsStateWithLifecycle()
+    val hasPlayer by vm.hasTrack.collectAsStateWithLifecycle()
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
 
@@ -101,8 +105,16 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
     var playerExpanded by rememberSaveable { mutableStateOf(false) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
     var sheetFor by remember { mutableStateOf<MusicItem?>(null) }
-    val hasPlayer = playback?.track != null
     val contentBottom = if (hasPlayer) MiniPlayerSpace else 0.dp
+    // PlayerHost draws nothing without a track. Without this, a player that was open when the
+    // track went away would come back full-screen on the next track.
+    // After a pause, because a hand-off between PC and phone has no track for a moment.
+    LaunchedEffect(hasPlayer) {
+        if (!hasPlayer) {
+            delay(1_500)
+            playerExpanded = false
+        }
+    }
 
     val opener = Opener { item ->
         when (item) {
@@ -169,7 +181,12 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     entry<SettingsRoute> {
                         val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
                         val target by vm.target.collectAsStateWithLifecycle()
-                        SettingsScreen(pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm, target, vm::setTarget)
+                        val qualityWifi by vm.qualityWifi.collectAsStateWithLifecycle()
+                        val qualityMobile by vm.qualityMobile.collectAsStateWithLifecycle()
+                        SettingsScreen(
+                            pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm, target, vm::setTarget,
+                            qualityWifi, vm::setQualityWifi, qualityMobile, vm::setQualityMobile, contentBottom,
+                        )
                     }
                     entry<PairingRoute> {
                         PairingScreen(
@@ -224,10 +241,29 @@ private fun SettingsScreen(
     onSignOut: () -> Unit,
     target: dev.thathunky.meteora.data.PlaybackTarget,
     onTarget: (dev.thathunky.meteora.data.PlaybackTarget) -> Unit,
+    qualityWifi: StreamQuality,
+    onQualityWifi: (StreamQuality) -> Unit,
+    qualityMobile: StreamQuality,
+    onQualityMobile: (StreamQuality) -> Unit,
+    bottomPadding: Dp,
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // Scrolls, and leaves room for the mini player, so the last rows are reachable on short screens.
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).padding(bottom = bottomPadding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         ListItem(headlineContent = { Text(stringResource(R.string.play_on)) })
         TargetSelector(target, name, onTarget, Modifier.fillMaxWidth())
+        Text(stringResource(R.string.quality_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+        Text(stringResource(R.string.quality_wifi), style = MaterialTheme.typography.labelLarge)
+        QualitySelector(qualityWifi, onQualityWifi, Modifier.fillMaxWidth())
+        Text(stringResource(R.string.quality_mobile), style = MaterialTheme.typography.labelLarge)
+        QualitySelector(qualityMobile, onQualityMobile, Modifier.fillMaxWidth())
+        Text(
+            stringResource(R.string.quality_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         ListItem(
             headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
             overlineContent = { Text(stringResource(R.string.ytm_account)) },
@@ -248,17 +284,11 @@ private fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun Placeholder(milestone: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        LoadingIndicator()
         Text(
-            stringResource(R.string.placeholder_coming, milestone),
-            style = MaterialTheme.typography.titleMediumEmphasized,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(48.dp),
+            stringResource(R.string.disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
         )
     }
 }
@@ -282,6 +312,36 @@ private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
             )
             if (connection is ConnectionState.Offline) {
                 androidx.compose.material3.TextButton(onClick = onRetry) { Text(stringResource(R.string.action_reconnect)) }
+            }
+        }
+    }
+}
+
+/** Low / Normal / High, in the official app's order, as a connected button group like [TargetSelector]. */
+@Composable
+private fun QualitySelector(
+    quality: StreamQuality,
+    onQuality: (StreamQuality) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = listOf(
+        StreamQuality.Low to stringResource(R.string.quality_low),
+        StreamQuality.Normal to stringResource(R.string.quality_normal),
+        StreamQuality.High to stringResource(R.string.quality_high),
+    )
+    androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = Arrangement.spacedBy(androidx.compose.material3.ButtonGroupDefaults.ConnectedSpaceBetween)) {
+        options.forEachIndexed { i, (q, label) ->
+            androidx.compose.material3.ToggleButton(
+                checked = quality == q,
+                onCheckedChange = { if (it) onQuality(q) },
+                shapes = when (i) {
+                    0 -> androidx.compose.material3.ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    options.lastIndex -> androidx.compose.material3.ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> androidx.compose.material3.ButtonGroupDefaults.connectedMiddleButtonShapes()
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(label, maxLines = 1)
             }
         }
     }

@@ -30,7 +30,7 @@ class MusicActions @Inject constructor(
     /** Song tap = song + radio; collection = play from the top (optionally from a track). */
     fun play(item: MusicItem, startVideoId: String? = null) {
         when (item) {
-            is MusicItem.Song -> router.play(PlayIntent.SongRadio(item.videoId))
+            is MusicItem.Song -> router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
             is MusicItem.Playlist -> router.play(PlayIntent.Collection(item.playlistId, startVideoId))
             is MusicItem.Album -> withAlbumPlaylist(item) { router.play(PlayIntent.Collection(it, startVideoId)) }
             is MusicItem.Artist -> scope.launch {
@@ -59,7 +59,7 @@ class MusicActions @Inject constructor(
     fun playNext(item: MusicItem) = enqueue(item, next = true)
     fun addToQueue(item: MusicItem) = enqueue(item, next = false)
 
-    fun radio(item: MusicItem.Song) = router.play(PlayIntent.SongRadio(item.videoId))
+    fun radio(item: MusicItem.Song) = router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
 
     private fun enqueue(item: MusicItem, next: Boolean) {
         if (router.isPhone) {

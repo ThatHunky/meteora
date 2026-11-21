@@ -100,6 +100,12 @@ fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = M
                     )
                 }
                 Text(stringResource(R.string.pair_code_body, s.name), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(R.string.disclaimer),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (s.attempt > 0) {
                     Text(stringResource(R.string.pair_code_retry), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
                 }
@@ -191,6 +197,13 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
             androidx.compose.material3.TextButton(onClick = onSkip) { Text(stringResource(R.string.pair_skip)) }
             Text(
                 stringResource(R.string.pair_skip_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.disclaimer),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp),

@@ -58,6 +58,10 @@ class PlaybackRouter @Inject constructor(
 
     val isPhone get() = _target.value == PlaybackTarget.Phone
 
+    init {
+        if (isPhone) local.prewarm()
+    }
+
     /**
      * Switch target. With [handOff], whatever is playing moves along: the queue and position
      * carry over and the other side pauses.
@@ -68,6 +72,7 @@ class PlaybackRouter @Inject constructor(
         prefs.edit().putString(KEY_TARGET, t.name).apply()
         val pcState = pc.state.value
         _target.value = t
+        if (t == PlaybackTarget.Phone) local.prewarm()
         if (!handOff) return
         scope.launch {
             when (t) {
@@ -111,8 +116,9 @@ class PlaybackRouter @Inject constructor(
         if (isPhone) local.handle(command) else pc.send(command)
     }
 
-    fun play(intent: PlayIntent, shuffle: Boolean = false) {
-        if (isPhone) local.play(intent, shuffle) else pc.play(intent)
+    /** [first]: the tapped song, if known, so the phone can start it before its queue has loaded. */
+    fun play(intent: PlayIntent, shuffle: Boolean = false, first: LocalSong? = null) {
+        if (isPhone) local.play(intent, shuffle, first) else pc.play(intent)
     }
 
     fun queueCommandFor(videoId: String, index: Int, build: (Int) -> Command) {

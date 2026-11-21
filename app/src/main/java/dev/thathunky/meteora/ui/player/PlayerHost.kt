@@ -6,6 +6,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -74,11 +76,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
@@ -105,6 +109,7 @@ import dev.thathunky.meteora.domain.LikeStatus
 import dev.thathunky.meteora.domain.PlaybackState
 import dev.thathunky.meteora.domain.TrackState
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -160,18 +165,23 @@ private fun MiniPlayer(
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onExpand)
+            // Thresholds in dp, so a swipe is the same distance on every screen density.
             .pointerInput(Unit) {
+                val open = 24.dp.toPx()
                 detectVerticalDragGestures(
-                    onDragEnd = { if (dragY < -60) onExpand(); dragY = 0f },
+                    onDragEnd = { if (dragY < -open) onExpand(); dragY = 0f },
+                    onDragCancel = { dragY = 0f },
                     onVerticalDrag = { _, d -> dragY += d },
                 )
             }
             .pointerInput(Unit) {
+                val skip = 48.dp.toPx()
                 detectHorizontalDragGestures(
                     onDragEnd = {
-                        if (dragX < -120) vm.next() else if (dragX > 120) vm.previous()
+                        if (dragX < -skip) vm.next() else if (dragX > skip) vm.previous()
                         dragX = 0f
                     },
+                    onDragCancel = { dragX = 0f },
                     onHorizontalDrag = { _, d -> dragX += d },
                 )
             },
@@ -198,7 +208,10 @@ private fun MiniPlayer(
             Text(track.artist, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         FilledIconButton(onClick = vm::playPause, shapes = IconButtonDefaults.shapes()) {
-            Icon(if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, null)
+            Icon(
+                if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
+            )
         }
     }
 }
@@ -215,16 +228,19 @@ private fun FullPlayer(
     val track = s.track ?: return@with
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    var backProgress by remember { mutableFloatStateOf(0f) }
-    var dragDown by remember { mutableFloatStateOf(0f) }
+    // Animatables, so a cancelled back gesture or a short drag settles back instead of snapping.
+    val backProgress = remember { Animatable(0f) }
+    val dragDown = remember { Animatable(0f) }
+    val settle: FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.fastSpatialSpec()
+    val scope = rememberCoroutineScope()
     var showQueue by remember { mutableStateOf(false) }
 
     PredictiveBackHandler { events ->
         try {
-            events.collect { backProgress = it.progress }
+            events.collect { backProgress.snapTo(it.progress) }
             onCollapse()
         } catch (e: CancellationException) {
-            backProgress = 0f
+            scope.launch { backProgress.animateTo(0f, settle) }
             throw e
         }
     }
@@ -234,21 +250,25 @@ private fun FullPlayer(
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                val k = 1f - 0.1f * backProgress
+                // The settle spring may overshoot: keep both inside their range.
+                val back = backProgress.value.coerceIn(0f, 1f)
+                val k = 1f - 0.1f * back
                 scaleX = k; scaleY = k
-                translationY = dragDown.coerceAtLeast(0f)
-                shape = RoundedCornerShape((32 * backProgress).dp)
-                clip = backProgress > 0f
+                translationY = dragDown.value.coerceAtLeast(0f)
+                shape = RoundedCornerShape((32 * back).dp)
+                clip = back > 0f
             }
             .background(Brush.verticalGradient(listOf(scheme.primaryContainer, scheme.surface, scheme.surface)))
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {
-                        if (dragDown > with(density) { 160.dp.toPx() }) onCollapse()
-                        dragDown = 0f
+                        // On collapse the offset stays, so the player leaves from where the finger let go.
+                        if (dragDown.value > with(density) { 160.dp.toPx() }) onCollapse()
+                        else scope.launch { dragDown.animateTo(0f, settle) }
                     },
-                    onDragCancel = { dragDown = 0f },
-                    onVerticalDrag = { _, d -> dragDown += d },
+                    onDragCancel = { scope.launch { dragDown.animateTo(0f, settle) } },
+                    // Clamped as it accumulates: dragging up first must not eat the drag back down.
+                    onVerticalDrag = { _, d -> scope.launch { dragDown.snapTo((dragDown.value + d).coerceAtLeast(0f)) } },
                 )
             },
     ) {
@@ -259,7 +279,7 @@ private fun FullPlayer(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onCollapse) { Icon(Icons.Outlined.KeyboardArrowDown, null) }
+                IconButton(onClick = onCollapse) { Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse)) }
                 Spacer(Modifier.weight(1f))
                 val pcName = (connection as? ConnectionState.Connected)?.pcName
                 val knownPc by vm.pcName.collectAsStateWithLifecycle()
@@ -316,22 +336,29 @@ private fun FullPlayer(
             }
 
             Spacer(Modifier.height(16.dp))
-            val morphProgress by animateFloatAsState(
+            val morphProgress = animateFloatAsState(
                 if (s.trackState == TrackState.Playing) 1f else 0f,
                 MaterialTheme.motionScheme.slowSpatialSpec(),
                 label = "artMorph",
             )
             val morph = remember { Morph(MaterialShapes.Square, MaterialShapes.Cookie12Sided) }
-            AsyncImage(
-                model = track.artworkUrl,
-                contentDescription = track.album,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .sharedElement(rememberSharedContentState("art"), anim)
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(MorphShape(morph, morphProgress)),
-            )
+            // The art takes the space the controls leave, so it shrinks on short or landscape
+            // screens instead of pushing the controls off the bottom.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = track.artworkUrl,
+                    contentDescription = track.album,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .sharedElement(rememberSharedContentState("art"), anim)
+                        .aspectRatio(1f)
+                        // Read in the layer block: the morph redraws the art without recomposing the player.
+                        .graphicsLayer {
+                            clip = true
+                            shape = MorphShape(morph, morphProgress.value)
+                        },
+                )
+            }
 
             Spacer(Modifier.height(28.dp))
             Column(Modifier.fillMaxWidth().sharedBounds(rememberSharedContentState("title"), anim)) {
@@ -402,7 +429,7 @@ private fun FullPlayer(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(12.dp))
             // On the phone the hardware keys and system slider already set the volume.
             if (connection != ConnectionState.Local) VolumeRow(s, vm)
             Spacer(Modifier.height(16.dp))
@@ -416,15 +443,20 @@ private fun FullPlayer(
 @Composable
 private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
     val duration = s.track?.durationSec ?: 0.0
-    val live by rememberLiveProgress(s)
+    // `live` changes every frame while playing. It is only read inside the two lambdas below, so
+    // a frame redraws the bar (and, once a second, the time label) without recomposing the rest.
+    val live = rememberLiveProgress(s)
     val override by vm.seekOverride.collectAsStateWithLifecycle()
     LaunchedEffect(s.progressSec) { vm.onPositionReport(s.progressSec) }
     var dragFraction by remember { mutableStateOf<Float?>(null) }
-    var widthPx by remember { mutableFloatStateOf(1f) }
     val haptics = LocalHapticFeedback.current
 
-    val shown = dragFraction
-        ?: if (duration > 0) ((override ?: live) / duration).toFloat().coerceIn(0f, 1f) else 0f
+    val shown: () -> Float = {
+        dragFraction ?: if (duration > 0) ((override ?: live.value) / duration).toFloat().coerceIn(0f, 1f) else 0f
+    }
+    val shownSeconds by remember(duration, dragFraction, override) {
+        derivedStateOf { (if (duration > 0) shown() * duration else live.value).toInt() }
+    }
     val amplitude by animateFloatAsState(
         if (s.trackState == TrackState.Playing && dragFraction == null) 1f else 0f,
         label = "waveAmp",
@@ -436,7 +468,6 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
                 .fillMaxWidth()
                 .height(36.dp)
                 .pointerInput(duration) {
-                    widthPx = size.width.toFloat()
                     detectTapGestures { o ->
                         if (duration > 0) vm.seekTo(duration * (o.x / size.width).coerceIn(0f, 1f))
                     }
@@ -456,13 +487,13 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
             contentAlignment = Alignment.Center,
         ) {
             LinearWavyProgressIndicator(
-                progress = { shown },
+                progress = shown,
                 amplitude = { amplitude },
                 modifier = Modifier.fillMaxWidth().height(14.dp),
             )
         }
         Row(Modifier.fillMaxWidth()) {
-            Text(formatTime(if (duration > 0) shown * duration else live), style = MaterialTheme.typography.labelMedium)
+            Text(formatTime(shownSeconds.toDouble()), style = MaterialTheme.typography.labelMedium)
             Spacer(Modifier.weight(1f))
             Text(formatTime(duration), style = MaterialTheme.typography.labelMedium)
         }

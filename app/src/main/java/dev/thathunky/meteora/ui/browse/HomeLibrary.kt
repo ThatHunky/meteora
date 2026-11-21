@@ -81,6 +81,12 @@ class HomeViewModel @Inject constructor(private val ytm: YtmClient, auth: YtmAut
         _refreshing.value = false
     }
 
+    /** From the failed state: show the loader again rather than a pull-to-refresh spinner. */
+    fun retry() = viewModelScope.launch {
+        _home.value = Load.Loading
+        load()
+    }
+
     private suspend fun load() {
         _home.value = runCatching { ytm.home() }.fold({ Load.Ready(it) }, { Load.Failed(it) })
     }
@@ -96,11 +102,18 @@ class LibraryViewModel @Inject constructor(private val ytm: YtmClient, auth: Ytm
 
     init {
         viewModelScope.launch {
-            auth.signedIn.distinctUntilChanged().collect { yes ->
-                if (!yes) return@collect
-                launch { _liked.value = runCatching { ytm.likedSongs() }.fold({ Load.Ready(it) }, { Load.Failed(it) }) }
-                launch { _playlists.value = runCatching { ytm.libraryPlaylists() }.fold({ Load.Ready(it) }, { Load.Failed(it) }) }
-            }
+            auth.signedIn.distinctUntilChanged().collect { yes -> if (yes) reload() }
+        }
+    }
+
+    fun reload() {
+        viewModelScope.launch {
+            _liked.value = Load.Loading
+            _liked.value = runCatching { ytm.likedSongs() }.fold({ Load.Ready(it) }, { Load.Failed(it) })
+        }
+        viewModelScope.launch {
+            _playlists.value = Load.Loading
+            _playlists.value = runCatching { ytm.libraryPlaylists() }.fold({ Load.Ready(it) }, { Load.Failed(it) })
         }
     }
 }
@@ -118,7 +131,7 @@ fun HomeScreen(
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val signedIn by vm.signedIn.collectAsStateWithLifecycle()
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
-        Loaded(home) { shelves ->
+        Loaded(home, onRetry = { vm.retry() }) { shelves ->
             LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                 item { header() }
                 item {
@@ -182,7 +195,7 @@ fun LibraryScreen(
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.filter_playlists)) })
         }
         when (tab) {
-            0 -> Loaded(liked) { page ->
+            0 -> Loaded(liked, onRetry = vm::reload) { page ->
                 LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                     item {
                         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -211,7 +224,7 @@ fun LibraryScreen(
                     }
                 }
             }
-            else -> Loaded(playlists) { items ->
+            else -> Loaded(playlists, onRetry = vm::reload) { items ->
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(152.dp),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomPadding),

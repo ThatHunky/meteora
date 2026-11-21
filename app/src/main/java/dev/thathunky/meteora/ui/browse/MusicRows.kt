@@ -81,7 +81,16 @@ fun MusicRow(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modi
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MusicCard(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.width(152.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
+    val haptics = LocalHapticFeedback.current
+    Column(
+        modifier.width(152.dp).combinedClickable(
+            onClick = onClick,
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongClick()
+            },
+        ),
+    ) {
         AsyncImage(
             model = item.thumbnail,
             contentDescription = null,
@@ -136,6 +145,6 @@ fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss:
                 modifier = Modifier.combinedClickable(onClick = { onAction(action); onDismiss() }),
             )
         }
-        Spacer(Modifier.height(24.dp).padding(bottom = 8.dp))
+        Spacer(Modifier.height(24.dp))
     }
 }

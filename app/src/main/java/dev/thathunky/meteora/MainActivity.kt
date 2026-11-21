@@ -47,9 +47,9 @@ class MainActivity : AppCompatActivity() {
             val vm: ShellViewModel = hiltViewModel()
             val seed by vm.albumSeed.collectAsStateWithLifecycle()
             val connection by vm.connection.collectAsStateWithLifecycle()
-            val playing by vm.playback.collectAsStateWithLifecycle()
+            val hasTrack by vm.hasTrack.collectAsStateWithLifecycle()
             // Ask once there's something the notification would control.
-            val wantsNotification = connection is ConnectionState.Connected || playing?.track != null
+            val wantsNotification = connection is ConnectionState.Connected || hasTrack
             LaunchedEffect(wantsNotification) {
                 if (wantsNotification) askForNotifications()
             }

@@ -9,6 +9,7 @@
     <string name="not_connected">Not connected to a PC</string>
     <string name="action_play">Play</string>
     <string name="action_pause">Pause</string>
+    <string name="action_collapse">Collapse player</string>
     <string name="action_next">Next</string>
     <string name="action_previous">Previous</string>
     <string name="action_try_again">Try again</string>
@@ -77,6 +78,14 @@
     <string name="target_phone">This phone</string>
     <string name="playing_on_phone">Playing on this phone</string>
     <string name="pair_skip">Use without a PC</string>
+    <string name="disclaimer">Meteora is an independent app. It is not affiliated with YTMDesktop, YouTube or Google.</string>
     <string name="pair_skip_note">Music plays on this phone. You can pair a PC later in Settings.</string>
     <string name="share_phone_mode">Sharing plays on your PC. Switch “Play on” to your PC in Meteora first.</string>
+    <string name="quality_title">Audio quality on this phone</string>
+    <string name="quality_wifi">On Wi-Fi</string>
+    <string name="quality_mobile">On mobile data</string>
+    <string name="quality_high">High</string>
+    <string name="quality_normal">Normal</string>
+    <string name="quality_low">Low</string>
+    <string name="quality_note">High is about 256 kbps and needs YouTube Music Premium with you signed in; otherwise it is the same as Normal, about 130 kbps. Low is about 50 kbps. A change applies from the next track.</string>
 </resources>

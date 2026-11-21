@@ -2,6 +2,7 @@ package dev.thathunky.meteora.ui.signin
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -52,7 +53,13 @@ fun SignInScreen(onDone: () -> Unit, vm: SignInViewModel = hiltViewModel()) {
         Text(
             stringResource(R.string.signin_title),
             style = MaterialTheme.typography.titleLargeEmphasized,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+        )
+        Text(
+            stringResource(R.string.disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 12.dp),
         )
         Box(Modifier.fillMaxWidth()) {
             if (loading) LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
@@ -73,7 +80,9 @@ fun SignInScreen(onDone: () -> Unit, vm: SignInViewModel = hiltViewModel()) {
 
                         override fun onPageFinished(view: WebView, url: String?) {
                             loading = false
-                            if (finished || url == null || !url.startsWith("https://music.youtube.com")) return
+                            // Compare the host: a prefix check would also accept music.youtube.com.example.
+                            val uri = url?.let(Uri::parse)
+                            if (finished || uri?.scheme != "https" || uri.host != "music.youtube.com") return
                             val cookies = CookieManager.getInstance().getCookie("https://music.youtube.com") ?: return
                             if (!vm.auth.isSession(cookies)) return
                             finished = true

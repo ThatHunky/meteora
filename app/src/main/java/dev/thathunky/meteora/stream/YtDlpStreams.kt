@@ -56,13 +56,13 @@ class YtDlpStreams(private val context: Context) {
 
     fun version(): String? = if (ready) YoutubeDL.getInstance().version(context) else null
 
-    suspend fun resolve(videoId: String): AudioStream = runLock.withLock {
+    suspend fun resolve(videoId: String, quality: StreamQuality = StreamQuality.High): AudioStream = runLock.withLock {
         ensureReady()
         withContext(Dispatchers.IO) {
             val t = SystemClock.elapsedRealtime()
             val request = YoutubeDLRequest("https://music.youtube.com/watch?v=$videoId").apply {
                 // Progressive audio only: no HLS/DASH manifests to deal with in ExoPlayer.
-                addOption("-f", "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[protocol^=http]")
+                addOption("-f", formatFor(quality))
                 addOption("-O", "%(.{url,http_headers,format_id,abr})j")
                 addOption("--no-playlist")
                 addOption("--no-warnings")
@@ -81,8 +81,9 @@ class YtDlpStreams(private val context: Context) {
                 (v as? JsonPrimitive)?.contentOrNull?.let { k to it }
             }?.toMap().orEmpty()
             val took = SystemClock.elapsedRealtime() - t
-            Log.i(TAG, "resolved $videoId in $took ms: format ${obj["format_id"]} abr ${obj["abr"]}")
-            AudioStream(videoId, url, headers, staleAtFor(url), source = "yt-dlp")
+            Log.i(TAG, "resolved $videoId in $took ms: $quality → format ${obj["format_id"]} abr ${obj["abr"]}")
+            val format = (obj["format_id"] as? JsonPrimitive)?.contentOrNull ?: "ytdlp"
+            AudioStream(videoId, url, headers, staleAtFor(url), source = "yt-dlp", cacheKey = "$videoId/$format", quality = quality)
         }
     }
 
@@ -95,6 +96,15 @@ class YtDlpStreams(private val context: Context) {
 
     private companion object {
         const val TAG = "StreamResolver"
+        const val DEFAULT_FORMAT = "bestaudio[ext=m4a][protocol^=http]/bestaudio[protocol^=http]/best[protocol^=http]"
+
+        // The default stays as the tail, so a video without a small format still plays.
+        fun formatFor(quality: StreamQuality): String = when (quality) {
+            StreamQuality.High -> DEFAULT_FORMAT
+            StreamQuality.Normal -> "bestaudio[abr<=160][protocol^=http]/$DEFAULT_FORMAT"
+            StreamQuality.Low -> "bestaudio[abr<=56][protocol^=http]/$DEFAULT_FORMAT"
+        }
+
         const val KEY_UPDATED = "updatedAt"
         const val UPDATE_EVERY_MS = 24 * 60 * 60 * 1000L
     }

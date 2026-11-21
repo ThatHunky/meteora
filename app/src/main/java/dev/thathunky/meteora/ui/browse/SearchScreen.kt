@@ -29,9 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,13 +54,10 @@ fun SearchScreen(
     val results by vm.results.collectAsStateWithLifecycle()
     val filter by vm.filter.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
-    var showSuggestions by remember { mutableStateOf(true) }
 
+    // The view model decides when there are suggestions to show (none for the submitted query).
     LaunchedEffect(field) {
-        snapshotFlow { field.text.toString() }.collect {
-            vm.query.value = it
-            showSuggestions = true
-        }
+        snapshotFlow { field.text.toString() }.collect { vm.query.value = it }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -75,7 +69,6 @@ fun SearchScreen(
             shape = RoundedCornerShape(28.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             onKeyboardAction = {
-                showSuggestions = false
                 focus.clearFocus()
                 vm.submit(field.text.toString())
             },
@@ -91,7 +84,7 @@ fun SearchScreen(
             }
         }
 
-        if (showSuggestions && suggestions.isNotEmpty()) {
+        if (suggestions.isNotEmpty()) {
             LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
                 items(suggestions) { s ->
                     ListItem(
@@ -99,10 +92,10 @@ fun SearchScreen(
                         leadingContent = { Icon(Icons.Outlined.Search, null) },
                         trailingContent = { Icon(Icons.Outlined.NorthWest, null) },
                         modifier = Modifier.clickable {
-                            field.setTextAndPlaceCursorAtEnd(s)
-                            showSuggestions = false
-                            focus.clearFocus()
+                            // Submit first, so the text change below is already the submitted query.
                             vm.submit(s)
+                            field.setTextAndPlaceCursorAtEnd(s)
+                            focus.clearFocus()
                         },
                     )
                 }

@@ -12,8 +12,13 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,10 +32,18 @@ import dev.thathunky.meteora.domain.QueueEntry
 import dev.thathunky.meteora.domain.Track
 import dev.thathunky.meteora.domain.TrackState
 import dev.thathunky.meteora.domain.withArtSize
+import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.stream.StreamResolver
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.WatchQueue
 import dev.thathunky.meteora.ytm.YtmClient
+import java.io.File
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -109,23 +122,60 @@ class LocalEngine @Inject constructor(
     private var unshuffled: List<String>? = null
     private val likes = HashMap<String, LikeStatus>()
     private val retried = HashSet<String>()
+    /** videoId → tier it was first opened with. Written on the loader thread. */
+    private val pinned = ConcurrentHashMap<String, StreamQuality>()
+    /** Video id of a song that [play] started by itself while its queue is still loading. Main thread. */
+    private var startedAlone: String? = null
+    /** When the last play request came in, for the start-up time in the log. 0 once reported. */
+    @Volatile private var tappedAt = 0L
+    private var failedInARow = 0
+    private var networkAttempts = 0
+    private var networkRetry: Job? = null
     private var ticker: Job? = null
     private var loadJob: Job? = null
 
+    /** Audio already downloaded, so replays, seeks back and repeat-one cost no network. In cacheDir: Android may clear it. */
+    private val diskCache by lazy {
+        SimpleCache(File(context.cacheDir, "audio"), LeastRecentlyUsedCacheEvictor(DISK_CACHE_BYTES), StandaloneDatabaseProvider(context))
+    }
+
     private fun build(): ExoPlayer {
-        val http = OkHttpDataSource.Factory(okHttp)
-        val resolving = ResolvingDataSource.Factory(http) { spec ->
+        // The shared client never times out a read (it also holds the PC's websocket). A stream
+        // that stalls must fail so ExoPlayer can retry it, e.g. after Wi-Fi drops to mobile data.
+        val media = okHttp.newBuilder().readTimeout(MEDIA_READ_TIMEOUT_S, TimeUnit.SECONDS).build()
+        val cached = CacheDataSource.Factory()
+            .setCache(diskCache)
+            .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(media))
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        // Resolve first, cache second: the cache key includes the format the resolver picked.
+        val resolving = ResolvingDataSource.Factory(cached) { spec ->
             if (spec.uri.scheme != SCHEME) return@Factory spec
             val id = spec.uri.host ?: return@Factory spec
-            // Runs on ExoPlayer's loader thread, so blocking is fine.
-            val stream = runBlocking { resolver.resolve(id) }
+            // Runs on ExoPlayer's loader thread, so blocking is fine. The tier is fixed at the
+            // first open: a later open (seek, stall) of another format would mix two files' bytes.
+            val q = pinned.getOrPut(id) { resolver.quality.current() }
+            val stream = runBlocking { resolver.resolve(id, q) }
+            // YouTube throttles an open-ended request ("from byte N to the end") to about twice
+            // playback speed. Asking for the exact byte range downloads at full speed, which is
+            // what lets the buffer below fill and the next track load ahead.
+            val size = stream.contentLength
+            val length = if (spec.length == C.LENGTH_UNSET.toLong() && size != null && spec.position < size) size - spec.position else spec.length
             spec.buildUpon()
                 .setUri(Uri.parse(stream.url))
+                .setKey(stream.cacheKey)
+                .setLength(length)
                 .setHttpRequestHeaders(spec.httpRequestHeaders + stream.headers)
                 .build()
         }
+        // A track is a few MB: hold up to 10 minutes of audio, so the current track downloads
+        // in full within seconds and the next one is fetched and buffered while this one plays.
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(MIN_BUFFER_MS, MAX_BUFFER_MS, START_BUFFER_MS, REBUFFER_MS)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
         return ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 /* handleAudioFocus = */ true,
@@ -138,11 +188,26 @@ class LocalEngine @Inject constructor(
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+                retried.clear()
+                // Tracks ahead may already be part-buffered in their pinned tier (two or more are
+                // fetched ahead), so only the ones behind the current track lose their pin.
+                val keep = (player.currentMediaItemIndex until player.mediaItemCount).mapTo(HashSet()) { player.getMediaItemAt(it).mediaId }
+                pinned.keys.retainAll(keep)
+                maybeExtendRadio()
+            }
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_READY) {
+                failedInARow = 0
+                networkAttempts = 0
+            }
             publish()
-            if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) maybeExtendRadio()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying && tappedAt != 0L) {
+                Log.i(TAG, "playing ${SystemClock.elapsedRealtime() - tappedAt} ms after the tap")
+                tappedAt = 0
+            }
             ticker?.cancel()
             // Republish now and then so the position stays honest (the UI interpolates in between).
             if (isPlaying) ticker = scope.launch(Dispatchers.Main) {
@@ -157,36 +222,110 @@ class LocalEngine @Inject constructor(
             val p = _player ?: return
             val id = p.currentMediaItem?.mediaId
             Log.w(TAG, "playback error on $id: ${error.errorCodeName}", error)
-            // Most likely an expired or IP-bound URL: resolve again once, then skip the track.
-            if (id != null && retried.add(id)) {
-                resolver.invalidate(id)
-                p.prepare()
-                p.play()
-            } else {
-                _errors.tryEmit(error)
-                if (p.hasNextMediaItem()) {
-                    p.seekToNextMediaItem()
+            when {
+                // Offline is not the track's fault: wait and try the same track again. Skipping
+                // here would burn through the whole queue while there is no network.
+                isNetworkError(error) -> retryWhenBackOnline(p, error)
+                // Most likely an expired or IP-bound URL: resolve again once, then skip the track.
+                id != null && retried.add(id) -> {
+                    // A failed web music URL (no Premium, or it wants a token) retries on the anonymous path.
+                    resolver.invalidate(id, pinned[id]?.let { resolver.cached(id, it) }?.source)
                     p.prepare()
-                    p.play()
+                }
+                else -> {
+                    _errors.tryEmit(error)
+                    if (p.hasNextMediaItem() && ++failedInARow < MAX_FAILED_IN_A_ROW) {
+                        p.seekToNextMediaItem()
+                        p.prepare()
+                    } else {
+                        p.pause()
+                    }
                 }
             }
+            publish()
+        }
+    }
+
+    private fun isNetworkError(error: PlaybackException): Boolean =
+        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+            generateSequence(error.cause) { it.cause }.any {
+                it is UnknownHostException || it is ConnectException || it is SocketTimeoutException || it is NoRouteToHostException
+            }
+
+    /** Re-prepare the failed track after 1, 2, 4… s (15 s at most); give up after [MAX_NETWORK_ATTEMPTS]. */
+    private fun retryWhenBackOnline(p: ExoPlayer, error: PlaybackException) {
+        networkRetry?.cancel()
+        if (networkAttempts >= MAX_NETWORK_ATTEMPTS) {
+            networkAttempts = 0
+            _errors.tryEmit(error)
+            p.pause()
+            return
+        }
+        val wait = (1_000L shl networkAttempts.coerceAtMost(4)).coerceAtMost(15_000)
+        networkAttempts++
+        networkRetry = scope.launch(Dispatchers.Main) {
+            delay(wait)
+            if (p.playWhenReady && p.playbackState == Player.STATE_IDLE) p.prepare()
         }
     }
 
     // ---- queue loading ----
 
-    fun play(intent: PlayIntent, shuffle: Boolean = false) = load {
+    /**
+     * [first] is the tapped song when the caller knows it. It then starts at once, by itself, and
+     * its queue is put around it when YouTube answers (about 0.8 s later), without a break.
+     */
+    fun play(intent: PlayIntent, shuffle: Boolean = false, first: LocalSong? = null) {
+        // The tapped track is known before its queue is: resolve its stream alongside the queue request.
+        val startId = when (intent) {
+            is PlayIntent.SongRadio -> intent.videoId
+            is PlayIntent.Collection -> if (shuffle) null else intent.startVideoId
+            PlayIntent.LikedSongs -> null
+        }
+        startId?.let(resolver::warm)
+        if (first != null && first.videoId == startId) {
+            scope.launch(Dispatchers.Main) {
+                radioContinuation = null
+                apply(Loaded(listOf(first), 0, null, false), 0, true)
+                startedAlone = first.videoId
+            }
+        }
+        load { queueFor(intent, shuffle) }
+    }
+
+    /** The queue for the song that [play] started alone: add what comes before and after it. */
+    private fun putQueueAround(loaded: Loaded): Boolean {
+        val id = startedAlone ?: return false
+        startedAlone = null
+        val p = _player ?: return false
+        val start = loaded.start.coerceIn(0, loaded.songs.lastIndex)
+        // Not the song that is playing (YouTube may swap in another version): take the queue as it is.
+        if (loaded.shuffle || p.mediaItemCount != 1 || p.currentMediaItem?.mediaId != id || loaded.songs[start].videoId != id) {
+            Log.i(TAG, "queue starts with ${loaded.songs[start].videoId}, not the tapped $id: restarting on the queue")
+            return false
+        }
+        p.addMediaItems(0, loaded.songs.subList(0, start).map(::mediaItem))
+        p.addMediaItems(loaded.songs.subList(start + 1, loaded.songs.size).map(::mediaItem))
+        publish()
+        return true
+    }
+
+    private suspend fun queueFor(intent: PlayIntent, shuffle: Boolean): Loaded =
         when (intent) {
             is PlayIntent.SongRadio -> ytm.watchQueue(videoId = intent.videoId)
             is PlayIntent.Collection -> ytm.watchQueue(intent.startVideoId, intent.playlistId)
             PlayIntent.LikedSongs -> ytm.watchQueue(playlistId = "LM")
         }.also { playlistId = (intent as? PlayIntent.Collection)?.playlistId ?: (intent as? PlayIntent.SongRadio)?.let { "RDAMVM${it.videoId}" } ?: "LM" }
             .let { q -> Loaded(q.songs.map { it.toLocal() }, q.startIndex, q.continuation, shuffle) }
-    }
+
+    /** One-off stream setup, done when the phone becomes the target instead of on the first tap. */
+    fun prewarm() = resolver.prewarm()
 
     /** Start on [songs] right away (e.g. a hand-off from the PC). */
     fun setQueue(songs: List<LocalSong>, startIndex: Int, positionMs: Long = 0, playWhenReady: Boolean = true, source: String? = null) {
         loadJob?.cancel()
+        songs.getOrNull(startIndex)?.let { resolver.warm(it.videoId) }
         scope.launch(Dispatchers.Main) {
             playlistId = source
             radioContinuation = null
@@ -198,24 +337,32 @@ class LocalEngine @Inject constructor(
 
     private fun load(fetch: suspend () -> Loaded) {
         loadJob?.cancel()
+        val t0 = SystemClock.elapsedRealtime()
+        tappedAt = t0
         loadJob = scope.launch {
             val loaded = runCatching { fetch() }.onFailure {
                 Log.w(TAG, "queue load failed", it)
                 _errors.tryEmit(it)
             }.getOrNull() ?: return@launch
+            Log.i(TAG, "queue of ${loaded.songs.size} in ${SystemClock.elapsedRealtime() - t0} ms")
             if (loaded.songs.isEmpty()) return@launch
-            // Warm the first track's stream while ExoPlayer is being set up.
-            launch { runCatching { resolver.resolve(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId) } }
+            // Warm the first track's stream while ExoPlayer is being set up (a no-op if play() already did).
+            resolver.warm(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId)
             withContext(Dispatchers.Main) {
                 radioContinuation = loaded.continuation
-                apply(loaded, 0, true)
+                if (!putQueueAround(loaded)) apply(loaded, 0, true)
             }
         }
     }
 
     private fun apply(loaded: Loaded, positionMs: Long, playWhenReady: Boolean) {
         val p = player
+        startedAlone = null
         retried.clear()
+        pinned.clear()
+        failedInARow = 0
+        networkAttempts = 0
+        networkRetry?.cancel()
         unshuffled = null
         val start = loaded.start.coerceIn(0, loaded.songs.lastIndex)
         p.setMediaItems(loaded.songs.map(::mediaItem), start, positionMs)
@@ -385,6 +532,8 @@ class LocalEngine @Inject constructor(
                 p.isPlaying -> TrackState.Playing
                 p.playWhenReady && p.playbackState == Player.STATE_BUFFERING -> TrackState.Buffering
                 p.playWhenReady && p.playbackState == Player.STATE_IDLE && p.playerError == null -> TrackState.Buffering
+                // Waiting to retry after a network error.
+                p.playWhenReady && networkRetry?.isActive == true -> TrackState.Buffering
                 else -> TrackState.Paused
             },
             progressSec = p.currentPosition / 1000.0,
@@ -465,5 +614,13 @@ class LocalEngine @Inject constructor(
         const val SCHEME = "meteora"
         const val X_ALBUM_ID = "albumId"
         const val X_ARTIST_ID = "artistId"
+        const val DISK_CACHE_BYTES = 256L * 1024 * 1024
+        const val MEDIA_READ_TIMEOUT_S = 12L
+        const val MIN_BUFFER_MS = 60_000
+        const val MAX_BUFFER_MS = 10 * 60_000
+        const val START_BUFFER_MS = 750
+        const val REBUFFER_MS = 2_000
+        const val MAX_FAILED_IN_A_ROW = 3
+        const val MAX_NETWORK_ATTEMPTS = 8
     }
 }

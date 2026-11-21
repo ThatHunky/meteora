@@ -56,4 +56,7 @@ object AppModule {
 
     @Provides @Singleton
     fun ytmAuth(store: dev.thathunky.meteora.ytm.YtmAuthStore): YtmAuthProvider = store
+
+    @Provides @Singleton
+    fun jsSolver(solver: dev.thathunky.meteora.stream.WebViewJsSolver): dev.thathunky.meteora.stream.JsSolver = solver
 }

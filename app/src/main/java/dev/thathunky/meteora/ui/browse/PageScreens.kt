@@ -44,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,11 +59,19 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.ytm.MusicItem
 
 @Composable
-fun <T> Loaded(state: Load<T>, content: @Composable (T) -> Unit) {
+fun <T> Loaded(state: Load<T>, onRetry: (() -> Unit)? = null, content: @Composable (T) -> Unit) {
     when (state) {
         Load.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
-        is Load.Failed -> Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+        is Load.Failed -> Column(
+            Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(stringResource(R.string.load_failed), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            // Without this a failed page stays failed until the app restarts.
+            if (onRetry != null) {
+                FilledTonalButton(onClick = onRetry, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.action_try_again)) }
+            }
         }
         is Load.Ready -> content(state.value)
     }
@@ -82,7 +92,8 @@ fun CollectionScreen(
     LaunchedEffect(id) { vm.load(id, isAlbum) }
     val page by vm.page.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
-    Loaded(page) { p ->
+    val haptics = LocalHapticFeedback.current
+    Loaded(page, onRetry = { vm.load(id, isAlbum, force = true) }) { p ->
         val pid = p.playlistId ?: if (!isAlbum) id else null
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
@@ -129,7 +140,10 @@ fun CollectionScreen(
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier.combinedClickable(
                         onClick = { if (pid != null) actions.playCollectionTrack(pid, t.videoId) else opener.open(t) },
-                        onLongClick = { onLongPress(t) },
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onLongPress(t)
+                        },
                     ),
                 )
             }
@@ -148,7 +162,7 @@ fun ArtistScreen(
 ) {
     LaunchedEffect(browseId) { vm.load(browseId) }
     val page by vm.page.collectAsStateWithLifecycle()
-    Loaded(page) { p ->
+    Loaded(page, onRetry = { vm.load(browseId, force = true) }) { p ->
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.name, null, null, round = true)

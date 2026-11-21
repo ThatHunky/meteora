@@ -28,7 +28,13 @@ class ShellViewModel @Inject constructor(
     private val store: PairedPcStore,
     seeds: AlbumSeedExtractor,
     private val ytmAuth: dev.thathunky.meteora.ytm.YtmAuthStore,
+    private val quality: dev.thathunky.meteora.stream.StreamQualityStore,
 ) : ViewModel() {
+    val qualityWifi: StateFlow<dev.thathunky.meteora.stream.StreamQuality> = quality.wifi
+    val qualityMobile: StateFlow<dev.thathunky.meteora.stream.StreamQuality> = quality.mobile
+    fun setQualityWifi(q: dev.thathunky.meteora.stream.StreamQuality) = quality.setWifi(q)
+    fun setQualityMobile(q: dev.thathunky.meteora.stream.StreamQuality) = quality.setMobile(q)
+
     val ytmSignedIn: StateFlow<Boolean> = ytmAuth.signedIn.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun signOutYtm() {
@@ -39,6 +45,16 @@ class ShellViewModel @Inject constructor(
     val target: StateFlow<dev.thathunky.meteora.data.PlaybackTarget> = router.target
     fun setTarget(t: dev.thathunky.meteora.data.PlaybackTarget) = router.setTarget(t)
     val playback: StateFlow<PlaybackState?> = router.state
+
+    /**
+     * Whether anything is loaded. The shell reads this instead of [playback], which changes
+     * several times a second while the PC plays and would recompose everything that reads it.
+     */
+    val hasTrack: StateFlow<Boolean> = router.state
+        .map { it?.track != null }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, router.state.value?.track != null)
+
     val pairedPc: StateFlow<PairedPc?> = store.pc.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Theme seed from the current album art; keeps the last one while a track change settles. */

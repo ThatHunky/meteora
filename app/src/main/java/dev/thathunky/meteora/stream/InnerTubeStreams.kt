@@ -2,7 +2,6 @@ package dev.thathunky.meteora.stream
 
 import android.os.SystemClock
 import android.util.Log
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,7 +34,7 @@ class InnerTubeStreams(private val http: OkHttpClient) {
     private val visitorLock = Mutex()
     @Volatile private var visitorData: String? = null
 
-    suspend fun resolve(videoId: String): AudioStream = withContext(Dispatchers.IO) {
+    suspend fun resolve(videoId: String, quality: StreamQuality = StreamQuality.High): AudioStream = withContext(Dispatchers.IO) {
         val t = SystemClock.elapsedRealtime()
         var root = player(videoId, visitor())
         if (status(root) == "LOGIN_REQUIRED") {
@@ -43,15 +42,23 @@ class InnerTubeStreams(private val http: OkHttpClient) {
             visitorData = null
             root = player(videoId, visitor())
         }
-        val picked = pickAudio(root) ?: throw StreamException("player: ${status(root)} ${reason(root).orEmpty()} for $videoId")
-        Log.i(TAG, "resolved $videoId in ${SystemClock.elapsedRealtime() - t} ms: itag ${picked.itag}")
+        val picked = pickAudio(root, quality) ?: throw StreamException("player: ${status(root)} ${reason(root).orEmpty()} for $videoId")
+        Log.i(TAG, "resolved $videoId in ${SystemClock.elapsedRealtime() - t} ms: $quality → itag ${picked.itag}, ${picked.bitrate / 1000} kbps")
         AudioStream(
             videoId = videoId,
             url = picked.url,
             headers = mapOf("User-Agent" to USER_AGENT),
             staleAtMs = SystemClock.elapsedRealtime() + (picked.expiresInSec * 1000 - 10 * 60_000).coerceAtLeast(60_000),
             source = "innertube",
+            cacheKey = "$videoId/${picked.itag}",
+            quality = quality,
+            contentLength = picked.contentLength,
         )
+    }
+
+    /** Fetch the visitor id (and open the connection to youtube.com) before the first track needs it. */
+    suspend fun warmUp() {
+        withContext(Dispatchers.IO) { visitor() }
     }
 
     private suspend fun visitor(): String = visitorLock.withLock {
@@ -61,7 +68,7 @@ class InnerTubeStreams(private val http: OkHttpClient) {
     /** `sw.js_data` is the small bootstrap blob YouTube's service worker reads; it carries the visitor id. */
     private fun fetchVisitorData(): String {
         val body = http.newCall(Request.Builder().url("https://www.youtube.com/sw.js_data").header("User-Agent", USER_AGENT).build())
-            .execute().use { if (!it.isSuccessful) throw IOException("sw.js_data HTTP ${it.code}") else it.body.string() }
+            .execute().use { if (!it.isSuccessful) throw StreamException("sw.js_data HTTP ${it.code}") else it.body.string() }
         return parseVisitorData(body) ?: throw StreamException("no visitor data")
     }
 
@@ -99,7 +106,8 @@ class InnerTubeStreams(private val http: OkHttpClient) {
         return json.parseToJsonElement(text)
     }
 
-    data class Picked(val itag: Int, val url: String, val expiresInSec: Long)
+    /** [url] is empty when the format only has a [cipher] (`signatureCipher` query string). */
+    data class Picked(val itag: Int, val url: String, val expiresInSec: Long, val bitrate: Int, val contentLength: Long? = null, val cipher: String? = null)
 
     companion object {
         private const val TAG = "InnerTubeStreams"
@@ -108,24 +116,45 @@ class InnerTubeStreams(private val http: OkHttpClient) {
         const val CLIENT_VERSION = "1.02"
         const val USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 
-        /** Opus 160k, then AAC 128k, then anything audio with a plain URL. */
-        private val PREFERRED_ITAGS = listOf(251, 140, 250, 249, 139)
+        /** Opus sounds better per bit, so it wins near-ties; a much higher-bitrate AAC still wins. */
+        private const val OPUS_WEIGHT = 1.3
 
         fun status(root: JsonElement): String? = root.obj("playabilityStatus")?.string("status")
-        private fun reason(root: JsonElement): String? = root.obj("playabilityStatus")?.string("reason")
+        fun reason(root: JsonElement): String? = root.obj("playabilityStatus")?.string("reason")
 
-        fun pickAudio(root: JsonElement): Picked? {
+        private fun ceiling(quality: StreamQuality): Int = when (quality) {
+            StreamQuality.Low -> 56_000
+            StreamQuality.Normal -> 160_000
+            StreamQuality.High -> Int.MAX_VALUE
+        }
+
+        /**
+         * [allowCipher]: also take formats that only have a `signatureCipher` (the web music
+         * client); the caller then has to decipher [Picked.cipher] into a URL.
+         */
+        fun pickAudio(root: JsonElement, quality: StreamQuality = StreamQuality.High, allowCipher: Boolean = false): Picked? {
             if (status(root) != "OK") return null
             val sd = root.obj("streamingData") ?: return null
-            val formats = (sd["adaptiveFormats"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-                .filter { it.string("mimeType")?.startsWith("audio/") == true && it.string("url") != null }
-            val best = PREFERRED_ITAGS.firstNotNullOfOrNull { tag -> formats.firstOrNull { it.string("itag") == tag.toString() } }
-                ?: formats.maxByOrNull { it.string("bitrate")?.toIntOrNull() ?: 0 }
+            val all = (sd["adaptiveFormats"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+                .filter { it.string("mimeType")?.startsWith("audio/") == true }
+                .filter { it.string("url") != null || (allowCipher && it.string("signatureCipher") != null) }
+            // Loudness-compressed and dubbed tracks only when nothing else is there.
+            val formats = all.filter { it.string("isDrc") != "true" && it.obj("audioTrack")?.string("audioIsDefault") != "false" }
+                .ifEmpty { all }
+            fun bitrate(f: JsonObject) = f.string("averageBitrate")?.toIntOrNull() ?: f.string("bitrate")?.toIntOrNull() ?: 0
+            fun score(f: JsonObject) = bitrate(f) * (if (f.string("mimeType")?.contains("opus") == true) OPUS_WEIGHT else 1.0)
+            val max = ceiling(quality)
+            val best = formats.filter { bitrate(it) <= max }.maxByOrNull(::score)
+                ?: formats.minByOrNull(::bitrate)
                 ?: return null
+            val url = best.string("url")
             return Picked(
                 itag = best.string("itag")?.toIntOrNull() ?: 0,
-                url = best.string("url")!!,
+                url = url.orEmpty(),
+                cipher = if (url == null) best.string("signatureCipher") else null,
                 expiresInSec = sd.string("expiresInSeconds")?.toLongOrNull() ?: 6 * 3600,
+                bitrate = bitrate(best),
+                contentLength = best.string("contentLength")?.toLongOrNull()?.takeIf { it > 0 },
             )
         }
 

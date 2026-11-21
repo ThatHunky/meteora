@@ -8,6 +8,7 @@
     <string name="not_connected">Немає з’єднання з ПК</string>
     <string name="action_play">Відтворити</string>
     <string name="action_pause">Пауза</string>
+    <string name="action_collapse">Згорнути програвач</string>
     <string name="action_next">Далі</string>
     <string name="action_previous">Назад</string>
     <string name="action_try_again">Спробувати ще</string>
@@ -76,6 +77,14 @@
     <string name="target_phone">Цей телефон</string>
     <string name="playing_on_phone">Грає на цьому телефоні</string>
     <string name="pair_skip">Без ПК</string>
+    <string name="disclaimer">Meteora — незалежний застосунок. Він не пов’язаний з YTMDesktop, YouTube чи Google.</string>
     <string name="pair_skip_note">Музика гратиме на цьому телефоні. ПК можна підключити пізніше в налаштуваннях.</string>
     <string name="share_phone_mode">Надсилання грає на ПК. Спершу перемкніть «Де грати» на ПК у Meteora.</string>
+    <string name="quality_title">Якість звуку на цьому телефоні</string>
+    <string name="quality_wifi">Через Wi-Fi</string>
+    <string name="quality_mobile">Через мобільний інтернет</string>
+    <string name="quality_high">Висока</string>
+    <string name="quality_normal">Звичайна</string>
+    <string name="quality_low">Низька</string>
+    <string name="quality_note">«Висока» — приблизно 256 кбіт/с, потрібні YouTube Music Premium і вхід в обліковий запис; інакше вона така сама, як «Звичайна», приблизно 130 кбіт/с. «Низька» — приблизно 50 кбіт/с. Зміна діє з наступного треку.</string>
 </resources>

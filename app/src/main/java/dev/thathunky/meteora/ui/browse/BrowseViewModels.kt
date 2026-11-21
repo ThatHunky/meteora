@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 sealed interface Load<out T> {
@@ -45,16 +45,26 @@ class SearchViewModel @Inject constructor(private val ytm: YtmClient) : ViewMode
 
     private var searchJob: Job? = null
 
+    /** The query whose results are showing. It gets no suggestions: the list would cover the results. */
+    private var submitted: String? = null
+
     init {
         viewModelScope.launch {
-            query.debounce(200).distinctUntilChanged().filter { it.length >= 2 }.collect { q ->
-                _suggestions.value = runCatching { ytm.suggestions(q) }.getOrDefault(emptyList())
+            query.debounce(200).distinctUntilChanged().collectLatest { q ->
+                if (q.length < 2 || q == submitted) {
+                    _suggestions.value = emptyList()
+                    return@collectLatest
+                }
+                val found = runCatching { ytm.suggestions(q) }.getOrDefault(emptyList())
+                // The text may have changed, or been submitted, while the request was out.
+                if (query.value == q && q != submitted) _suggestions.value = found
             }
         }
     }
 
     fun submit(q: String = query.value) {
         if (q.isBlank()) return
+        submitted = q
         query.value = q
         _suggestions.value = emptyList()
         searchJob?.cancel()
@@ -76,10 +86,11 @@ class CollectionViewModel @Inject constructor(private val ytm: YtmClient) : View
     val page: StateFlow<Load<CollectionPage>> = _page.asStateFlow()
     private var loadedId: String? = null
 
-    fun load(id: String, isAlbum: Boolean) {
-        if (loadedId == id) return
+    fun load(id: String, isAlbum: Boolean, force: Boolean = false) {
+        if (loadedId == id && !force) return
         loadedId = id
         viewModelScope.launch {
+            _page.value = Load.Loading
             _page.value = runCatching { if (isAlbum) ytm.album(id) else ytm.playlist(id) }
                 .fold({ Load.Ready(it) }, { Load.Failed(it) })
         }
@@ -92,10 +103,11 @@ class ArtistViewModel @Inject constructor(private val ytm: YtmClient) : ViewMode
     val page: StateFlow<Load<ArtistPage>> = _page.asStateFlow()
     private var loadedId: String? = null
 
-    fun load(id: String) {
-        if (loadedId == id) return
+    fun load(id: String, force: Boolean = false) {
+        if (loadedId == id && !force) return
         loadedId = id
         viewModelScope.launch {
+            _page.value = Load.Loading
             _page.value = runCatching { ytm.artist(id) }.fold({ Load.Ready(it) }, { Load.Failed(it) })
         }
     }
