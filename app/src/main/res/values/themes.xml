@@ -4,4 +4,10 @@
     <style name="Theme.Meteora" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
+
+    <!-- Share receiver: no UI, just a toast. -->
+    <style name="Theme.Meteora.Invisible" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoDisplay">true</item>
+    </style>
 </resources>
