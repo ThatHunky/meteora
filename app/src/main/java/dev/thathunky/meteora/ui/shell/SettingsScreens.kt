@@ -90,7 +90,7 @@ private fun SettingsCategory.icon(): ImageVector = when (this) {
 /** The top-level list: one row per category with a line about its current state. */
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPadding: Dp) {
+fun SettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, bottomPadding: Dp) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     val target by vm.target.collectAsStateWithLifecycle()
     val signedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
@@ -111,7 +111,7 @@ fun SettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, bottomPa
                 headline = stringResource(c.title()),
                 supporting = summary,
                 leading = { Icon(c.icon(), contentDescription = null) },
-                modifier = Modifier.clickable { backStack.add(c.route()) },
+                modifier = Modifier.clickable { open(c.route()) },
             )
         }
     }
@@ -170,7 +170,7 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack: () -> Unit, bottomPadding: Dp) {
+fun AccountSettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, onBack: () -> Unit, bottomPadding: Dp) {
     val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
     SettingsPage(R.string.ytm_account, onBack, bottomPadding) {
         ListItem(
@@ -178,7 +178,7 @@ fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, o
             overlineContent = { Text(stringResource(R.string.ytm_account)) },
         )
         if (ytmSignedIn) MButton(stringResource(R.string.signout_action), vm::signOutYtm, kind = ButtonKind.Outlined)
-        else MButton(stringResource(R.string.signin_action), { backStack.add(SignInRoute) })
+        else MButton(stringResource(R.string.signin_action), { open(SignInRoute) })
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
@@ -190,7 +190,7 @@ fun AccountSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, o
 
 @androidx.media3.common.util.UnstableApi
 @Composable
-fun PcSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack: () -> Unit, bottomPadding: Dp) {
+fun PcSettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, onBack: () -> Unit, bottomPadding: Dp) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     SettingsPage(R.string.settings_pc, onBack, bottomPadding) {
         ListItem(
@@ -198,7 +198,7 @@ fun PcSettingsScreen(vm: ShellViewModel, backStack: NavBackStack<NavKey>, onBack
             supportingContent = { Text(pc?.preferredOrder()?.joinToString(" · ").orEmpty()) },
             overlineContent = { Text(stringResource(R.string.settings_pc)) },
         )
-        MButton(stringResource(R.string.settings_repair), { backStack.add(PairingRoute) })
+        MButton(stringResource(R.string.settings_repair), { open(PairingRoute) })
         MButton(stringResource(R.string.settings_forget), vm::forgetPc, kind = ButtonKind.Outlined)
         Text(
             stringResource(R.string.settings_forget_note),

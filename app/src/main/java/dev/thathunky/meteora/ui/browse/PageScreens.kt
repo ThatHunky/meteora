@@ -106,7 +106,7 @@ fun CollectionScreen(
     vm: CollectionViewModel = hiltViewModel(),
     actionsVm: ActionsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(id) { vm.load(id, isAlbum) }
+    LaunchedEffect(id, vm) { vm.load(id, isAlbum) }
     val page by vm.page.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
     val haptics = LocalHapticFeedback.current
@@ -175,7 +175,7 @@ fun ArtistScreen(
     vm: ArtistViewModel = hiltViewModel(),
     actionsVm: ActionsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(browseId) { vm.load(browseId) }
+    LaunchedEffect(browseId, vm) { vm.load(browseId) }
     val page by vm.page.collectAsStateWithLifecycle()
     Loaded(page, onRetry = { vm.load(browseId, force = true) }) { p ->
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
@@ -208,7 +208,8 @@ fun ArtistScreen(
             p.shelves.forEachIndexed { si, shelf ->
                 item(key = "h$si") { SectionHeader(shelf.title) }
                 if (shelf.items.all { it is MusicItem.Song }) {
-                    items(shelf.items.take(5), key = { "s$si:${it.key()}" }) { item ->
+                    // distinctBy as in every other list: a repeated song would reuse a lazy key and crash.
+                    items(shelf.items.distinctBy { it.key() }.take(5), key = { "s$si:${it.key()}" }) { item ->
                         MusicRow(item, onClick = { opener.open(item) }, onLongClick = { onLongPress(item) })
                     }
                 } else {
