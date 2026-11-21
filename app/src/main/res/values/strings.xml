@@ -58,6 +58,9 @@
     <string name="action_radio">Start radio</string>
     <string name="action_go_album">Go to album</string>
     <string name="action_go_artist">Go to artist</string>
+    <string name="action_share">Share</string>
+    <string name="action_more">More</string>
+    <string name="share_chooser">Share via</string>
     <string name="share_label">Play on PC</string>
     <string name="share_unsupported">Meteora can’t play this link</string>
     <string name="share_no_pc">PC not connected. Open Meteora to pair or reconnect.</string>
@@ -88,4 +91,6 @@
     <string name="quality_normal">Normal</string>
     <string name="quality_low">Low</string>
     <string name="quality_note">High is about 256 kbps and needs YouTube Music Premium with you signed in; otherwise it is the same as Normal, about 130 kbps. Low is about 50 kbps. A change applies from the next track.</string>
+    <string name="autoplay_title">Autoplay</string>
+    <string name="autoplay_note">When an album or playlist ends on this phone, keep playing similar music.</string>
 </resources>

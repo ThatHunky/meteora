@@ -4,6 +4,7 @@ import dev.thathunky.meteora.domain.LikeStatus
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,6 +25,28 @@ class WatchQueueTest {
         assertNotNull(first.thumbnail)
         assertNotNull("radio continues", q.continuation)
         q.songs.forEach { assertEquals(11, it.videoId.length); assertTrue(it.title.isNotBlank()) }
+    }
+
+    @Test fun radioHasNoAutomix() = assertNull(YtmParser.watchQueue(root).automix)
+
+    /** `next` for playlistId OLAK5uy_m7ToVnaKcPCN19ONmKOHl1F29TlHzkMQU (the 5-track Radiohead release of album.json), signed out, 2026-11-21. */
+    @Test fun albumAndItsAutomix() {
+        val album = Json.parseToJsonElement(requireNotNull(javaClass.getResource("/fixtures/ytm/next-album.json")).readText())
+        val q = YtmParser.watchQueue(album)
+        assertEquals(listOf("3M_Gg1xAHE4", "vh2ED26hMNU", "9-8zVH35qc4", "d9psS8I7yYc", "_1KDA806Klg"), q.songs.map { it.videoId })
+        assertEquals("Pyramid Song", q.songs.first().title)
+        assertEquals(0, q.startIndex)
+        assertNull("an album queue ends", q.continuation)
+        assertEquals(AutomixRef("RDAMPLOLAK5uy_m7ToVnaKcPCN19ONmKOHl1F29TlHzkMQU", "wAEB8gECeAE%3D"), q.automix)
+        assertEquals(collectionRadioId("OLAK5uy_m7ToVnaKcPCN19ONmKOHl1F29TlHzkMQU"), q.automix?.playlistId)
+    }
+
+    @Test fun radioIds() {
+        assertEquals("RDAMPLOLAK5uy_x", collectionRadioId("OLAK5uy_x"))
+        assertEquals("RDAMPLPL123", collectionRadioId("VLPL123"))
+        assertEquals("RDAMPLRDCLAK5uy_x", collectionRadioId("RDCLAK5uy_x"))
+        assertEquals("RDAMPLPL123", collectionRadioId("RDAMPLPL123"))
+        assertEquals("RDAMVMO7gRpIKfSCM", collectionRadioId("RDAMVMO7gRpIKfSCM"))
     }
 
     @Test fun signedOutNothingIsLiked() {

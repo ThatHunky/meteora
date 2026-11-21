@@ -64,15 +64,16 @@ class YtmClient(
             .ifEmpty { browse("FEmusic_liked_playlists").findAll("musicTwoRowItemRenderer").mapNotNull(YtmParser::twoRowItem) }
 
     /** What the YTM player would queue for this video and/or playlist (radio when only a video). */
-    suspend fun watchQueue(videoId: String? = null, playlistId: String? = null): WatchQueue =
-        YtmParser.watchQueue(nextRaw(videoId, playlistId))
+    suspend fun watchQueue(videoId: String? = null, playlistId: String? = null, params: String? = null): WatchQueue =
+        YtmParser.watchQueue(nextRaw(videoId, playlistId, params))
 
-    /** The raw `next` response behind [watchQueue]. */
-    internal suspend fun nextRaw(videoId: String? = null, playlistId: String? = null): JsonElement {
+    /** The raw `next` response behind [watchQueue]. [params]: from a `watchPlaylistEndpoint` (automix). */
+    internal suspend fun nextRaw(videoId: String? = null, playlistId: String? = null, params: String? = null): JsonElement {
         require(videoId != null || playlistId != null)
         return post("next", buildJsonObject {
             videoId?.let { put("videoId", it) }
             put("playlistId", playlistId ?: "RDAMVM$videoId")
+            params?.let { put("params", it) }
             put("enablePersistentPlaylistPanel", true)
             put("isAudioOnly", true)
             put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")

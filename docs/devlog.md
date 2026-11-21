@@ -279,6 +279,14 @@ The user: "I think likes aren't synced." In phone mode the like button always st
 
 Seen along the way: after tapping a search result the search field keeps focus, so the keyboard comes back over the mini player when the app returns to the front. Not fixed.
 
+## Radio, autoplay, share, artist actions (P1 of docs/parity-plan.md)
+
+- **Radio for anything.** The long-press sheet now has a list per type (song; album or playlist; artist) and Start radio on all of them. A collection's radio is `RDAMPL<playlistId>`, an artist's is the one its page already offers. The collection id was checked with signed-out `next` calls from the PC for an album, a `PL…` playlist and an `RDCLAK…` mix (about 50 tracks and a continuation each), not through YTMDesktop.
+- **Autoplay on the phone.** An album's `next` response ends with an `automixPreviewVideoRenderer` pointing at `RDAMPL<id>`, saved as a fixture. When a queue with no continuation gets within three tracks of its end, the phone fetches that once and carries on with its radio. Off under Settings → Autoplay, and repeat-all wins.
+- **Share** from the sheet, the album, playlist and artist pages and Now Playing, as music.youtube.com links. Meteora's own "Play on PC" entry is left out of the chooser. Sharing the audio file itself was asked for and left out (see the plan).
+- **Now Playing** has an overflow menu (Start radio, Share, Go to album, Go to artist), and the artist and album in the subtitle open their pages.
+- **Checked:** build and unit tests only. Nothing here was tried on a phone yet.
+
 ### Known gaps
 
 - **Solver in a WebView:** slow (about half a second a track) and heavy; the Rust core is meant to replace it.

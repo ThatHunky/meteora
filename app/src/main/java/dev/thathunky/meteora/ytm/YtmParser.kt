@@ -94,7 +94,14 @@ object YtmParser {
         val selected = root.findAll("playlistPanelVideoRenderer").indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
         val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
             ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
-        return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root))
+        return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root), automix(root))
+    }
+
+    /** The item after the last track of an album or playlist queue (seen signed out on 2026-11-21). */
+    private fun automix(root: JsonElement): AutomixRef? {
+        val endpoint = root.findAll("automixPreviewVideoRenderer").firstOrNull()?.findAll("watchPlaylistEndpoint")?.firstOrNull()
+        val playlistId = endpoint.str("playlistId") ?: return null
+        return AutomixRef(playlistId, endpoint.str("params"))
     }
 
     /**

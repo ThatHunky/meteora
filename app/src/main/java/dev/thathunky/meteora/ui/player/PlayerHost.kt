@@ -45,7 +45,22 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Radio
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Constraints
+import dev.thathunky.meteora.domain.Track
+import dev.thathunky.meteora.share.ShareLink
+import dev.thathunky.meteora.share.ShareTarget
+import dev.thathunky.meteora.share.shareLink
+import dev.thathunky.meteora.share.shareTitle
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.Shuffle
@@ -122,6 +137,9 @@ fun PlayerHost(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     miniBottomPadding: androidx.compose.ui.unit.Dp,
+    onOpenAlbum: (browseId: String) -> Unit,
+    onOpenArtist: (browseId: String) -> Unit,
+    onRadio: (videoId: String) -> Unit,
     modifier: Modifier = Modifier,
     vm: PlayerViewModel = hiltViewModel(),
 ) {
@@ -137,7 +155,11 @@ fun PlayerHost(
             label = "player",
         ) { isExpanded ->
             if (isExpanded) {
-                FullPlayer(s, connection, vm, onCollapse = { onExpandedChange(false) }, scope = this@SharedTransitionLayout, anim = this)
+                FullPlayer(
+                    s, connection, vm, onCollapse = { onExpandedChange(false) },
+                    links = TrackLinks(onOpenAlbum, onOpenArtist, onRadio),
+                    scope = this@SharedTransitionLayout, anim = this,
+                )
             } else {
                 Box(Modifier.fillMaxSize().padding(bottom = miniBottomPadding), contentAlignment = Alignment.BottomCenter) {
                     MiniPlayer(s, vm, onExpand = { onExpandedChange(true) }, scope = this@SharedTransitionLayout, anim = this@AnimatedContent)
@@ -216,12 +238,20 @@ private fun MiniPlayer(
     }
 }
 
+/** What Now Playing can open or start from the current track; the shell owns navigation. */
+private class TrackLinks(
+    val openAlbum: (String) -> Unit,
+    val openArtist: (String) -> Unit,
+    val radio: (String) -> Unit,
+)
+
 @Composable
 private fun FullPlayer(
     s: PlaybackState,
     connection: ConnectionState,
     vm: PlayerViewModel,
     onCollapse: () -> Unit,
+    links: TrackLinks,
     scope: SharedTransitionScope,
     anim: AnimatedVisibilityScope,
 ) = with(scope) {
@@ -333,6 +363,7 @@ private fun FullPlayer(
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue)) }
+                TrackMenu(track, links)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -368,13 +399,7 @@ private fun FullPlayer(
                     maxLines = 1,
                     modifier = Modifier.basicMarquee(),
                 )
-                Text(
-                    listOfNotNull(track.artist, track.album).joinToString(" · "),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.basicMarquee(),
-                )
+                ArtistAlbumLine(track, links)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -438,6 +463,101 @@ private fun FullPlayer(
     }
 
     if (showQueue) QueueSheet(s, vm, onDismiss = { showQueue = false })
+}
+
+/** Start radio, Share, Go to album, Go to artist. The last two only when the track carries the id. */
+@Composable
+private fun TrackMenu(track: Track, links: TrackLinks) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_radio)) },
+                leadingIcon = { Icon(Icons.Outlined.Radio, null) },
+                onClick = { open = false; links.radio(track.videoId) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_share)) },
+                leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                onClick = {
+                    open = false
+                    context.shareLink(ShareLink.url(ShareTarget.Video(track.videoId, null)), shareTitle(track.title, track.artist))
+                },
+            )
+            track.albumId?.let { id ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_go_album)) },
+                    leadingIcon = { Icon(Icons.Outlined.Album, null) },
+                    onClick = { open = false; links.openAlbum(id) },
+                )
+            }
+            track.artistChannelId?.let { id ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_go_artist)) },
+                    leadingIcon = { Icon(Icons.Outlined.Person, null) },
+                    onClick = { open = false; links.openArtist(id) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Artist · Album", each part tappable when its page is known. Two texts, each with its own
+ * marquee: the short one keeps its full width and the long one scrolls in what is left.
+ */
+@Composable
+private fun ArtistAlbumLine(track: Track, links: TrackLinks) {
+    val album = track.album?.takeIf { it.isNotBlank() }
+    Layout(
+        content = {
+            LinePart(track.artist, track.artistChannelId?.let { id -> { links.openArtist(id) } })
+            if (album != null) {
+                LinePart(" · ", null)
+                LinePart(album, track.albumId?.let { id -> { links.openAlbum(id) } })
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) { measurables, constraints ->
+        val max = constraints.maxWidth
+        val widths = if (measurables.size < 3 || !constraints.hasBoundedWidth) {
+            measurables.map { minOf(it.maxIntrinsicWidth(Constraints.Infinity), max) }
+        } else {
+            val sep = measurables[1].maxIntrinsicWidth(Constraints.Infinity)
+            val a = measurables[0].maxIntrinsicWidth(Constraints.Infinity)
+            val b = measurables[2].maxIntrinsicWidth(Constraints.Infinity)
+            val room = (max - sep).coerceAtLeast(0)
+            val (wa, wb) = when {
+                a + b <= room -> a to b
+                a <= room / 2 -> a to room - a
+                b <= room / 2 -> room - b to b
+                else -> room / 2 to room - room / 2
+            }
+            listOf(wa, sep, wb)
+        }
+        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints(maxWidth = widths[i].coerceAtLeast(0))) }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        layout(if (constraints.hasBoundedWidth) max else placeables.sumOf { it.width }, height) {
+            var x = 0
+            placeables.forEach { p ->
+                p.placeRelative(x, (height - p.height) / 2)
+                x += p.width
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinePart(text: String, onClick: (() -> Unit)?) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = (if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).basicMarquee(),
+    )
 }
 
 @Composable

@@ -24,11 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Radio
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -46,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +60,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.share.share
 import dev.thathunky.meteora.ytm.MusicItem
 
 @Composable
@@ -121,6 +126,10 @@ fun CollectionScreen(
                         Icon(Icons.Outlined.Shuffle, null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.shuffle))
+                    }
+                    ShareButton {
+                        if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
+                        else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))
                     }
                 }
             }
@@ -192,6 +201,7 @@ fun ArtistScreen(
                             Text(stringResource(R.string.action_radio))
                         }
                     }
+                    ShareButton { MusicItem.Artist(browseId, p.name, "", p.thumbnail) }
                 }
             }
             p.shelves.forEachIndexed { si, shelf ->
@@ -211,6 +221,19 @@ fun ArtistScreen(
                 }
             }
         }
+    }
+}
+
+/** The share icon at the end of a page's button row. [item] is built only on tap. */
+@Composable
+private fun ShareButton(item: () -> MusicItem) {
+    val context = LocalContext.current
+    FilledTonalIconButton(
+        onClick = { context.share(item()) },
+        shapes = IconButtonDefaults.shapes(),
+        modifier = Modifier.size(56.dp),
+    ) {
+        Icon(Icons.Outlined.Share, stringResource(R.string.action_share))
     }
 }
 
