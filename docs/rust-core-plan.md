@@ -95,7 +95,9 @@ Files created and changed; `cargo test` and Gradle test counts; the `.so` size a
 - **R2, PC state:** `state_update(json)` parses YTMDesktop's state in Rust, keeps the previous one, and returns a compact result: unchanged, progress only, or a full new state. `RealtimeClient` and `PlayerRepository` then stop building a `StateDto` tree 4–15 times a second. Needs its own measurements first (allocation rate in Android Studio's profiler or `dumpsys meminfo` over a minute of playback).
 - **R3, YouTube Music parsing:** `ytm/YtmParser` (290 lines of renderer search over large JSON) ported to Rust, returning the app's item lists as JSON. The biggest port and the smallest gain; do it last or not at all. Before starting it, do the evaluation below: an existing crate may make the port unnecessary.
 
-## Before R3: evaluate RustyPipe
+## Before R3: evaluate RustyPipe (done 2026‑11‑21: leave it)
+
+**Outcome:** do not adopt it. Its last code change is from June 2025 and its last release (0.11.4) from April 2025, and YouTube has changed its player many times since. It also has no Home feed and no like / dislike. Details and evidence are in `docs/api-notes.md`. Two things are worth taking from it: it runs its JavaScript on `rquickjs`, the binding R1 plans to use, and its YouTube Music response models are a useful reference if R3 is ever done by hand. The questions it was checked against are kept below.
 
 [RustyPipe](https://docs.rs/rustypipe) is a Rust client for the YouTube and YouTube Music InnerTube APIs, inspired by NewPipe. It may be able to replace the hand-written `YtmParser`, and possibly the Python yt‑dlp fallback (about 18 MB of the APK). Nothing below is verified yet; the evaluation is a spike that ends in a written answer, not in code in the app.
 

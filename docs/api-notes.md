@@ -238,10 +238,25 @@ Parsing: renderers such as `musicCarouselShelfRenderer`, `musicTwoRowItemRendere
 - **Audio formats in that response** (average bitrate): 251 Opus 127 kbps, 140 AAC 130 kbps, 250 Opus 65 kbps, 249 Opus 49 kbps, 139 HE‑AAC 49 kbps. The top two are labelled `AUDIO_QUALITY_MEDIUM`. The 256 kbps Premium formats are not offered to this signed-out client.
 - **Source:** client details come from the yt-dlp 2026.10.26 client table (`yt_dlp/extractor/youtube/_base.py`), where visionOS is the only default client that needs no JavaScript. `android_vr` has returned 403 for all formats since 2026-08-17.
 
+**256 kbps for Premium (probed on the OP7T, 2026‑11‑21, signed in):**
+- `/player` as `WEB_REMIX` on `music.youtube.com`, with the session cookies and `SAPISIDHASH`, lists itag 141 (AAC, 257 kbps) and 774 (Opus, 258 kbps), both `AUDIO_QUALITY_HIGH`, next to 140/249/250/251. Every URL is behind `signatureCipher`.
+- The same request as `WEB` lists no HIGH formats and no URLs; as `TVHTML5` it is `UNPLAYABLE`; `IOS` and `VISIONOS` with cookies return HTTP 400.
+- yt-dlp's client table marks the web music client's PO token as not required for Premium. Not yet confirmed here that a deciphered URL downloads.
+- The solver scripts yt-dlp ships (`yt_dlp_ejs/yt/solver/lib.min.js` and `core.min.js`, 0.8.0) solved a signature and an `n` value for player `6b3d0364` under Node: 311 ms the first time, 68 ms after.
+
 **Fallback: yt-dlp** through `youtubedl-android` 0.18.1 (GPL‑3.0).
 - **Speed:** about 15 s per track on the OP7T.
 - **DNS:** Python's lookups failed intermittently behind Private DNS.
 - **Updates:** `updateYoutubeDL(STABLE)` at most once a day.
+
+**RustyPipe, evaluated and not adopted (2026‑11‑21).** `rustypipe` 0.11.4 from crates.io, source read, nothing run against YouTube.
+- **Upkeep:** the release is dated 2025‑04‑23. The repository's last code commits are from 2025‑06‑18; the only commit since (2026‑08‑03) changes a licence identifier. Its deobfuscator finds the signature functions with patterns written for 2025 players, so stream URLs from it are unlikely to work today. This alone rules it out.
+- **Coverage:** it has YouTube Music search with suggestions, album, playlist and artist pages, liked tracks, the saved library, history, radio and lyrics. It has no Home feed (`FEmusic_home` does not appear in the source) and no like / dislike call.
+- **Sign-in:** it accepts cookies and signs with `SAPISIDHASH`.
+- **JavaScript:** it embeds QuickJS through `rquickjs` 0.9.
+- **PO tokens:** optional, through a separate `rustypipe-botguard` program.
+- **Networking:** its own, on `reqwest` and `tokio`.
+- **Licence:** GPL‑3.0, compatible with Meteora.
 
 **Queues:** `POST music.youtube.com/youtubei/v1/next` with `{videoId?, playlistId, isAudioOnly, enablePersistentPlaylistPanel}`.
 - **Response:** `playlistPanelVideoRenderer` items, with `selected:true` on the starting track.
