@@ -123,12 +123,13 @@ object Looks {
     )
 
     // Kept well apart from Expressive, its nearest neighbour: rounder corners, rows drawn as
-    // separate cards with real gaps, bigger art and wider margins, lighter and airier titles.
+    // separate cards with real gaps, bigger art, airier titles. The margins stay 20 dp: at 24 the
+    // Library's 152 dp playlist grid falls to one column on a 360 dp phone, and the player uses them.
     val Soft = Look(
         id = LookId.Soft, typeface = Typeface.System, capsLabels = false, lowerLabels = false,
         cornerSmall = 20.dp, cornerMedium = 28.dp, cornerLarge = 36.dp, pills = true,
         outline = 0.dp, hardShadow = 0.dp, surface = SurfaceStyle.Tonal, gradients = 0.5f,
-        rowHeight = 80.dp, rowArt = 60.dp, rowGap = 8.dp, screenPadding = 24.dp,
+        rowHeight = 80.dp, rowArt = 60.dp, rowGap = 8.dp, screenPadding = 20.dp,
         progress = ProgressStyle.WavyThick, loading = LoadingStyle.Morphing, header = HeaderStyle.Large,
         nav = NavStyle.TallTabs, mini = MiniStyle.DockedLarge, miniSpace = 76.dp, pauseArt = PauseArt.Shrink,
         textControls = false, morphs = false, expressiveMotion = true, artworkSetting = true,

@@ -172,20 +172,21 @@ fun <T> SegmentedChoice(
                         LookId.Flat -> RoundedCornerShape(8.dp).let { ToggleButtonShapes(it, it, it) }
                         else -> ToggleButtonShapes(CircleShape, CircleShape, CircleShape)
                     }
-                    ToggleButton(
-                        checked = selected == o.value,
-                        onCheckedChange = { if (it) onSelect(o.value) },
-                        enabled = enabled,
-                        shapes = shapes,
-                        // The default 16 dp a side leaves too little for a label once there are three or more.
-                        contentPadding = PaddingValues(horizontal = if (options.size > 2) 8.dp else 16.dp, vertical = 8.dp),
-                        modifier = Modifier.weight(1f).then(if (look.id == LookId.Soft) Modifier.heightIn(min = 52.dp) else Modifier),
-                    ) {
+                    val checked = selected == o.value
+                    val onChecked: (Boolean) -> Unit = { if (it) onSelect(o.value) }
+                    val mod = Modifier.weight(1f).then(if (look.id == LookId.Soft) Modifier.heightIn(min = 52.dp) else Modifier)
+                    val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
                         if (o.icon != null) {
-                            Icon(o.icon, contentDescription = null, Modifier.size(18.dp))
+                            Icon(o.icon, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                         }
                         ChoiceLabel(o.label, MaterialTheme.typography.labelLarge)
+                    }
+                    if (options.size > 2) {
+                        // The default 16 dp a side leaves too little for a label once there are three or more.
+                        ToggleButton(checked = checked, onCheckedChange = onChecked, modifier = mod, enabled = enabled, shapes = shapes, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp), content = content)
+                    } else {
+                        ToggleButton(checked = checked, onCheckedChange = onChecked, modifier = mod, enabled = enabled, shapes = shapes, content = content)
                     }
                 }
             }
