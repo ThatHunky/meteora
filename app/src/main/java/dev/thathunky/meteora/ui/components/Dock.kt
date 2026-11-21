@@ -142,22 +142,21 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                         if (on) Box(Modifier.align(Alignment.TopCenter).size(32.dp, 2.dp).background(scheme.primary))
                         Icon(item.icon, null, tint = tint)
                     }
-                    NavStyle.Boxes -> Box(cell.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                    NavStyle.Boxes -> Box(cell.padding(horizontal = 3.dp), contentAlignment = Alignment.Center) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight()
                                 .retroBox(RoundedCornerShape(look.cornerSmall), if (on) scheme.primary else scheme.surface, pressed = on)
-                                .padding(horizontal = 4.dp),
+                                .padding(horizontal = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                         ) {
                             val c = if (on) scheme.onPrimary else scheme.onSurface
-                            Icon(item.icon, null, Modifier.size(18.dp), tint = c)
-                            Spacer(Modifier.width(4.dp))
-                            // Plain: next to the icon there is about 49 dp at 360 dp wide, too little for
-                            // "НАЛАШТУВАННЯ" even shrunk, and shrinking would only make the tabs unequal.
-                            Text(lookLabel(item.label), style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Text only: with an icon beside it "НАЛАШТУВАННЯ" had about 49 dp on a 360 dp
+                            // screen and was cut. The box and the capitals carry the look.
+                            // Capitals without the extra letter spacing, and a slight shrink before any cut.
+                            NavLabel(lookLabel(item.label), c, tight = true)
                         }
                     }
                     // tmux-like: "1:home", the selected one inverted. No icons.
@@ -175,15 +174,15 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
  * is about 92 dp at full size, a little more than a quarter of a 360 dp screen.
  */
 @Composable
-private fun NavLabel(text: String, color: Color, modifier: Modifier = Modifier) {
-    val style = MaterialTheme.typography.labelSmall
+private fun NavLabel(text: String, color: Color, modifier: Modifier = Modifier, tight: Boolean = false) {
+    val style = MaterialTheme.typography.labelSmall.let { if (tight) it.copy(letterSpacing = 0.sp) else it }
     Text(
         text,
         style = style,
         color = color,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
+        autoSize = TextAutoSize.StepBased(minFontSize = if (tight) 8.sp else 9.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
         modifier = modifier,
     )
 }
