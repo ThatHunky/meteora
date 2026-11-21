@@ -17,7 +17,7 @@ object LikeProbe {
     suspend fun run(ytm: YtmClient, videoId: String?, playlistId: String?) {
         val root = runCatching { ytm.nextRaw(videoId, playlistId ?: if (videoId == null) "LM" else null) }
             .getOrElse { Log.i(TAG, "failed: $it"); return }
-        val items = root.findAll("playlistPanelVideoRenderer")
+        val items = root.queueItems()
         val statuses = HashMap<String, Int>()
         val paths = HashMap<String, Int>()
         var withStatus = 0

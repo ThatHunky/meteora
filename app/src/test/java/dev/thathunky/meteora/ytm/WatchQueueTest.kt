@@ -56,6 +56,22 @@ class WatchQueueTest {
         assertTrue(q.likes.values.all { it == LikeStatus.Indifferent })
     }
 
+    /** A song with a music video comes wrapped with the video as `counterpart`: one queue entry, not two. */
+    @Test fun counterpartIsNotQueued() {
+        fun r(id: String, type: String) = """{"playlistPanelVideoRenderer":{"videoId":"$id","title":{"runs":[{"text":"T"}]},
+            "navigationEndpoint":{"watchEndpoint":{"watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"$type"}}}}}}"""
+        val q = YtmParser.watchQueue(
+            Json.parseToJsonElement(
+                """{"contents":[
+                  {"playlistPanelVideoWrapperRenderer":{"primaryRenderer":${r("aaaaaaaaaaa", "MUSIC_VIDEO_TYPE_ATV")},
+                    "counterpart":[{"counterpartRenderer":${r("vvvvvvvvvvv", "MUSIC_VIDEO_TYPE_OMV")}}]}},
+                  ${r("bbbbbbbbbbb", "MUSIC_VIDEO_TYPE_ATV")}]}""",
+            ),
+        )
+        assertEquals(listOf("aaaaaaaaaaa", "bbbbbbbbbbb"), q.songs.map { it.videoId })
+        assertTrue(q.songs.none { it.isVideo })
+    }
+
     /** The shape seen signed in on 2026-11-21: a liked-songs toggle per item, the overlay for the current one. */
     @Test fun likesFromTogglesAndOverlay() {
         fun item(id: String, defaultIcon: String, toggledIcon: String) = """{"playlistPanelVideoRenderer":{"videoId":"$id","title":{"runs":[{"text":"T"}]},

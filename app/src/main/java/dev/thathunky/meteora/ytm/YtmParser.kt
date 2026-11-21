@@ -75,7 +75,7 @@ object YtmParser {
 
     /** The `next` endpoint's watch queue (radio / album / playlist as the player would queue it). */
     fun watchQueue(root: JsonElement): WatchQueue {
-        val songs = root.findAll("playlistPanelVideoRenderer").mapNotNull { r ->
+        val songs = root.queueItems().mapNotNull { r ->
             val videoId = r.str("videoId") ?: return@mapNotNull null
             val byline = r["longBylineText"]["runs"].array()
             MusicItem.Song(
@@ -91,7 +91,7 @@ object YtmParser {
                     ?.let { it != "MUSIC_VIDEO_TYPE_ATV" } ?: false,
             )
         }.distinctBy { it.videoId }
-        val selected = root.findAll("playlistPanelVideoRenderer").indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
+        val selected = root.queueItems().indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
         val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
             ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
         return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root), automix(root))
@@ -112,7 +112,7 @@ object YtmParser {
      */
     private fun queueLikes(root: JsonElement): Map<String, LikeStatus> {
         val likes = HashMap<String, LikeStatus>()
-        for (r in root.findAll("playlistPanelVideoRenderer")) {
+        for (r in root.queueItems()) {
             val videoId = r.str("videoId") ?: continue
             val icon = r.findAll("toggleMenuServiceItemRenderer").firstNotNullOfOrNull { t ->
                 t["defaultIcon"].str("iconType")?.takeIf { it == "FAVORITE" || it == "UNFAVORITE" }
@@ -298,6 +298,28 @@ internal fun JsonElement.findAll(key: String): List<JsonObject> {
 }
 
 /** Like [findAll] for several keys, preserving document order, not descending into matches. */
+/**
+ * The queue's items. Signed in, a song that also has a music video comes wrapped with the other
+ * version under `counterpart` (the audio/video switch in the official app); that one is not a
+ * separate queue entry, so it is skipped.
+ */
+internal fun JsonElement.queueItems(): List<JsonObject> {
+    val out = ArrayList<JsonObject>()
+    fun walk(e: JsonElement) {
+        when (e) {
+            is JsonObject -> for ((k, v) in e) {
+                if (k == "counterpart") continue
+                if (k == "playlistPanelVideoRenderer" && v is JsonObject) out += v
+                walk(v)
+            }
+            is JsonArray -> e.forEach(::walk)
+            else -> Unit
+        }
+    }
+    walk(this)
+    return out
+}
+
 internal fun JsonElement.findAllOf(keys: Collection<String>): List<Pair<String, JsonObject>> {
     val out = ArrayList<Pair<String, JsonObject>>()
     fun walk(e: JsonElement) {
