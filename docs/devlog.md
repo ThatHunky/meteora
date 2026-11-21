@@ -335,6 +335,26 @@ Plan: [theming-plan.md](theming-plan.md). The user forwarded a friend's request 
 
 Unit tests after the merges: 62 in Kotlin, 31 in Rust.
 
+### Looks: themes that change more than colour
+
+Plan: [looks-plan.md](looks-plan.md). The user: "The themes must change the look dramatically, not only the color." Every theme now names a look, and Settings has a Style row to combine any colours with any look:
+
+- **Expressive** (album art, System, Meteora): Material 3 Expressive as before.
+- **Terminal** (Mono, Moonfly): JetBrains Mono everywhere, bundled with its OFL licence (the font has Cyrillic); square corners; 1 dp outlines instead of fills; controls written as `[ next ]`; a `████░░░░` seek bar; `# section` headers; a `|/-\` spinner; 48 dp rows.
+- **Flat** (Nord, Tokyo Night): light, tight type; 8 dp corners; no gradients; a 2 dp seek line; icon-only tabs; the cover dims on pause.
+- **Retro** (Gruvbox): serif titles and capital labels; 2 dp corners with a 2 dp outline and a hard offset shadow that buttons sink into when pressed; a thick outlined seek bar; bouncing squares while loading.
+- **Soft** (Catppuccin, Rosé Pine): 32 dp corners, fat pills, a thicker wave, rows on rounded tonal cards, roomier padding and a taller tab bar.
+
+Screens call wrappers in `ui/components` and the wrappers branch on the look. Two more requests came in while this was being built:
+
+- **Settings** is now a short list (Appearance, Playback, YouTube Music account, Paired PC, About), each opening its own sub-screen.
+- **A bottom dock.** The user disliked the floating mini player and the nav bar. The mini player is now an opaque full-width row on top of the tabs, with a 2 dp progress line, and the selected tab is marked by colour and a small line instead of a large pill. Terminal's dock is two text status lines.
+
+Carousel cards keep their fixed height but put the subtitle right under the title.
+
+- **Not seen on a phone.** Nothing in this section was installed or looked at; it was only built and unit-tested. The likely trouble spots are the Terminal transport row in English (`[ previous ]` and the rest may not fit a 360 dp screen), the mini-to-full transition in each look, the dock's progress line near the rounded corners, and Retro's shadow colour on Gruvbox.
+- Unit tests: 75 in Kotlin. Two of them are from other work committed meanwhile.
+
 ### Known gaps
 
 - **Solver:** preparing a new player script takes about 6 s after each app start.
