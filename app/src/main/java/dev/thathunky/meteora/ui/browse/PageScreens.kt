@@ -238,7 +238,13 @@ private fun Hero(thumbnail: String?, title: String, subtitle: String?, second: S
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth(0.72f).aspectRatio(1f)
-                    .clip(if (round) CircleShape else MaterialShapes.Cookie12Sided.toShape()),
+                    .clip(
+                        when {
+                            round -> CircleShape
+                            dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped -> MaterialShapes.Cookie12Sided.toShape()
+                            else -> androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+                        },
+                    ),
             )
             Spacer(Modifier.height(20.dp))
             Text(title, style = MaterialTheme.typography.headlineMediumEmphasized, textAlign = TextAlign.Center)

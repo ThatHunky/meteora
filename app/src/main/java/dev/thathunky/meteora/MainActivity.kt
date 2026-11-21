@@ -5,10 +5,13 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.KeyEvent
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
@@ -26,7 +29,12 @@ import dev.thathunky.meteora.playback.MeteoraSessionService
 import dev.thathunky.meteora.playback.RemotePlayer
 import dev.thathunky.meteora.ui.shell.MeteoraShell
 import dev.thathunky.meteora.ui.shell.ShellViewModel
+import dev.thathunky.meteora.ui.settings.AppearanceViewModel
+import dev.thathunky.meteora.ui.theme.LocalAlbumSeed
+import dev.thathunky.meteora.ui.theme.LocalArtworkShape
 import dev.thathunky.meteora.ui.theme.MeteoraTheme
+import dev.thathunky.meteora.ui.theme.isDark
+import dev.thathunky.meteora.ui.theme.themeById
 import javax.inject.Inject
 
 // AppCompatActivity (not ComponentActivity) so per-app locales work on Android 12.
@@ -53,8 +61,23 @@ class MainActivity : AppCompatActivity() {
             LaunchedEffect(wantsNotification) {
                 if (wantsNotification) askForNotifications()
             }
-            MeteoraTheme(albumSeed = seed) {
-                MeteoraShell(vm)
+            val appearance: AppearanceViewModel = hiltViewModel()
+            val themeId by appearance.themeId.collectAsStateWithLifecycle()
+            val mode by appearance.mode.collectAsStateWithLifecycle()
+            val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
+            val artworkShape by appearance.artworkShape.collectAsStateWithLifecycle()
+            val theme = themeById(themeId)
+            val dark = isDark(theme, mode, isSystemInDarkTheme())
+            // Bar icons follow the app's theme: a dark theme on a light phone needs light icons.
+            LaunchedEffect(dark) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            CompositionLocalProvider(LocalArtworkShape provides artworkShape, LocalAlbumSeed provides seed) {
+                MeteoraTheme(theme = theme, mode = mode, pureBlack = pureBlack, albumSeed = seed) {
+                    MeteoraShell(vm)
+                }
             }
         }
     }

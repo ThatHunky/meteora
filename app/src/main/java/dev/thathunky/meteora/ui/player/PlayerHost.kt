@@ -193,7 +193,10 @@ private fun MiniPlayer(
                 modifier = Modifier
                     .sharedElement(rememberSharedContentState("art"), anim)
                     .size(44.dp)
-                    .clip(MaterialShapes.Cookie9Sided.toShape()),
+                    .clip(
+                        if (dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped) MaterialShapes.Cookie9Sided.toShape()
+                        else RoundedCornerShape(10.dp),
+                    ),
             )
         },
         trailingContent = {
@@ -342,6 +345,9 @@ private fun FullPlayer(
                 label = "artMorph",
             )
             val morph = remember { Morph(MaterialShapes.Square, MaterialShapes.Cookie12Sided) }
+            // Rounded shows the whole cover and marks pause by size instead of by cutting.
+            val scalloped = dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped
+            val rounded = remember { RoundedCornerShape(28.dp) }
             // The art takes the space the controls leave, so it shrinks on short or landscape
             // screens instead of pushing the controls off the bottom.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -355,7 +361,13 @@ private fun FullPlayer(
                         // Read in the layer block: the morph redraws the art without recomposing the player.
                         .graphicsLayer {
                             clip = true
-                            shape = MorphShape(morph, morphProgress.value)
+                            if (scalloped) {
+                                shape = MorphShape(morph, morphProgress.value)
+                            } else {
+                                shape = rounded
+                                val k = 0.88f + 0.12f * morphProgress.value
+                                scaleX = k; scaleY = k
+                            }
                         },
                 )
             }

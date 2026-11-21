@@ -88,4 +88,18 @@
     <string name="quality_normal">Normal</string>
     <string name="quality_low">Low</string>
     <string name="quality_note">High is about 256 kbps and needs YouTube Music Premium with you signed in; otherwise it is the same as Normal, about 130 kbps. Low is about 50 kbps. A change applies from the next track.</string>
+    <!-- Appearance -->
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_theme">Theme</string>
+    <string name="appearance_mode">Mode</string>
+    <string name="mode_system">System</string>
+    <string name="mode_light">Light</string>
+    <string name="mode_dark">Dark</string>
+    <string name="appearance_pure_black">Pure black background</string>
+    <string name="appearance_artwork">Artwork shape</string>
+    <string name="artwork_rounded">Rounded</string>
+    <string name="artwork_scalloped">Scalloped</string>
+    <string name="theme_album">Album art</string>
+    <string name="theme_system">System colours</string>
+    <string name="theme_by">by %1$s</string>
 </resources>
