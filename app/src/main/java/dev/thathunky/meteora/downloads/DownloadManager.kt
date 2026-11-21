@@ -208,6 +208,28 @@ class DownloadManager @Inject constructor(
 
     fun fileExists(uri: String): Boolean = downloader.exists(uri)
 
+    // ---- offline ----
+
+    /** No network that reaches the internet. */
+    fun offline(): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return true
+        return !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    /**
+     * A queue built from the index alone (the network is needed for YouTube's queue): the
+     * collection [playlistId]'s downloaded tracks in order, or just [videoId]. Null when nothing fits.
+     */
+    fun localQueue(playlistId: String?, videoId: String?): Pair<List<LocalSong>, Int>? {
+        val songs = index.songs.value
+        val ids = playlistId?.let { index.collections.value[it]?.videoIds } ?: listOfNotNull(videoId)
+        val done = ids.mapNotNull { songs[it]?.takeIf { e -> e.state == DownloadState.Done } }
+        if (done.isEmpty()) return null
+        val start = done.indexOfFirst { it.videoId == videoId }.coerceAtLeast(0)
+        return done.map { it.toLocalSong() } to start
+    }
+
     // ---- space ----
 
     fun usedBytes(): Long = index.songs.value.values.filter { it.state == DownloadState.Done }.sumOf { it.bytes }

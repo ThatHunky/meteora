@@ -134,6 +134,7 @@ class LocalEngine @Inject constructor(
     private val okHttp: OkHttpClient,
     @AppScope private val scope: CoroutineScope,
     private val autoplay: AutoplayStore,
+    private val downloads: dev.thathunky.meteora.downloads.DownloadManager,
 ) {
     private val _state = MutableStateFlow<PlaybackState?>(null)
     val state: StateFlow<PlaybackState?> = _state.asStateFlow()
@@ -157,6 +158,8 @@ class LocalEngine @Inject constructor(
     private val retried = HashSet<String>()
     /** videoId → tier it was first opened with. Written on the loader thread. */
     private val pinned = ConcurrentHashMap<String, StreamQuality>()
+    /** videoId → its downloaded file's URI, or "" to stream; fixed at the first open like [pinned]. Loader thread. */
+    private val pinnedFile = ConcurrentHashMap<String, String>()
     /** Video id of a song that [play] started by itself while its queue is still loading. Main thread. */
     private var startedAlone: String? = null
     /** When the last play request came in, for the start-up time in the log. 0 once reported. */
@@ -182,10 +185,13 @@ class LocalEngine @Inject constructor(
             .setUpstreamDataSourceFactory(ChunkedDataSource.Factory(OkHttpDataSource.Factory(media)))
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         // Resolve first, cache second: the cache key includes the format the resolver picked.
-        val resolving = ResolvingDataSource.Factory(cached) { spec ->
+        // A downloaded file is read straight from MediaStore, never through the HTTP cache.
+        val network = SchemeDataSource.Factory(cached) { androidx.media3.datasource.ContentDataSource(context) }
+        val resolving = ResolvingDataSource.Factory(network) { spec ->
             if (spec.uri.scheme == VIDEO_SCHEME) return@Factory resolveVideo(spec)
             if (spec.uri.scheme != SCHEME) return@Factory spec
             val id = spec.uri.host ?: return@Factory spec
+            downloadedFile(id)?.let { return@Factory spec.buildUpon().setUri(Uri.parse(it)).setKey(null).build() }
             // Runs on ExoPlayer's loader thread, so blocking is fine. The tier is fixed at the
             // first open: a later open (seek, stall) of another format would mix two files' bytes.
             val q = pinned.getOrPut(id) { resolver.quality.current() }
@@ -238,6 +244,12 @@ class LocalEngine @Inject constructor(
     private val pinnedVideo = ConcurrentHashMap<String, VideoQuality>()
     /** Views showing the picture, the last one on top (Now Playing, then full screen over it). Main thread. */
     private val videoViews = ArrayList<View>()
+
+    /** The track's downloaded file, decided once per track; a file deleted outside the app is forgotten and the track streams. Loader thread. */
+    private fun downloadedFile(id: String): String? = pinnedFile.getOrPut(id) {
+        val uri = downloads.index.completeUri(id) ?: return@getOrPut ""
+        if (downloads.fileExists(uri)) uri else "".also { downloads.forgetMissing(id) }
+    }.ifEmpty { null }
 
     /** Runs on the loader thread, like the audio branch. */
     private fun resolveVideo(spec: DataSpec): DataSpec {
@@ -431,6 +443,7 @@ class LocalEngine @Inject constructor(
                 // fetched ahead), so only the ones behind the current track lose their pin.
                 val ahead = (player.currentMediaItemIndex until player.mediaItemCount).map { player.getMediaItemAt(it) }
                 pinned.keys.retainAll(ahead.mapTo(HashSet()) { it.mediaId })
+                pinnedFile.keys.retainAll(ahead.mapTo(HashSet()) { it.mediaId })
                 pinnedVideo.keys.retainAll(ahead.mapNotNullTo(HashSet()) { it.toLocalSong().videoPlan?.videoId })
                 maybeExtendRadio()
                 // Not from inside the callback: it replaces items.
@@ -472,6 +485,7 @@ class LocalEngine @Inject constructor(
                 id != null && retried.add(id) -> {
                     // A failed web music URL (no Premium, or it wants a token) retries on the anonymous path.
                     resolver.invalidate(id, pinned[id]?.let { resolver.cached(id, it) }?.source)
+                    pinnedFile.remove(id)
                     p.currentMediaItem?.toLocalSong()?.videoPlan?.let { resolver.invalidateVideo(it.videoId) }
                     p.prepare()
                 }
@@ -678,6 +692,7 @@ class LocalEngine @Inject constructor(
         startedAlone = null
         retried.clear()
         pinned.clear()
+        pinnedFile.clear()
         pinnedVideo.clear()
         // A new queue gives pictures that failed before another chance (the network may have changed).
         noVideo.clear()

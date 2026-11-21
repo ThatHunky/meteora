@@ -26,11 +26,39 @@ class MusicActions @Inject constructor(
     private val router: PlaybackRouter,
     private val ytm: YtmClient,
     @AppScope private val scope: CoroutineScope,
+    private val downloads: dev.thathunky.meteora.downloads.DownloadManager,
 ) {
     private val pc get() = router.pc
 
+    /**
+     * On the phone with no network, a downloaded song or collection plays from the index (YouTube's
+     * queue needs the network). True if it did.
+     */
+    private fun playOffline(playlistId: String?, videoId: String?): Boolean {
+        if (!router.isPhone || !downloads.offline()) return false
+        val (songs, start) = downloads.localQueue(playlistId, videoId) ?: return false
+        router.local.setQueue(songs, start, source = playlistId)
+        return true
+    }
+
+    /** The Downloads tab: always from the files, online or not. */
+    fun playDownloaded(playlistId: String?, videoId: String?) {
+        val (songs, start) = downloads.localQueue(playlistId, videoId) ?: return
+        if (router.isPhone) router.local.setQueue(songs, start, source = playlistId)
+        else if (playlistId != null) router.play(PlayIntent.Collection(playlistId, videoId)) else videoId?.let { router.play(PlayIntent.SongRadio(it)) }
+    }
+
     /** Song tap = song + radio; collection = play from the top (optionally from a track). */
     fun play(item: MusicItem, startVideoId: String? = null) {
+        val offlineKey = when (item) {
+            is MusicItem.Song -> null to item.videoId
+            is MusicItem.Playlist -> item.playlistId to startVideoId
+            is MusicItem.Album -> item.playlistId to startVideoId
+            is MusicItem.Artist -> null to null
+        }
+        if (offlineKey.second != null || offlineKey.first != null) {
+            if (playOffline(offlineKey.first, offlineKey.second)) return
+        }
         when (item) {
             is MusicItem.Song -> router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
             is MusicItem.Playlist -> router.play(PlayIntent.Collection(item.playlistId, startVideoId))
@@ -41,8 +69,10 @@ class MusicActions @Inject constructor(
         }
     }
 
-    fun playCollectionTrack(playlistId: String, videoId: String) =
+    fun playCollectionTrack(playlistId: String, videoId: String) {
+        if (playOffline(playlistId, videoId)) return
         router.play(PlayIntent.Collection(playlistId, videoId))
+    }
 
     fun shuffleCollection(playlistId: String, videoIds: List<String>) {
         val start = videoIds.randomOrNull() ?: return

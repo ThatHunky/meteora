@@ -32,6 +32,15 @@ data class DownloadEntry(
     val wanted: Boolean get() = manual || smart
 }
 
+fun DownloadEntry.toLocalSong() = dev.thathunky.meteora.playback.LocalSong(
+    videoId = videoId,
+    title = title,
+    artist = artist,
+    album = album,
+    durationSec = durationSec,
+    artworkUrl = artworkUrl,
+)
+
 /** An album or playlist the user downloaded, with its tracks in order. */
 data class DownloadCollection(
     val id: String,
