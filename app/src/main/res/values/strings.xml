@@ -43,6 +43,14 @@
     <string name="queue">Queue</string>
     <string name="automix">Up next from autoplay</string>
     <string name="reorder">Reorder</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="queue_empty">Nothing in the queue</string>
+    <string name="queue_now_playing">Now playing</string>
+    <string name="action_open_player">Open player</string>
+    <string name="seek_bar">Position</string>
+    <string name="seek_state">%1$s of %2$s</string>
+    <string name="action_video_controls">Show video controls</string>
     <string name="like">Like</string>
     <string name="dislike">Dislike</string>
     <string name="shuffle">Shuffle</string>

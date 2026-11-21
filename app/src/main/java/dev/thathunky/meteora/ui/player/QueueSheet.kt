@@ -30,7 +30,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,19 +73,39 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
     var items by remember { mutableStateOf(s.queue.withIndex().toList()) }
     var dragFrom by remember { mutableStateOf<IndexedValue<QueueEntry>?>(null) }
     LaunchedEffect(s.queue) { if (dragFrom == null) items = s.queue.withIndex().toList() }
+    // For the drop: a queue update that came in during the drag was skipped above.
+    val queueNow by rememberUpdatedState(s.queue)
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = (s.selectedIndex - 1).coerceAtLeast(0))
     val reorder = rememberReorderableLazyListState(listState) { from, to ->
         items = items.toMutableList().apply { add(to.index, removeAt(from.index)) }
         haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
     }
+    val moveUp = stringResource(R.string.move_up)
+    val moveDown = stringResource(R.string.move_down)
+    val nowPlaying = stringResource(R.string.queue_now_playing)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
-        SectionHeader(stringResource(R.string.queue), padding = PaddingValues(horizontal = 24.dp, vertical = 8.dp))
+        SectionHeader(stringResource(R.string.queue), padding = PaddingValues(horizontal = look.screenPadding + 8.dp, vertical = 8.dp))
+        if (items.isEmpty() && s.automix.isEmpty()) {
+            Text(
+                stringResource(R.string.queue_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = look.screenPadding + 8.dp, vertical = 32.dp),
+            )
+        }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             itemsIndexed(items, key = { _, it -> "${it.index}:${it.value.videoId}" }) { position, entry ->
                 ReorderableItem(reorder, key = "${entry.index}:${entry.value.videoId}") { isDragging ->
                     val dismiss = rememberSwipeToDismissBoxState()
+                    // The PC may refuse the removal (the queue comes back unchanged): put the row back.
+                    LaunchedEffect(dismiss.currentValue) {
+                        if (dismiss.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                            delay(2_000)
+                            dismiss.reset()
+                        }
+                    }
                     SwipeToDismissBox(
                         state = dismiss,
                         enableDismissFromStartToEnd = false,
@@ -107,18 +134,23 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                                     Icons.Outlined.DragHandle,
                                     stringResource(R.string.reorder),
                                     onClick = {},
-                                    modifier = Modifier.draggableHandle(
-                                        onDragStarted = {
-                                            dragFrom = entry
-                                            haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-                                        },
-                                        onDragStopped = {
-                                            val from = dragFrom
-                                            dragFrom = null
-                                            val to = items.indexOfFirst { it === from }
-                                            if (from != null && to >= 0 && to != from.index) vm.move(from.value.videoId, from.index, to)
-                                        },
-                                    ),
+                                    modifier = Modifier
+                                        .draggableHandle(
+                                            onDragStarted = {
+                                                dragFrom = entry
+                                                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                            },
+                                            onDragStopped = {
+                                                val from = dragFrom
+                                                dragFrom = null
+                                                val to = items.indexOfFirst { it === from }
+                                                if (from != null && to >= 0 && to != from.index) vm.move(from.value.videoId, from.index, to)
+                                                // Dropped in place: nothing will come back from the PC, so catch up now.
+                                                else items = queueNow.withIndex().toList()
+                                            },
+                                        )
+                                        // A button that does nothing on a tap; TalkBack moves rows with the row's actions instead.
+                                        .clearAndSetSemantics { },
                                 )
                             },
                             highlight = when {
@@ -127,7 +159,19 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                                 else -> MaterialTheme.colorScheme.surfaceContainerLow
                             },
                             marked = current,
-                            modifier = Modifier.fillMaxWidth().clickable { vm.playAt(entry.value.videoId, position) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.playAt(entry.value.videoId, position) }
+                                .semantics {
+                                    if (current) stateDescription = nowPlaying
+                                    // Only while nothing is being dragged: the indexes are the PC's then.
+                                    if (dragFrom == null) {
+                                        customActions = buildList {
+                                            if (entry.index > 0) add(CustomAccessibilityAction(moveUp) { vm.move(entry.value.videoId, entry.index, entry.index - 1); true })
+                                            if (entry.index < items.lastIndex) add(CustomAccessibilityAction(moveDown) { vm.move(entry.value.videoId, entry.index, entry.index + 1); true })
+                                        }
+                                    }
+                                },
                         )
                     }
                 }

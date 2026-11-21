@@ -38,7 +38,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -61,6 +63,7 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.domain.LikeStatus
 import dev.thathunky.meteora.domain.PlaybackState
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /**
  * The picture edge to edge, in landscape with the system bars hidden, over Now Playing. A tap
@@ -94,17 +97,26 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
     }
 
     var controls by remember { mutableStateOf(true) }
+    // Bumped by every control, so the controls stay up while they are being used.
+    var used by remember { mutableIntStateOf(0) }
+    var seeking by remember { mutableStateOf(false) }
     val current by rememberUpdatedState(s)
+    val override by player.seekOverride.collectAsStateWithLifecycle()
+    val currentOverride by rememberUpdatedState(override)
     val jump = { by: Double ->
         val duration = current.track?.durationSec ?: 0.0
         if (duration > 0) {
-            player.seekTo((current.progressAt(SystemClock.elapsedRealtime()) + by).coerceIn(0.0, duration))
+            // From a seek still on its way, so two quick jumps add up.
+            val from = currentOverride ?: current.progressAt(SystemClock.elapsedRealtime())
+            player.seekTo((from + by).coerceIn(0.0, duration))
         }
+        used++
     }
     var menu by remember { mutableStateOf(false) }
-    LaunchedEffect(controls, s.isPlaying, menu) {
-        if (controls && s.isPlaying && !menu) {
-            delay(CONTROLS_MS)
+    val timeout = controlsTimeout()
+    LaunchedEffect(controls, s.isPlaying, menu, seeking, used) {
+        if (controls && s.isPlaying && !menu && !seeking) {
+            delay(timeout)
             controls = false
         }
     }
@@ -137,7 +149,7 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
                         Text(s.track?.artist.orEmpty(), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     val liked = s.track?.like == LikeStatus.Like
-                    IconButton(onClick = player::toggleLike) {
+                    IconButton(onClick = { player.toggleLike(); used++ }) {
                         Icon(if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, stringResource(R.string.like), tint = Color.White)
                     }
                     VideoOptionsButton(vm, menu, { menu = it }, Color.White)
@@ -146,19 +158,19 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
                     }
                 }
                 Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().safeDrawingPadding().padding(horizontal = 24.dp, vertical = 8.dp)) {
-                    FullscreenSeek(s, player)
+                    FullscreenSeek(s, player, override, onSeeking = { seeking = it })
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = player::previous) {
+                        IconButton(onClick = { player.previous(); used++ }) {
                             Icon(Icons.Filled.SkipPrevious, stringResource(R.string.action_previous), tint = Color.White)
                         }
                         IconButton(onClick = { jump(-JUMP_SEC) }) {
                             Icon(Icons.Filled.Replay10, stringResource(R.string.action_rewind), tint = Color.White)
                         }
-                        FilledTonalIconButton(onClick = player::playPause, Modifier.size(56.dp)) {
+                        FilledTonalIconButton(onClick = { player.playPause(); used++ }, Modifier.size(56.dp)) {
                             Icon(
                                 if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
@@ -167,7 +179,7 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
                         IconButton(onClick = { jump(JUMP_SEC) }) {
                             Icon(Icons.Filled.Forward10, stringResource(R.string.action_forward), tint = Color.White)
                         }
-                        IconButton(onClick = player::next) {
+                        IconButton(onClick = { player.next(); used++ }) {
                             Icon(Icons.Filled.SkipNext, stringResource(R.string.action_next), tint = Color.White)
                         }
                     }
@@ -177,21 +189,32 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
     }
 }
 
-/** Its own composable: the position changes every frame, and only this needs to follow it. */
+/**
+ * Its own composable, so only this follows the position. The live position is rounded to a
+ * thousandth of the track, so the slider recomposes a few times a second instead of every frame.
+ * After a drag, the seek target ([override]) holds the thumb until the player reports it.
+ */
 @Composable
-private fun FullscreenSeek(s: PlaybackState, vm: PlayerViewModel) {
+private fun FullscreenSeek(s: PlaybackState, vm: PlayerViewModel, override: Double?, onSeeking: (Boolean) -> Unit) {
     val duration = s.track?.durationSec ?: 0.0
     val live = rememberLiveProgress(s)
     var drag by remember { mutableStateOf<Float?>(null) }
-    val fraction = drag ?: if (duration > 0) (live.value / duration).toFloat().coerceIn(0f, 1f) else 0f
+    val livePosition by remember(live, duration) {
+        derivedStateOf { if (duration > 0) ((live.value / duration).coerceIn(0.0, 1.0) * 1000).roundToInt() / 1000f else 0f }
+    }
+    val fraction = drag ?: override?.takeIf { duration > 0 }?.let { (it / duration).toFloat().coerceIn(0f, 1f) } ?: livePosition
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(formatTime(fraction * duration), color = Color.White, style = MaterialTheme.typography.labelMedium)
         Slider(
             value = fraction,
-            onValueChange = { drag = it },
+            onValueChange = {
+                if (drag == null) onSeeking(true)
+                drag = it
+            },
             onValueChangeFinished = {
                 drag?.let { if (duration > 0) vm.seekTo(duration * it) }
                 drag = null
+                onSeeking(false)
             },
             enabled = duration > 0,
             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),

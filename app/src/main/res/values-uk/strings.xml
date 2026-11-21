@@ -42,6 +42,14 @@
     <string name="queue">Черга</string>
     <string name="automix">Далі з автовідтворення</string>
     <string name="reorder">Перемістити</string>
+    <string name="move_up">Перемістити вище</string>
+    <string name="move_down">Перемістити нижче</string>
+    <string name="queue_empty">У черзі нічого немає</string>
+    <string name="queue_now_playing">Зараз грає</string>
+    <string name="action_open_player">Відкрити програвач</string>
+    <string name="seek_bar">Позиція</string>
+    <string name="seek_state">%1$s з %2$s</string>
+    <string name="action_video_controls">Показати керування відео</string>
     <string name="like">Подобається</string>
     <string name="dislike">Не подобається</string>
     <string name="shuffle">Перемішати</string>

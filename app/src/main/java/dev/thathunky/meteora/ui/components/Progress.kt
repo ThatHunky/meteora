@@ -75,7 +75,9 @@ fun MProgress(progress: () -> Float, amplitude: () -> Float, modifier: Modifier 
             val x = size.width * p
             drawLine(scheme.surfaceContainerHighest, Offset(0f, y), Offset(size.width, y), w)
             drawLine(scheme.primary, Offset(0f, y), Offset(x, y), w)
-            drawCircle(scheme.primary, 5.dp.toPx(), Offset(x.coerceIn(5.dp.toPx(), size.width - 5.dp.toPx()), y))
+            val r = 5.dp.toPx()
+            // maxOf: coerceIn throws when the range is empty, as it is while the bar is narrower than the thumb.
+            drawCircle(scheme.primary, r, Offset(x.coerceIn(r, maxOf(r, size.width - r)), y))
         }
         ProgressStyle.ThickBar -> Canvas(modifier.fillMaxWidth().height(20.dp)) {
             val p = progress().coerceIn(0f, 1f)
@@ -85,7 +87,7 @@ fun MProgress(progress: () -> Float, amplitude: () -> Float, modifier: Modifier 
             val thumb = 16.dp.toPx()
             drawRect(scheme.primary, Offset(0f, top), Size(size.width * p, bar))
             drawRect(scheme.outline, Offset(line / 2, top), Size(size.width - line, bar), style = Stroke(line))
-            val tx = (size.width * p - thumb / 2).coerceIn(0f, size.width - thumb)
+            val tx = (size.width * p - thumb / 2).coerceIn(0f, maxOf(0f, size.width - thumb))
             val ty = (size.height - thumb) / 2
             drawRect(scheme.onSurface, Offset(tx, ty), Size(thumb, thumb))
             drawRect(scheme.outline, Offset(tx, ty), Size(thumb, thumb), style = Stroke(line))
@@ -111,8 +113,8 @@ private fun BlockProgress(progress: () -> Float, modifier: Modifier) {
             val empty = measurer.measure(blockBar(0f, cells), style.copy(color = scheme.onSurfaceVariant))
             val y = (size.height - full.size.height) / 2
             onDrawBehind {
-                // Whole cells only, as blockBar() fills them.
-                val filled = blockBar(progress(), cells).count { it == '█' }
+                // Whole cells only, as blockBar() fills them; counted without building the string each frame.
+                val filled = (progress().coerceIn(0f, 1f) * cells).toInt().coerceIn(0, cells)
                 drawText(empty, topLeft = Offset(0f, y))
                 // From the laid-out row, so a fractional glyph advance cannot drift the clip.
                 clipRect(right = full.size.width.toFloat() * filled / cells.coerceAtLeast(1)) { drawText(full, topLeft = Offset(0f, y)) }
