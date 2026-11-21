@@ -222,3 +222,26 @@ Prior art to read, not copy: ytmusicapi (Python), Metrolist / InnerTune (Kotlin)
 | Accounts | `account/accounts_list` | — |
 
 Parsing: renderers such as `musicCarouselShelfRenderer`, `musicTwoRowItemRenderer`, `musicResponsiveListItemRenderer`, `musicShelfRenderer` and `musicImmersiveHeaderRenderer`/`musicResponsiveHeaderRenderer` change often. Parse defensively: unknown renderer → skip; missing field → null.
+
+---
+
+## Phone playback: getting audio URLs (verified 2026-11-21)
+
+**Fast path: InnerTube `/player`, visionOS client.**
+- **Request:** `POST https://www.youtube.com/youtubei/v1/player`.
+- **Body:** `{"context":{"client":{"clientName":"VISIONOS","clientVersion":"1.02","deviceMake":"Apple","deviceModel":"RealityDevice17,1","osName":"visionOS","osVersion":"26.5.23O471","visitorData":<vd>}},"videoId":…,"contentCheckOk":true,"racyCheckOk":true}`.
+- **Headers:** `X-YouTube-Client-Name: 101`, `X-YouTube-Client-Version: 1.02`, `X-Goog-Visitor-Id: <vd>`, and the Safari UA from yt-dlp.
+- **Visitor ID:** from `GET https://www.youtube.com/sw.js_data`, which is `)]}'` followed by JSON, with the ID at `[0][2][0][0][13]`. Without it the response is `LOGIN_REQUIRED` "Sign in to confirm you're not a bot".
+- **Response:** `streamingData.adaptiveFormats` contains audio itags 139/140/249/250/251, each with a plain `url`: no `signatureCipher`, no n‑parameter, no PO token. `expiresInSeconds` is about 21600.
+- **Behaviour:** ranged reads and mid-file seeks return 206. URLs are tied to the requesting IP, so the phone resolves its own.
+- **Source:** client details come from the yt-dlp 2026.10.26 client table (`yt_dlp/extractor/youtube/_base.py`), where visionOS is the only default client that needs no JavaScript. `android_vr` has returned 403 for all formats since 2026-08-17.
+
+**Fallback: yt-dlp** through `youtubedl-android` 0.18.1 (GPL‑3.0).
+- **Speed:** about 15 s per track on the OP7T.
+- **DNS:** Python's lookups failed intermittently behind Private DNS.
+- **Updates:** `updateYoutubeDL(STABLE)` at most once a day.
+
+**Queues:** `POST music.youtube.com/youtubei/v1/next` with `{videoId?, playlistId, isAudioOnly, enablePersistentPlaylistPanel}`.
+- **Response:** `playlistPanelVideoRenderer` items, with `selected:true` on the starting track.
+- **Radio** (`RDAMVM<id>`) returns 50 tracks plus `nextRadioContinuationData`.
+- **Playlist-only calls** (`OLAK5uy_…`, `RD…`) work.

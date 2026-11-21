@@ -1,8 +1,8 @@
 # Meteora: plan
 
-An Android remote for **YTMDesktop**. It controls playback on the PC and lets you browse your YouTube Music Home, library and search on the phone, then start any of it on the PC with one tap. It is built with Material 3 Expressive.
+An Android remote for **YTMDesktop** that can also play on its own. It controls playback on the PC and lets you browse your YouTube Music Home, library and search on the phone, then start any of it on the PC, or on the phone itself, with one tap. It is built with Material 3 Expressive.
 
-> Status: plan agreed 2026‑11‑21, reviewed and revised the same day. No code yet. Next: spikes **S1** (companion recipes) and **S2** (WebView sign‑in) before M0.
+> Status (2026‑11‑21, evening): S1, S2 and M0–M5 done and checked on the OP7T; phone playback (M7) added and checked. Next: M6 polish. Day-by-day story: [docs/devlog.md](docs/devlog.md).
 > API details: [docs/api-notes.md](docs/api-notes.md)
 
 ---
@@ -27,6 +27,7 @@ An Android remote for **YTMDesktop**. It controls playback on the PC and lets yo
 | Q15 | Background | A foreground service stays connected while the PC is playing. It disconnects after **10 min paused** or when the notification is dismissed. |
 | Q16 | Tap behavior | Song tap: play now with song radio. Collection tap: open its page (Play / Shuffle button group). Long press: Play next / Add to queue / Start radio. |
 | Q17 | Offline | PC unreachable: browsing still works, play actions are disabled, a banner offers Reconnect. YTM session expired: controls still work, browse screens ask you to sign in again. |
+| Q20 | Phone playback | Added after v1 scope (user request, 2026‑11‑21). A **Play on: PC / This phone** switch; switching hands off the queue and position. Streams come from a direct InnerTube `/player` call (visionOS client: plain URLs, no cipher, no PO token), with **yt-dlp** (youtubedl-android, self-updating) as the fallback. youtubedl-android is **GPL‑3.0**, consistent with Q1. Sideload only: this is against YouTube's terms. |
 | Q18 | Testing | JVM tests with MockWebServer and recorded fixtures for both APIs, a fake companion server for development, manual end-to-end runs on the OP7T. No screenshot tests in v1. |
 
 Fixed details that came with the decisions above:
@@ -223,18 +224,19 @@ All song rows: tap = play with radio, long‑press = action sheet.
 | M | Scope | Done when |
 |---|---|---|
 | **S1** spike ✅ 2026-11-21 | Pair with `curl` against the real PC (you toggle authorization and click Allow). Send every command once. Try each `changeVideo` / `queueAdd` recipe. Capture `/state` and a realtime `state-update` stream (with queue) as fixtures. | Every recipe in api-notes is marked ✅ or replaced; fixtures saved |
-| **S2** spike | A throwaway WebView activity on the OP7T: Google sign‑in → `music.youtube.com`, read cookies, one authenticated `browse FEmusic_home` call. Record the fixtures for the parsers. | Sign‑in works, or a fallback from §10 is chosen |
-| **M0** | Project skeleton: Gradle, catalog, Hilt, theme with Expressive + dynamic/album color plumbing, nav shell with a placeholder for every screen, en/uk resources, Spotless/detekt | `./gradlew assembleDebug` installs on the OP7T and shows the themed shell |
-| **M1** | Companion: discovery, pairing, REST commands, realtime, `ConnectionManager` (LAN→Tailscale, backoff), throttler, fake server. **Capture real `state-update` fixtures.** | Pairing with the real PC works; play/pause/next/seek/volume work from a debug screen |
-| **M2** | Now Playing + mini player + Queue with the full Expressive treatment, album‑art theming, shared‑element transition, predictive back | The PC is controllable end to end from polished UI; queue reorder/remove works |
-| **M3** | Media session service: notification, lock screen, BT buttons, remote volume keys, idle disconnect | Lock-screen controls work; volume keys move the PC volume; service stops after 10 min paused |
-| **M4** | YTM: WebView login, cookie store, SAPISIDHASH, brand‑account picker, Search (works signed‑out), Album/Artist/Playlist pages, play recipes | Search → tap a song starts it on the PC with radio; album Play/Shuffle work |
-| **M5** | Home + Library (Liked songs, Playlists), long‑press action sheet, Share‑to‑Meteora | Home Quick picks play on the PC; sharing a link from YT Music on the phone plays it on the PC |
+| **S2** spike ✅ 2026-11-21 | A throwaway WebView activity on the OP7T: Google sign‑in → `music.youtube.com`, read cookies, one authenticated `browse FEmusic_home` call. Record the fixtures for the parsers. | Sign‑in works, or a fallback from §10 is chosen |
+| **M0** ✅ | Project skeleton: Gradle, catalog, Hilt, theme with Expressive + dynamic/album color plumbing, nav shell with a placeholder for every screen, en/uk resources, Spotless/detekt | `./gradlew assembleDebug` installs on the OP7T and shows the themed shell |
+| **M1** ✅ | Companion: discovery, pairing, REST commands, realtime, `ConnectionManager` (LAN→Tailscale, backoff), throttler, fake server. **Capture real `state-update` fixtures.** | Pairing with the real PC works; play/pause/next/seek/volume work from a debug screen |
+| **M2** ✅ | Now Playing + mini player + Queue with the full Expressive treatment, album‑art theming, shared‑element transition, predictive back | The PC is controllable end to end from polished UI; queue reorder/remove works |
+| **M3** ✅ | Media session service: notification, lock screen, BT buttons, remote volume keys, idle disconnect | Lock-screen controls work; volume keys move the PC volume; service stops after 10 min paused |
+| **M4** ✅ | YTM: WebView login, cookie store, SAPISIDHASH, brand‑account picker, Search (works signed‑out), Album/Artist/Playlist pages, play recipes | Search → tap a song starts it on the PC with radio; album Play/Shuffle work |
+| **M5** ✅ | Home + Library (Liked songs, Playlists), long‑press action sheet, Share‑to‑Meteora | Home Quick picks play on the PC; sharing a link from YT Music on the phone plays it on the PC |
+| **M7** ✅ | Phone playback: stream resolver (InnerTube → yt-dlp), ExoPlayer engine, PC/phone switch with hand-off, session player swap | A searched song plays on the phone; next track starts; playback survives screen off; switching back gives the session to the PC |
 | **M6** | Polish: offline states, error snackbars, a11y pass, haptics, Ukrainian translation review, e2e checklist on the OP7T | The checklist passes; the app feels finished |
 
 **v1.1:** Library Albums/Artists, Quick Settings tile, Glance widget, adaptive layouts (tablet/foldable rail).
 
-**Later / maybe:** multiple PCs; lyrics (InnerTube `next` → lyrics browse); a "Continue on phone" handoff; F‑Droid packaging.
+**Later / maybe:** multiple PCs; lyrics (InnerTube `next` → lyrics browse); F‑Droid packaging.
 
 ---
 
@@ -250,4 +252,5 @@ All song rows: tap = play with radio, long‑press = action sheet.
 | YTMDesktop changes the companion API | `/metadata` version check on connect; re‑verify the bundle on each YTMD update (api-notes header); fake server mirrors the verified contract |
 | `changeVideo` on the PC needs an active YTM view | Surface `YOUTUBE_MUSIC_UNVAILABLE` / `TIME_OUT` as clear errors |
 | 2 commands/s limit | `CommandThrottler` + optimistic UI |
+| **YouTube blocks the stream path** (PO tokens, client changes) | Two independent paths: the InnerTube call fails over to yt-dlp, which updates itself daily. If both break, PC mode is unaffected. yt-dlp takes ~15 s a track and Python's DNS lookups were flaky behind Private DNS on the OP7T, so it stays a fallback only. |
 | OP7T OEM quirks | It runs LineageOS, close to AOSP. Still test the foreground-service and multicast behavior on the real device. |
