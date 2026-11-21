@@ -173,7 +173,12 @@ object YtmParser {
         nav["browseEndpoint"]?.let { return browseItem(it, title, subtitle, thumb, r) }
         nav["watchEndpoint"]?.let { w ->
             val videoId = w.str("videoId") ?: return null
-            return MusicItem.Song(videoId, title, artistRefs(r["subtitle"]["runs"].array()), null, null, thumb, isVideo = true)
+            // Was always "video": every Home card that plays said Video, songs included.
+            val videoType = w.findAll("watchEndpointMusicConfig").firstOrNull()?.str("musicVideoType")
+            return MusicItem.Song(
+                videoId, title, artistRefs(r["subtitle"]["runs"].array()), null, null, thumb,
+                isVideo = videoType != null && videoType != "MUSIC_VIDEO_TYPE_ATV",
+            )
         }
         nav["watchPlaylistEndpoint"].str("playlistId")?.let { pid ->
             return MusicItem.Playlist("VL$pid", title, subtitle, thumb, pid)

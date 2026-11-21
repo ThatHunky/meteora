@@ -50,4 +50,20 @@ class YtmParserTest {
         assertTrue(a.shelves.flatMap { it.items }.any { it is MusicItem.Album })
         assertTrue(a.shelves.first().items.any { it is MusicItem.Song })
     }
+
+    /** Home cards that play: a song (ATV) must not be called a video. */
+    @Test fun homeCardKind() {
+        fun isVideo(type: String?): Boolean {
+            val config = if (type == null) "" else ",\"watchEndpointMusicSupportedConfigs\":{\"watchEndpointMusicConfig\":{\"musicVideoType\":\"$type\"}}"
+            val card = Json.parseToJsonElement(
+                "{\"title\":{\"runs\":[{\"text\":\"T\"}]},\"subtitle\":{\"runs\":[{\"text\":\"Artist\"}]}," +
+                    "\"navigationEndpoint\":{\"watchEndpoint\":{\"videoId\":\"aaaaaaaaaaa\"$config}}}",
+            ) as kotlinx.serialization.json.JsonObject
+            return (YtmParser.twoRowItem(card) as MusicItem.Song).isVideo
+        }
+        assertEquals(false, isVideo("MUSIC_VIDEO_TYPE_ATV"))
+        assertEquals(true, isVideo("MUSIC_VIDEO_TYPE_OMV"))
+        assertEquals(true, isVideo("MUSIC_VIDEO_TYPE_UGC"))
+        assertEquals(false, isVideo(null))
+    }
 }
