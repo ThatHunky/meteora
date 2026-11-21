@@ -161,6 +161,7 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         VideoQualitySection()
+        dev.thathunky.meteora.ui.downloads.DownloadsSettingsSection()
         ListItem(
             headlineContent = { Text(stringResource(R.string.autoplay_title)) },
             supportingContent = { Text(stringResource(R.string.autoplay_note)) },
