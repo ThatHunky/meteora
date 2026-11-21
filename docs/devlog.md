@@ -147,8 +147,91 @@ Results:
 - **Script gap:** my lines that read the playback status came back empty on this Pixel, so the 889 ms log line is the evidence the skip happened.
 - **Lesson:** after Wi‑Fi comes back, wireless debugging returns on a new port (39939 → 38693). My watcher kept knocking on the old one; `adb mdns services` shows the new port.
 
+## Review pass: design, animations, streaming (21:50 → 22:25)
+
+The user asked for a review of the design, the animations in particular, then the rest of the app, and partway through added "optimize streaming to perfection", a quality switch, a "not affiliated" notice and a plan for downloads. I read the UI, player, theme, pairing, playback and stream code, plus the stores and the share receiver. Not read line by line: the companion REST and Socket.IO clients and the YouTube Music parser.
+
+### What the review found and fixed
+
+- **Search suggestions covered the results.** Seen on the OP7T before changing anything: type "deft", tap the suggestion "deftones change", and four seconds later the screen shows suggestions for "deftones change" instead of results. Setting the field's text counted as typing. The view model now remembers the submitted query and gives it no suggestions. Re-checked on the phone with "slipk" → "slipknot duality": results stay.
+- **Settings couldn't scroll** and ignored the mini player. On the OP7T the old content happened to end above the mini player, so nothing was hidden yet; with the quality block added below, the last rows would have been unreachable. It scrolls now and leaves room at the bottom, which I saw on the phone.
+- **Everything recomposed on every PC update.** `MainActivity` and the shell read the whole playback state, which changes 4–15 times a second, only to learn whether a track is loaded. They now read a `hasTrack` flow. I did not measure the difference.
+- **Seek bar and artwork recomposed the player every frame.** The live position and the shape-morph progress are now read where they are drawn. The time label updates once a second.
+- **Drags snapped.** A short pull-down on the full player, or a cancelled back gesture, jumped back to rest. Both now settle with the theme's spring, and a pull that collapses the player leaves from where the finger let go. Dragging up first no longer eats the drag back down.
+- **Swipe distances were in pixels** on the mini player (60 and 120), so they were shorter on denser screens. Now 24 dp and 48 dp, about what they were on the OP7T.
+- **Artwork couldn't shrink.** It was always the full width, which on a short or landscape screen pushes the controls off the bottom. It now takes the space the controls leave.
+- **A failed page stayed failed** until the app restarted: Home, Library, album, playlist and artist pages had no retry. They have a "Try again" button now.
+- **Colour roles that snapped.** The animated colour scheme left out the error, scrim and "fixed" roles. Added.
+- **Small ones:** labels for the mini player's play button and the collapse button, a haptic on long-press for cards and track rows, a full player that no longer comes back expanded after the track went away, a host comparison in place of a URL prefix check on the sign-in screen, and dead code removed.
+
+### Streaming
+
+Three changes came from reading the code, two from measuring on the phone.
+
+- **No more racing through the queue offline.** A second playback error on a track skipped it, so with no network the player would skip to the end of the queue. Network errors now retry the same track after 1, 2, 4… seconds; other errors still get one fresh URL and then a skip, and after two skips in a row the player pauses instead of skipping again.
+- **A stalled download can fail.** The shared HTTP client never times out a read, because it also holds the PC's websocket. Audio now uses a 12-second read timeout, so a stream that dies on a network change errors out and is retried.
+- **Lookups survive a cancelled caller.** One lookup per video was shared, but it ran in the first caller's coroutine; tapping another song cancelled it for everyone waiting. It now runs in the app's scope. yt-dlp is also no longer tried when the phone is simply offline, where it could only fail 15 seconds later.
+- **A disk cache** (256 MB, least recently used, in the cache directory) so replays and seeks back cost no network. The key includes the format, so Opus and AAC bytes of one video can't mix.
+- **YouTube throttles open-ended requests.** I raised the buffer to 10 minutes expecting each track to download in seconds. On the phone, 94 seconds into a track only 180 seconds of it were buffered: about twice playback speed, and the next track was never fetched ahead. The fix was to ask for an exact byte range, using the file size from the `/player` response. After that the whole 4:43 track was buffered within 8 seconds and the next two tracks were resolved one and two seconds after the start.
+- **Start before the queue arrives.** The log showed where the time went on a tap: 114 ms to resolve the stream, 795 ms for YouTube to return the queue, then about 740 ms to start. The tapped song now starts by itself straight away and its queue is put around it when it arrives.
+
+Measured on the OP7T over Wi‑Fi, from the app's own log ("playing N ms after the tap"):
+
+| Case | Before starting ahead of the queue | After |
+|---|---|---|
+| Tap a song that was not fetched before | 1535 ms | 736 ms and 905 ms (the 905 included creating the player) |
+| Tap a song that was already fetched ahead | not measured | 136 ms |
+| Skip to the next track | not measured | new track playing at the first check, 156 ms after the tap |
+
+I have no number for the build as it was this morning: I only added the timing log partway through.
+
+### Is the official app's quality higher?
+
+It can be, for Premium accounts, and only when set to High. Google's help page gives the official app's tiers as up to 48, 128 and 256 kbps (Low, Normal, High). Meteora's `/player` call as the signed-out visionOS client returns five audio formats, and the best is itag 251: Opus at about 127 kbps, which YouTube labels medium quality. So Meteora plays the Normal tier. The 256 kbps formats would need a signed-in request from a client that serves Premium formats; I did not attempt that.
+
+The user installed the official app on the OP7T and signed in, so I looked at its settings (and changed nothing):
+
+- **The account has Premium:** the account menu says "YouTube Premium".
+- **Streaming quality** offers Low, Normal, High and Always High, and is set to **Normal** on both Wi‑Fi and mobile data. As configured, the official app and Meteora play the same tier.
+- **Download quality** is also Normal, with "Download over Wi‑Fi only" and a smart downloads option ("Recently played songs").
+- **Not measured:** the bitrate the official app actually decodes. Android's codec statistics showed Opus and AAC decoders at 48 kHz but no bitrate, and I could not tie the entries to the app.
+
+### Quality switch
+
+The user asked for the switch to be implemented by Opus from a detailed plan. The plan is [quality-switch-plan.md](quality-switch-plan.md); an Opus agent implemented it and I reviewed the diff.
+
+- **Tiers:** High (the best format returned), Balanced (about 65 kbps) and Data saver (about 50 kbps), chosen separately for Wi‑Fi and for mobile data, in Settings.
+- **Picking:** by bitrate under a ceiling per tier, with Opus weighted up because it sounds better per bit. Loudness-compressed and dubbed variants are skipped when there is an alternative.
+- **A track keeps its format** from its first open, because ExoPlayer reopens a stream on seek and a different format would mix two files' bytes. A change applies from the next track.
+- **Checked on the phone:** with Wi‑Fi set to Data saver, the next four lookups logged itag 249 at 48–54 kbps. Not checked: the mobile-data setting (needs a metered network) and the yt-dlp format selectors.
+
+### Also added
+
+- **"Not affiliated" notice** on the pairing screens, the sign-in screen and Settings: Meteora is an independent app, not affiliated with YTMDesktop, YouTube or Google. Seen in Settings; the other two screens were not opened.
+- **[CLAUDE.md](../CLAUDE.md)** with the build commands, the architecture, and the working rule the user set: a detailed plan first, then implementation by Opus.
+- **[downloads-plan.md](downloads-plan.md):** a plan, not code, for a download button, smart downloads and a download quality setting, Premium accounts only, stored in internal storage. Its first step is a spike, because nothing yet tells the app whether an account has Premium.
+
+### Found, not fixed
+
+- **Tabs forget their state.** Switching tabs clears the back stack, so Search loses its query and results. Seen on the phone.
+- **Queue sheet:** a row swiped away stays swiped if the removal fails, and the list isn't re-synced after a drag if the PC's queue changed meanwhile.
+- **Accessibility:** the seek bar has no seek action for TalkBack. A UI dump taken with the full player open listed the screen underneath and none of the player's buttons. That may be the dump tool rather than the app: the same dump still showed the previous track's title, so it was stale. Not checked with TalkBack itself.
+- **Plan items not built:** the colour source setting (the theme supports three sources, nothing sets one), the reduced-motion fallback, title weight animation, carousels, the collapsing top bar.
+- **Theme re-tint** rebuilds the colour scheme every frame while it animates, so everything that reads a colour recomposes for its duration. Not measured.
+- **Small:** `LocalEngine`'s like map is written off the main thread; a PC found by the subnet sweep is named by its IP address; the shell writes the bottom bar height during composition.
+
+### Not verified in this pass
+
+- Gestures, driven with `adb shell input swipe` on the final build: a swipe up on the mini player opened the full player, a 250‑pixel pull-down left it open and back at rest, and a 1000‑pixel pull-down collapsed it. I saw the end states in screenshots, not the motion in between. The cancelled back gesture and the sideways skip swipe were not tried.
+- Switching PC → This phone from the chip inside the full player. The player now waits 1.5 s before collapsing when the track goes away, because a hand-off has no track for a moment; not tried.
+- The artwork on a short or landscape screen.
+- The "Try again" button and the offline retry logic, which need the network off.
+- The PC target after these changes. The PC was paused throughout, and the OP7T is back on "PC".
+- Unit tests: 40 pass, including four new ones for format picking.
+
 ### Known gaps
 
+- **256 kbps:** not available to Meteora; see above.
 - **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play.
 - **Release build:** not built yet.
 - **Signed-out streams:** audio URLs are fetched without your cookies, so age-restricted or private tracks may not play.

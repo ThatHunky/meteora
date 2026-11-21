@@ -234,6 +234,8 @@ Parsing: renderers such as `musicCarouselShelfRenderer`, `musicTwoRowItemRendere
 - **Visitor ID:** from `GET https://www.youtube.com/sw.js_data`, which is `)]}'` followed by JSON, with the ID at `[0][2][0][0][13]`. Without it the response is `LOGIN_REQUIRED` "Sign in to confirm you're not a bot".
 - **Response:** `streamingData.adaptiveFormats` contains audio itags 139/140/249/250/251, each with a plain `url`: no `signatureCipher`, no n‑parameter, no PO token. `expiresInSeconds` is about 21600.
 - **Behaviour:** ranged reads and mid-file seeks return 206. URLs are tied to the requesting IP, so the phone resolves its own.
+- **Throttling (seen on the OP7T, 2026‑11‑21):** an open-ended request (no range, or `bytes=N-`) is served at about twice playback speed: 94 s into a track, 180 s were buffered. A request for an exact range (`bytes=N-M`, with M from the format's `contentLength`) is not throttled: a 4:43 track was fully buffered within 8 s. Tracks over about 10 MB were not tried; yt-dlp uses 10 MB chunks for the same reason.
+- **Audio formats in that response** (average bitrate): 251 Opus 127 kbps, 140 AAC 130 kbps, 250 Opus 65 kbps, 249 Opus 49 kbps, 139 HE‑AAC 49 kbps. The top two are labelled `AUDIO_QUALITY_MEDIUM`. The 256 kbps Premium formats are not offered to this signed-out client.
 - **Source:** client details come from the yt-dlp 2026.10.26 client table (`yt_dlp/extractor/youtube/_base.py`), where visionOS is the only default client that needs no JavaScript. `android_vr` has returned 403 for all formats since 2026-08-17.
 
 **Fallback: yt-dlp** through `youtubedl-android` 0.18.1 (GPL‑3.0).
