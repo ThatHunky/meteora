@@ -93,4 +93,20 @@ Files created and changed; `cargo test` and Gradle test counts; the `.so` size a
 ## R2 and R3 (outline only, not for this round)
 
 - **R2, PC state:** `state_update(json)` parses YTMDesktop's state in Rust, keeps the previous one, and returns a compact result: unchanged, progress only, or a full new state. `RealtimeClient` and `PlayerRepository` then stop building a `StateDto` tree 4–15 times a second. Needs its own measurements first (allocation rate in Android Studio's profiler or `dumpsys meminfo` over a minute of playback).
-- **R3, YouTube Music parsing:** `ytm/YtmParser` (290 lines of renderer search over large JSON) ported to Rust, returning the app's item lists as JSON. The biggest port and the smallest gain; do it last or not at all.
+- **R3, YouTube Music parsing:** `ytm/YtmParser` (290 lines of renderer search over large JSON) ported to Rust, returning the app's item lists as JSON. The biggest port and the smallest gain; do it last or not at all. Before starting it, do the evaluation below: an existing crate may make the port unnecessary.
+
+## Before R3: evaluate RustyPipe
+
+[RustyPipe](https://docs.rs/rustypipe) is a Rust client for the YouTube and YouTube Music InnerTube APIs, inspired by NewPipe. It may be able to replace the hand-written `YtmParser`, and possibly the Python yt‑dlp fallback (about 18 MB of the APK). Nothing below is verified yet; the evaluation is a spike that ends in a written answer, not in code in the app.
+
+Questions to answer, each from the crate's source or a small test program on the PC, with the crate version noted:
+
+1. **Coverage:** does it return what Meteora shows: Home shelves, search with filters and suggestions, album, playlist and artist pages, liked songs, library playlists, the "up next" queue with radio continuation, and like / dislike?
+2. **Signed in:** can it send the user's cookies with `SAPISIDHASH`, so Home and the library are personal? Meteora captures cookies in a WebView; the crate must accept them as given.
+3. **Streams:** which clients does it use for audio URLs, does it decipher the signature and `n` itself, and with what JavaScript engine? Can it return the 256 kbps formats (itag 141 / 774) for a signed-in Premium account?
+4. **PO tokens:** its docs say tokens come from a separate command-line program, `rustypipe-botguard`. An Android app cannot run that as is. Is it needed for the paths Meteora would use?
+5. **Networking:** it does its own HTTP. That breaks this plan's "Rust does no I/O" rule, so measure the cost: the `.so` size and memory with its HTTP and TLS stack included, and check whether it can be given responses fetched by Kotlin instead.
+6. **Android:** does it build for `aarch64-linux-android` with the NDK, and what does it need at run time (a cache directory, a clock, certificates)?
+7. **Upkeep and licence:** how quickly did it follow YouTube's last few breaking changes, and is its licence compatible with GPL‑3.0?
+
+Outcome, one of: adopt it for browsing and drop R3; adopt it for streams as well and drop the yt‑dlp fallback; use it only as a reference for our own code; or leave it. Write the answer and the evidence in `docs/api-notes.md`.
