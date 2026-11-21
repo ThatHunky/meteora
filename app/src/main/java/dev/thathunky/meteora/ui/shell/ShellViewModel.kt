@@ -21,9 +21,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@androidx.media3.common.util.UnstableApi
 @HiltViewModel
 class ShellViewModel @Inject constructor(
-    private val player: PlayerRepository,
+    private val router: dev.thathunky.meteora.data.PlaybackRouter,
     private val store: PairedPcStore,
     seeds: AlbumSeedExtractor,
     private val ytmAuth: dev.thathunky.meteora.ytm.YtmAuthStore,
@@ -33,12 +34,15 @@ class ShellViewModel @Inject constructor(
     fun signOutYtm() {
         viewModelScope.launch { ytmAuth.signOut() }
     }
-    val connection: StateFlow<ConnectionState> = player.connection
-    val playback: StateFlow<PlaybackState?> = player.state
+    private val player: PlayerRepository = router.pc
+    val connection: StateFlow<ConnectionState> = router.connection
+    val target: StateFlow<dev.thathunky.meteora.data.PlaybackTarget> = router.target
+    fun setTarget(t: dev.thathunky.meteora.data.PlaybackTarget) = router.setTarget(t)
+    val playback: StateFlow<PlaybackState?> = router.state
     val pairedPc: StateFlow<PairedPc?> = store.pc.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Theme seed from the current album art; keeps the last one while a track change settles. */
-    val albumSeed: StateFlow<Color?> = player.state
+    val albumSeed: StateFlow<Color?> = router.state
         .map { it?.track?.artworkUrl }
         .filterNotNull()
         .distinctUntilChanged()
@@ -50,7 +54,7 @@ class ShellViewModel @Inject constructor(
     fun onForeground() = player.acquire()
     fun onBackground() = player.release()
 
-    fun send(command: Command) = player.send(command)
+    fun send(command: Command) = router.send(command)
 
     fun reconnect() = player.reconnect()
 

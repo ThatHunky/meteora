@@ -63,6 +63,36 @@ class YtmClient(
         YtmParser.shelves(browse("FEmusic_liked_playlists")).flatMap { it.items }
             .ifEmpty { browse("FEmusic_liked_playlists").findAll("musicTwoRowItemRenderer").mapNotNull(YtmParser::twoRowItem) }
 
+    /** What the YTM player would queue for this video and/or playlist (radio when only a video). */
+    suspend fun watchQueue(videoId: String? = null, playlistId: String? = null): WatchQueue {
+        require(videoId != null || playlistId != null)
+        return YtmParser.watchQueue(post("next", buildJsonObject {
+            videoId?.let { put("videoId", it) }
+            put("playlistId", playlistId ?: "RDAMVM$videoId")
+            put("enablePersistentPlaylistPanel", true)
+            put("isAudioOnly", true)
+            put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")
+        }))
+    }
+
+    /** More radio tracks after [WatchQueue.continuation]. */
+    suspend fun watchQueueContinuation(continuation: String): WatchQueue =
+        YtmParser.watchQueue(post("next", buildJsonObject {
+            put("continuation", continuation)
+            put("enablePersistentPlaylistPanel", true)
+            put("isAudioOnly", true)
+        }))
+
+    /** Like / dislike / clear for the signed-in account. */
+    suspend fun rate(videoId: String, status: dev.thathunky.meteora.domain.LikeStatus) {
+        val endpoint = when (status) {
+            dev.thathunky.meteora.domain.LikeStatus.Like -> "like/like"
+            dev.thathunky.meteora.domain.LikeStatus.Dislike -> "like/dislike"
+            else -> "like/removelike"
+        }
+        post(endpoint, buildJsonObject { putJsonObject("target") { put("videoId", videoId) } })
+    }
+
     suspend fun browse(browseId: String): JsonElement = post("browse", buildJsonObject { put("browseId", browseId) })
 
     private suspend fun post(endpoint: String, body: JsonObject): JsonElement {

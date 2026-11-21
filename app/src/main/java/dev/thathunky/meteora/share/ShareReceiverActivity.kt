@@ -22,10 +22,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * on the PC without opening the app. Invisible; shows a toast and finishes.
  */
 @AndroidEntryPoint
+@androidx.media3.common.util.UnstableApi
 class ShareReceiverActivity : ComponentActivity() {
 
     @Inject lateinit var player: PlayerRepository
     @Inject lateinit var actions: MusicActions
+    @Inject lateinit var router: dev.thathunky.meteora.data.PlaybackRouter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +39,12 @@ class ShareReceiverActivity : ComponentActivity() {
         val target = text?.let(ShareLink::parse)
         if (target == null) {
             toast(R.string.share_unsupported)
+            finish()
+            return
+        }
+        if (router.isPhone) {
+            // Phone playback needs the app's session service; open the app instead of playing headless.
+            toast(R.string.share_phone_mode)
             finish()
             return
         }

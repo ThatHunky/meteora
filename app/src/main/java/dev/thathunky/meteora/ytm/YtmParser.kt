@@ -72,6 +72,30 @@ object YtmParser {
         )
     }
 
+    /** The `next` endpoint's watch queue (radio / album / playlist as the player would queue it). */
+    fun watchQueue(root: JsonElement): WatchQueue {
+        val songs = root.findAll("playlistPanelVideoRenderer").mapNotNull { r ->
+            val videoId = r.str("videoId") ?: return@mapNotNull null
+            val byline = r["longBylineText"]["runs"].array()
+            MusicItem.Song(
+                videoId = videoId,
+                title = r["title"].runsText().ifBlank { return@mapNotNull null },
+                artists = artistRefs(byline.takeWhile { it.str("text")?.trim() != "•" }.ifEmpty { byline }),
+                album = byline.firstOrNull { it.pageType() == PT_ALBUM }?.let {
+                    AlbumRef(it.str("text").orEmpty(), it["navigationEndpoint"]["browseEndpoint"].str("browseId"))
+                },
+                duration = r["lengthText"].runsText().ifBlank { null },
+                thumbnail = bestThumbnail(r),
+                isVideo = r.findAll("watchEndpointMusicConfig").firstOrNull()?.str("musicVideoType")
+                    ?.let { it != "MUSIC_VIDEO_TYPE_ATV" } ?: false,
+            )
+        }.distinctBy { it.videoId }
+        val selected = root.findAll("playlistPanelVideoRenderer").indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
+        val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
+            ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
+        return WatchQueue(songs, selected.coerceAtLeast(0), continuation)
+    }
+
     // ---- item renderers ----
 
     fun responsiveItem(r: JsonObject): MusicItem? {

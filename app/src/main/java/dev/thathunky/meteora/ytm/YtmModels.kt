@@ -67,3 +67,6 @@ data class ArtistPage(
     val radioPlaylistId: String?,
     val shufflePlaylistId: String?,
 )
+
+/** A watch queue from the `next` endpoint; [startIndex] is the item the player starts on. */
+data class WatchQueue(val songs: List<MusicItem.Song>, val startIndex: Int, val continuation: String?)

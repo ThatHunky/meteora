@@ -71,4 +71,11 @@
     <string name="ytm_signed_out">Вхід не виконано</string>
     <string name="pc_offline">Не вдається зв’язатися з ПК</string>
     <string name="action_reconnect">Перепідключити</string>
+    <string name="play_on">Де грати</string>
+    <string name="target_pc">ПК</string>
+    <string name="target_phone">Цей телефон</string>
+    <string name="playing_on_phone">Грає на цьому телефоні</string>
+    <string name="pair_skip">Без ПК</string>
+    <string name="pair_skip_note">Музика гратиме на цьому телефоні. ПК можна підключити пізніше в налаштуваннях.</string>
+    <string name="share_phone_mode">Надсилання грає на ПК. Спершу перемкніть «Де грати» на ПК у Meteora.</string>
 </resources>

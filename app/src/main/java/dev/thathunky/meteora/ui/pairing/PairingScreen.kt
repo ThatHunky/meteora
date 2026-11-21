@@ -55,7 +55,7 @@ import dev.thathunky.meteora.R
 import dev.thathunky.meteora.companion.discovery.DiscoveredPc
 
 @Composable
-fun PairingScreen(onDone: () -> Unit, modifier: Modifier = Modifier, vm: PairingViewModel = hiltViewModel()) {
+fun PairingScreen(onDone: () -> Unit, onSkip: () -> Unit, modifier: Modifier = Modifier, vm: PairingViewModel = hiltViewModel()) {
     val step by vm.step.collectAsStateWithLifecycle()
     val found by vm.discovered.collectAsStateWithLifecycle()
 
@@ -74,7 +74,7 @@ fun PairingScreen(onDone: () -> Unit, modifier: Modifier = Modifier, vm: Pairing
         label = "pairing",
     ) { s ->
         when (s) {
-            PairingStep.Choose -> ChooseStep(found, vm::pair, vm::pairManual)
+            PairingStep.Choose -> ChooseStep(found, vm::pair, vm::pairManual, onSkip)
             is PairingStep.Probing -> Centered {
                 LoadingIndicator(Modifier.size(96.dp))
                 Text(stringResource(R.string.pair_probing, s.name), style = MaterialTheme.typography.titleMedium)
@@ -132,7 +132,7 @@ fun PairingScreen(onDone: () -> Unit, modifier: Modifier = Modifier, vm: Pairing
 }
 
 @Composable
-private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit, onManual: (String) -> Unit) {
+private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit, onManual: (String) -> Unit, onSkip: () -> Unit) {
     val manualState = rememberTextFieldState()
     val manual = manualState.text.toString()
     LazyColumn(
@@ -185,6 +185,17 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
                 Text(stringResource(R.string.action_connect))
             }
             Spacer(Modifier.height(32.dp))
+        }
+        item {
+            Spacer(Modifier.height(16.dp))
+            androidx.compose.material3.TextButton(onClick = onSkip) { Text(stringResource(R.string.pair_skip)) }
+            Text(
+                stringResource(R.string.pair_skip_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

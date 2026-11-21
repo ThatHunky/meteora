@@ -72,4 +72,11 @@
     <string name="ytm_signed_out">Not signed in</string>
     <string name="pc_offline">Can’t reach your PC</string>
     <string name="action_reconnect">Reconnect</string>
+    <string name="play_on">Play on</string>
+    <string name="target_pc">PC</string>
+    <string name="target_phone">This phone</string>
+    <string name="playing_on_phone">Playing on this phone</string>
+    <string name="pair_skip">Use without a PC</string>
+    <string name="pair_skip_note">Music plays on this phone. You can pair a PC later in Settings.</string>
+    <string name="share_phone_mode">Sharing plays on your PC. Switch “Play on” to your PC in Meteora first.</string>
 </resources>

@@ -61,6 +61,9 @@ data class PlaybackState(
     val isTransient get() = queue.isEmpty() && selectedIndex < 0 && isGenerating
 }
 
+/** Ask googleusercontent for a [size]px square (`=w60-h60…` → `=w1080-h1080…`); other URLs unchanged. */
+fun String.withArtSize(size: Int): String = replace(Regex("=w\\d+-h\\d+"), "=w$size-h$size")
+
 /** Largest thumbnail, upscaled via the googleusercontent size suffix when possible. */
 fun List<ThumbnailDto>.bestArtwork(size: Int = 1080): String? {
     val best = maxByOrNull { it.width * it.height }?.url ?: return null

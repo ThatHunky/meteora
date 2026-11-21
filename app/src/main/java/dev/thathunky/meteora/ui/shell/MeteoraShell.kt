@@ -11,6 +11,11 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -142,7 +147,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 entryProvider = entryProvider {
                     entry<HomeRoute> {
                         HomeScreen(opener, longPress, onSignIn = { backStack.add(SignInRoute) }, contentBottom, header = {
-                            if (connection !is ConnectionState.Connected) ConnectionBanner(connection) { vm.reconnect() }
+                            if (connection !is ConnectionState.Connected && connection != ConnectionState.Local) ConnectionBanner(connection) { vm.reconnect() }
                         })
                     }
                     entry<SearchRoute> { SearchScreen(opener, longPress, contentBottom) }
@@ -163,13 +168,21 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     entry<ArtistRoute> { r -> ArtistScreen(r.browseId, opener, longPress, contentBottom) }
                     entry<SettingsRoute> {
                         val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
-                        SettingsScreen(pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm)
+                        val target by vm.target.collectAsStateWithLifecycle()
+                        SettingsScreen(pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm, target, vm::setTarget)
                     }
                     entry<PairingRoute> {
-                        PairingScreen(onDone = {
-                            backStack.clear()
-                            backStack.add(HomeRoute)
-                        })
+                        PairingScreen(
+                            onDone = {
+                                backStack.clear()
+                                backStack.add(HomeRoute)
+                            },
+                            onSkip = {
+                                vm.setTarget(dev.thathunky.meteora.data.PlaybackTarget.Phone)
+                                backStack.clear()
+                                backStack.add(HomeRoute)
+                            },
+                        )
                     }
                 },
             )
@@ -209,8 +222,12 @@ private fun SettingsScreen(
     onForget: () -> Unit,
     ytmSignedIn: Boolean,
     onSignOut: () -> Unit,
+    target: dev.thathunky.meteora.data.PlaybackTarget,
+    onTarget: (dev.thathunky.meteora.data.PlaybackTarget) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ListItem(headlineContent = { Text(stringResource(R.string.play_on)) })
+        TargetSelector(target, name, onTarget, Modifier.fillMaxWidth())
         ListItem(
             headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
             overlineContent = { Text(stringResource(R.string.ytm_account)) },
@@ -265,6 +282,40 @@ private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
             )
             if (connection is ConnectionState.Offline) {
                 androidx.compose.material3.TextButton(onClick = onRetry) { Text(stringResource(R.string.action_reconnect)) }
+            }
+        }
+    }
+}
+
+/** PC / This phone, as a connected button group. */
+@Composable
+fun TargetSelector(
+    target: dev.thathunky.meteora.data.PlaybackTarget,
+    pcName: String?,
+    onTarget: (dev.thathunky.meteora.data.PlaybackTarget) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = listOf(
+        dev.thathunky.meteora.data.PlaybackTarget.Pc to (pcName ?: stringResource(R.string.target_pc)),
+        dev.thathunky.meteora.data.PlaybackTarget.Phone to stringResource(R.string.target_phone),
+    )
+    androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = Arrangement.spacedBy(androidx.compose.material3.ButtonGroupDefaults.ConnectedSpaceBetween)) {
+        options.forEachIndexed { i, (t, label) ->
+            androidx.compose.material3.ToggleButton(
+                checked = target == t,
+                onCheckedChange = { if (it) onTarget(t) },
+                shapes = when (i) {
+                    0 -> androidx.compose.material3.ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    else -> androidx.compose.material3.ButtonGroupDefaults.connectedTrailingButtonShapes()
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(
+                    if (t == dev.thathunky.meteora.data.PlaybackTarget.Pc) Icons.Outlined.Computer else Icons.Outlined.PhoneAndroid,
+                    contentDescription = null,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(label, maxLines = 1)
             }
         }
     }

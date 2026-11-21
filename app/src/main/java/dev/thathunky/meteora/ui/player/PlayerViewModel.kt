@@ -6,7 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.companion.Command
 import dev.thathunky.meteora.companion.RepeatMode
 import dev.thathunky.meteora.data.ConnectionState
-import dev.thathunky.meteora.data.PlayerRepository
+import dev.thathunky.meteora.data.PlaybackRouter
+import dev.thathunky.meteora.data.PlaybackTarget
+import androidx.media3.common.util.UnstableApi
 import dev.thathunky.meteora.domain.PlaybackState
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -14,13 +16,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@UnstableApi
 @HiltViewModel
-class PlayerViewModel @Inject constructor(private val player: PlayerRepository) : ViewModel() {
+class PlayerViewModel @Inject constructor(private val player: PlaybackRouter) : ViewModel() {
 
     val state: StateFlow<PlaybackState?> = player.state
     val connection: StateFlow<ConnectionState> = player.connection
+    val target: StateFlow<PlaybackTarget> = player.target
+    val pcName: StateFlow<String?> = player.pc.connection.let { c ->
+        kotlinx.coroutines.flow.combine(c, player.pc.state) { conn, _ -> (conn as? ConnectionState.Connected)?.pcName }
+            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+    }
+
+    fun setTarget(t: PlaybackTarget) = player.setTarget(t)
 
     /** Optimistic seek target: shown until the PC reports a position near it (or 3 s pass). */
     private val _seekOverride = MutableStateFlow<Double?>(null)

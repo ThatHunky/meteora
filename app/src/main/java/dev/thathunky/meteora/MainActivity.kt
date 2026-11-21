@@ -21,7 +21,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import dev.thathunky.meteora.companion.Command
 import dev.thathunky.meteora.data.ConnectionState
-import dev.thathunky.meteora.data.PlayerRepository
+import dev.thathunky.meteora.data.PlaybackRouter
 import dev.thathunky.meteora.playback.MeteoraSessionService
 import dev.thathunky.meteora.playback.RemotePlayer
 import dev.thathunky.meteora.ui.shell.MeteoraShell
@@ -34,7 +34,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    @Inject lateinit var player: PlayerRepository
+    @Inject lateinit var router: PlaybackRouter
 
     private var controller: ListenableFuture<MediaController>? = null
     private val notificationPermission =
@@ -47,8 +47,11 @@ class MainActivity : AppCompatActivity() {
             val vm: ShellViewModel = hiltViewModel()
             val seed by vm.albumSeed.collectAsStateWithLifecycle()
             val connection by vm.connection.collectAsStateWithLifecycle()
-            LaunchedEffect(connection is ConnectionState.Connected) {
-                if (connection is ConnectionState.Connected) askForNotifications()
+            val playing by vm.playback.collectAsStateWithLifecycle()
+            // Ask once there's something the notification would control.
+            val wantsNotification = connection is ConnectionState.Connected || playing?.track != null
+            LaunchedEffect(wantsNotification) {
+                if (wantsNotification) askForNotifications()
             }
             MeteoraTheme(albumSeed = seed) {
                 MeteoraShell(vm)
@@ -69,9 +72,13 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
-    /** In the app, volume keys always drive the PC (outside it, the remote session does). */
+    /**
+     * When the PC is the target, volume keys in the app drive the PC (outside it, the remote
+     * session does). On the phone they fall through to the system as usual.
+     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val connected = player.connection.value is ConnectionState.Connected
+        val player = router.pc
+        val connected = !router.isPhone && player.connection.value is ConnectionState.Connected
         val vol = player.state.value?.volume
         if (connected && vol != null && (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
             if (event.action == KeyEvent.ACTION_DOWN) {

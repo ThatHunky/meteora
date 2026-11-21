@@ -41,6 +41,8 @@ sealed interface ConnectionState {
     /** Token revoked on the PC: user must pair again. */
     data object Unauthorized : ConnectionState
     data object Idle : ConnectionState
+    /** Playing on this phone: the PC connection doesn't matter. */
+    data object Local : ConnectionState
 }
 
 /**

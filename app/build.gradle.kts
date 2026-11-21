@@ -20,6 +20,8 @@ android {
         // Must stay valid semver: YTMDesktop validates appVersion at pairing.
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The bundled Python is ~15 MB per ABI; the OP7T and current phones are arm64.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     buildTypes {
@@ -47,6 +49,8 @@ android {
     }
 
     packaging {
+        // youtubedl-android executes libpython.so from nativeLibraryDir, so it must be extracted.
+        jniLibs.useLegacyPackaging = true
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/INDEX.LIST", "/META-INF/io.netty.versions.properties")
     }
 
@@ -89,6 +93,10 @@ dependencies {
 
     implementation(libs.media3.session)
     implementation(libs.media3.common)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.datasource.okhttp)
+    // yt-dlp + embedded Python for phone playback (GPL-3.0; see PLAN.md).
+    implementation(libs.youtubedl.library)
     implementation(libs.datastore.preferences)
 
     implementation(libs.hilt.android)

@@ -50,6 +50,9 @@ import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.VolumeDown
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilledIconButton
@@ -259,7 +262,55 @@ private fun FullPlayer(
                 IconButton(onClick = onCollapse) { Icon(Icons.Outlined.KeyboardArrowDown, null) }
                 Spacer(Modifier.weight(1f))
                 val pcName = (connection as? ConnectionState.Connected)?.pcName
-                AssistChip(onClick = {}, label = { Text(pcName?.let { stringResource(R.string.playing_on, it) } ?: stringResource(R.string.reconnecting)) })
+                val knownPc by vm.pcName.collectAsStateWithLifecycle()
+                val target by vm.target.collectAsStateWithLifecycle()
+                var targetMenu by remember { mutableStateOf(false) }
+                Box {
+                    AssistChip(
+                        onClick = { targetMenu = true },
+                        leadingIcon = {
+                            Icon(
+                                if (connection == ConnectionState.Local) androidx.compose.material.icons.Icons.Outlined.PhoneAndroid
+                                else androidx.compose.material.icons.Icons.Outlined.Computer,
+                                null,
+                                Modifier.size(18.dp),
+                            )
+                        },
+                        label = {
+                            Text(
+                                when {
+                                    connection == ConnectionState.Local -> stringResource(R.string.playing_on_phone)
+                                    pcName != null -> stringResource(R.string.playing_on, pcName)
+                                    else -> stringResource(R.string.reconnecting)
+                                },
+                            )
+                        },
+                    )
+                    androidx.compose.material3.DropdownMenu(expanded = targetMenu, onDismissRequest = { targetMenu = false }) {
+                        dev.thathunky.meteora.data.PlaybackTarget.entries.forEach { t ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (t == dev.thathunky.meteora.data.PlaybackTarget.Phone) stringResource(R.string.target_phone)
+                                        else knownPc ?: stringResource(R.string.target_pc),
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (t == dev.thathunky.meteora.data.PlaybackTarget.Phone) androidx.compose.material.icons.Icons.Outlined.PhoneAndroid
+                                        else androidx.compose.material.icons.Icons.Outlined.Computer,
+                                        null,
+                                    )
+                                },
+                                trailingIcon = { if (t == target) Icon(androidx.compose.material.icons.Icons.Outlined.Check, null) },
+                                onClick = {
+                                    targetMenu = false
+                                    vm.setTarget(t)
+                                },
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showQueue = true }) { Icon(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue)) }
             }
@@ -352,7 +403,8 @@ private fun FullPlayer(
             }
 
             Spacer(Modifier.weight(1f))
-            VolumeRow(s, vm)
+            // On the phone the hardware keys and system slider already set the volume.
+            if (connection != ConnectionState.Local) VolumeRow(s, vm)
             Spacer(Modifier.height(16.dp))
         }
         }
