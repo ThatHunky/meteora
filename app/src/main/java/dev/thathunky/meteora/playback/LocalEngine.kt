@@ -20,7 +20,21 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import android.view.SurfaceView
+import android.view.TextureView
+import android.view.View
+import dev.thathunky.meteora.stream.VideoQuality
+import dev.thathunky.meteora.ytm.VideoSegment
+import java.io.IOException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.thathunky.meteora.companion.Command
 import dev.thathunky.meteora.companion.RepeatMode
@@ -72,7 +86,14 @@ data class LocalSong(
     val artistId: String? = null,
     val durationSec: Double = 0.0,
     val artworkUrl: String? = null,
-)
+    /** Not an audio-only (ATV) track: it is its own music video. */
+    val isVideo: Boolean = false,
+    val videoCounterpartId: String? = null,
+    val segments: List<VideoSegment> = emptyList(),
+) {
+    /** Where its picture comes from in video mode; null when it has none to show. */
+    val videoPlan: VideoPlan? get() = VideoChoice.plan(videoId, isVideo, videoCounterpartId, segments, (durationSec * 1000).toLong())
+}
 
 fun MusicItem.Song.toLocal() = LocalSong(
     videoId = videoId,
@@ -83,9 +104,15 @@ fun MusicItem.Song.toLocal() = LocalSong(
     artistId = artists.firstOrNull()?.browseId,
     durationSec = parseDuration(duration),
     artworkUrl = thumbnail?.withArtSize(1080),
+    isVideo = isVideo,
+    videoCounterpartId = videoCounterpartId,
+    segments = segments,
 )
 
 fun QueueEntry.toLocal() = LocalSong(videoId, title, artist, durationSec = parseDuration(duration), artworkUrl = artworkUrl?.withArtSize(1080))
+
+/** A track's picture could not be resolved; it then plays as audio. An IOException, as data sources must throw. */
+class VideoUnavailableException(message: String, cause: Throwable?) : IOException(message, cause)
 
 /** "3:45" / "1:02:03" → seconds. */
 fun parseDuration(text: String?): Double =
@@ -156,6 +183,7 @@ class LocalEngine @Inject constructor(
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         // Resolve first, cache second: the cache key includes the format the resolver picked.
         val resolving = ResolvingDataSource.Factory(cached) { spec ->
+            if (spec.uri.scheme == VIDEO_SCHEME) return@Factory resolveVideo(spec)
             if (spec.uri.scheme != SCHEME) return@Factory spec
             val id = spec.uri.host ?: return@Factory spec
             // Runs on ExoPlayer's loader thread, so blocking is fine. The tier is fixed at the
@@ -176,12 +204,15 @@ class LocalEngine @Inject constructor(
         }
         // A track is a few MB: hold up to 10 minutes of audio, so the current track downloads
         // in full within seconds and the next one is fetched and buffered while this one plays.
+        // With video, the same 10 minutes of 720p would be 100 MB or more: past the first minute,
+        // loading also stops at [MAX_BUFFER_BYTES]. Audio alone never gets near it.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(MIN_BUFFER_MS, MAX_BUFFER_MS, START_BUFFER_MS, REBUFFER_MS)
+            .setTargetBufferBytes(MAX_BUFFER_BYTES)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         return ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
+            .setMediaSourceFactory(MediaSources(DefaultMediaSourceFactory(resolving), resolving))
             .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
@@ -190,7 +221,158 @@ class LocalEngine @Inject constructor(
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
-            .apply { addListener(listener) }
+            .apply {
+                addListener(listener)
+                // No picture until a screen shows one (attachVideo).
+                trackSelectionParameters = trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true).build()
+            }
+    }
+
+    // ---- video ----
+
+    /** Session-wide, not per track: once on, every following track that has a video shows it. Main thread. */
+    private var videoMode = false
+    /** Tracks whose picture failed this session: they play as audio, even in video mode. Main thread. */
+    private val noVideo = HashSet<String>()
+    /** Video id → ceiling it was first opened with, for the same reason as [pinned]. Written on the loader thread. */
+    private val pinnedVideo = ConcurrentHashMap<String, VideoQuality>()
+    /** Views showing the picture, the last one on top (Now Playing, then full screen over it). Main thread. */
+    private val videoViews = ArrayList<View>()
+
+    /** Runs on the loader thread, like the audio branch. */
+    private fun resolveVideo(spec: DataSpec): DataSpec {
+        val id = spec.uri.host ?: throw VideoUnavailableException("no video id", null)
+        val q = pinnedVideo.getOrPut(id) { resolver.quality.currentVideo() }
+        val stream = try {
+            runBlocking { resolver.resolveVideo(id, q) }
+        } catch (e: InterruptedException) {
+            throw e
+        } catch (e: Exception) {
+            throw VideoUnavailableException("video for $id: ${e.message}", e)
+        }
+        val size = stream.contentLength
+        val length = if (spec.length == C.LENGTH_UNSET.toLong() && size != null && spec.position < size) size - spec.position else spec.length
+        return spec.buildUpon()
+            .setUri(Uri.parse(stream.url))
+            .setKey(stream.cacheKey)
+            .setLength(length)
+            .setHttpRequestHeaders(spec.httpRequestHeaders + stream.headers)
+            .build()
+    }
+
+    /**
+     * Audio items as before. An item in video mode (its URI carries [Q_VIDEO]) is the same audio
+     * source merged with the picture's (`meteora-video://<id>`), so the sound is exactly what audio
+     * mode plays, same pinned format.
+     */
+    private inner class MediaSources(private val default: DefaultMediaSourceFactory, video: DataSource.Factory) : MediaSource.Factory by default {
+        private val videoFactory = ProgressiveMediaSource.Factory(video).setLoadErrorHandlingPolicy(NoRetryForMissingVideo())
+
+        override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+            val audio = default.createMediaSource(mediaItem)
+            if (mediaItem.localConfiguration?.uri?.getQueryParameter(Q_VIDEO) == null) return audio
+            val plan = mediaItem.toLocalSong().videoPlan ?: return audio
+            var picture: MediaSource = videoFactory.createMediaSource(MediaItem.fromUri("$VIDEO_SCHEME://${plan.videoId}"))
+            if (plan.offsetMs > 0 || plan.endMs != null) {
+                picture = ClippingMediaSource.Builder(picture)
+                    .setStartPositionMs(plan.offsetMs)
+                    .apply { plan.endMs?.let { setEndPositionMs(it) } }
+                    .build()
+            }
+            // Audio first: the item's timeline and metadata are the song's.
+            return MergingMediaSource(audio, picture)
+        }
+    }
+
+    /** A picture that cannot be resolved is not retried: the track falls back to audio at once. */
+    private class NoRetryForMissingVideo : DefaultLoadErrorHandlingPolicy() {
+        override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long =
+            if (generateSequence(loadErrorInfo.exception as Throwable?) { it.cause }.any { it is VideoUnavailableException }) C.TIME_UNSET
+            else super.getRetryDelayMsFor(loadErrorInfo)
+    }
+
+    fun setVideoMode(on: Boolean) = scope.launch(Dispatchers.Main) {
+        if (videoMode == on) return@launch
+        videoMode = on
+        Log.i(TAG, "video mode ${if (on) "on" else "off"}")
+        _player?.let { syncVideoModes(it) }
+        publish()
+    }
+
+    /** Show the picture in [view] (a TextureView or SurfaceView); the video track turns on. Main thread. */
+    fun attachVideo(view: View) {
+        videoViews.remove(view)
+        videoViews.add(view)
+        showOn(view)
+        applyVideoTrack()
+    }
+
+    /** [view] no longer shows the picture; the one under it takes over, or the video track turns off. Main thread. */
+    fun detachVideo(view: View) {
+        val wasTop = videoViews.lastOrNull() === view
+        if (!videoViews.remove(view)) return
+        val p = _player ?: return
+        when (view) {
+            is TextureView -> p.clearVideoTextureView(view)
+            is SurfaceView -> p.clearVideoSurfaceView(view)
+        }
+        if (wasTop) videoViews.lastOrNull()?.let(::showOn)
+        applyVideoTrack()
+    }
+
+    private fun showOn(view: View) {
+        when (view) {
+            is TextureView -> player.setVideoTextureView(view)
+            is SurfaceView -> player.setVideoSurfaceView(view)
+        }
+    }
+
+    /**
+     * The video track is on only while a view shows it. Off in the background, with the screen
+     * off and with Now Playing closed, so no data goes to pictures nobody sees; the sound goes on.
+     */
+    private fun applyVideoTrack() {
+        val p = _player ?: return
+        val off = videoViews.isEmpty()
+        if (p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == off) return
+        Log.i(TAG, "video track ${if (off) "off" else "on"}")
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, off).build()
+    }
+
+    /**
+     * Brings the current item and the next [VIDEO_AHEAD] in line with the mode; later ones are
+     * fixed as playback gets near them. The current one restarts at the same position.
+     */
+    private fun syncVideoModes(p: ExoPlayer) {
+        val count = p.mediaItemCount
+        if (count == 0) return
+        val current = p.currentMediaItemIndex
+        for (i in current..minOf(count - 1, current + VIDEO_AHEAD)) {
+            val item = p.getMediaItemAt(i)
+            val wanted = mediaItem(item.toLocalSong())
+            if (wanted.localConfiguration?.uri == item.localConfiguration?.uri) continue
+            if (i == current) {
+                val position = p.currentPosition
+                p.replaceMediaItem(i, wanted)
+                p.seekTo(i, position)
+            } else {
+                p.replaceMediaItem(i, wanted)
+            }
+        }
+    }
+
+    /** The current track's picture failed: play it as audio from where it was. True if that was the case. */
+    private fun dropVideo(p: ExoPlayer): Boolean {
+        val i = p.currentMediaItemIndex
+        val item = p.currentMediaItem ?: return false
+        if (item.localConfiguration?.uri?.getQueryParameter(Q_VIDEO) == null) return false
+        noVideo.add(item.mediaId)
+        Log.w(TAG, "no picture for ${item.mediaId}: playing it as audio")
+        val position = p.currentPosition
+        p.replaceMediaItem(i, mediaItem(item.toLocalSong()))
+        p.seekTo(i, position)
+        p.prepare()
+        return true
     }
 
     private val listener = object : Player.Listener {
@@ -199,9 +381,12 @@ class LocalEngine @Inject constructor(
                 retried.clear()
                 // Tracks ahead may already be part-buffered in their pinned tier (two or more are
                 // fetched ahead), so only the ones behind the current track lose their pin.
-                val keep = (player.currentMediaItemIndex until player.mediaItemCount).mapTo(HashSet()) { player.getMediaItemAt(it).mediaId }
-                pinned.keys.retainAll(keep)
+                val ahead = (player.currentMediaItemIndex until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                pinned.keys.retainAll(ahead.mapTo(HashSet()) { it.mediaId })
+                pinnedVideo.keys.retainAll(ahead.mapNotNullTo(HashSet()) { it.toLocalSong().videoPlan?.videoId })
                 maybeExtendRadio()
+                // Not from inside the callback: it replaces items.
+                if (player.mediaItemCount > 0) scope.launch(Dispatchers.Main) { _player?.let(::syncVideoModes) }
             }
             if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_READY) {
                 failedInARow = 0
@@ -233,6 +418,8 @@ class LocalEngine @Inject constructor(
                 // Offline is not the track's fault: wait and try the same track again. Skipping
                 // here would burn through the whole queue while there is no network.
                 isNetworkError(error) -> retryWhenBackOnline(p, error)
+                // In video mode, suspect the picture first: the sound on its own may well play.
+                dropVideo(p) -> Unit
                 // Most likely an expired or IP-bound URL: resolve again once, then skip the track.
                 id != null && retried.add(id) -> {
                     // A failed web music URL (no Premium, or it wants a token) retries on the anonymous path.
@@ -425,6 +612,7 @@ class LocalEngine @Inject constructor(
         startedAlone = null
         retried.clear()
         pinned.clear()
+        pinnedVideo.clear()
         failedInARow = 0
         networkAttempts = 0
         networkRetry?.cancel()
@@ -659,12 +847,15 @@ class LocalEngine @Inject constructor(
             shuffle = unshuffled != null,
             isGenerating = extending,
             playlistId = playlistId,
+            hasVideo = song.videoPlan != null && song.videoId !in noVideo,
+            videoMode = videoMode,
         )
     }
 
+    /** In video mode, a song with a picture gets [Q_VIDEO] on its URI, which [MediaSources] reads. */
     private fun mediaItem(s: LocalSong): MediaItem = MediaItem.Builder()
         .setMediaId(s.videoId)
-        .setUri("$SCHEME://${s.videoId}")
+        .setUri(if (videoMode && s.videoId !in noVideo && s.videoPlan != null) "$SCHEME://${s.videoId}?$Q_VIDEO=1" else "$SCHEME://${s.videoId}")
         .setCustomCacheKey(s.videoId)
         .setMediaMetadata(
             MediaMetadata.Builder()
@@ -676,6 +867,9 @@ class LocalEngine @Inject constructor(
                 .setExtras(Bundle().apply {
                     putString(X_ALBUM_ID, s.albumId)
                     putString(X_ARTIST_ID, s.artistId)
+                    putBoolean(X_IS_VIDEO, s.isVideo)
+                    putString(X_COUNTERPART, s.videoCounterpartId)
+                    if (s.segments.isNotEmpty()) putLongArray(X_SEGMENTS, s.segments.flatMap { listOf(it.audioStartMs, it.videoStartMs, it.durationMs) }.toLongArray())
                 })
                 .build(),
         )
@@ -692,6 +886,10 @@ class LocalEngine @Inject constructor(
             artistId = m.extras?.getString(X_ARTIST_ID),
             durationSec = (m.durationMs ?: 0L) / 1000.0,
             artworkUrl = m.artworkUri?.toString(),
+            isVideo = m.extras?.getBoolean(X_IS_VIDEO) == true,
+            videoCounterpartId = m.extras?.getString(X_COUNTERPART),
+            segments = m.extras?.getLongArray(X_SEGMENTS)?.toList()?.chunked(3)?.filter { it.size == 3 }
+                ?.map { VideoSegment(it[0], it[1], it[2]) }.orEmpty(),
         )
     }
 
@@ -704,8 +902,17 @@ class LocalEngine @Inject constructor(
     private companion object {
         const val TAG = "LocalEngine"
         const val SCHEME = "meteora"
+        const val VIDEO_SCHEME = "meteora-video"
+        /** Query parameter on an item's URI: this item plays with its picture. */
+        const val Q_VIDEO = "video"
         const val X_ALBUM_ID = "albumId"
         const val X_ARTIST_ID = "artistId"
+        const val X_IS_VIDEO = "isVideo"
+        const val X_COUNTERPART = "videoCounterpart"
+        /** Flattened (audio start, video start, duration) triples. */
+        const val X_SEGMENTS = "segments"
+        const val VIDEO_AHEAD = 2
+        const val MAX_BUFFER_BYTES = 50 * 1024 * 1024
         const val DISK_CACHE_BYTES = 256L * 1024 * 1024
         const val MEDIA_READ_TIMEOUT_S = 12L
         const val MIN_BUFFER_MS = 60_000

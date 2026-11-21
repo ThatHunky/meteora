@@ -47,6 +47,10 @@ data class PlaybackState(
     val shuffle: Boolean,
     val isGenerating: Boolean,
     val playlistId: String?,
+    /** Phone target only: the current track has a picture to show in video mode. Always false for the PC. */
+    val hasVideo: Boolean = false,
+    /** Phone target only: the Song / Video switch is on Video (for the session, not the track). */
+    val videoMode: Boolean = false,
 ) {
     val isPlaying get() = trackState == TrackState.Playing || trackState == TrackState.Buffering
 

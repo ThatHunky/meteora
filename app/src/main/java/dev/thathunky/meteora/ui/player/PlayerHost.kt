@@ -434,6 +434,7 @@ private fun FullPlayer(
             }
 
             Spacer(Modifier.height(16.dp))
+            SongVideoSwitch()
             val morphProgress = animateFloatAsState(
                 if (s.trackState == TrackState.Playing) 1f else 0f,
                 MaterialTheme.motionScheme.slowSpatialSpec(),
@@ -452,6 +453,7 @@ private fun FullPlayer(
                     // Read in the layer block: pause redraws the art without recomposing the player.
                     playing = { morphProgress.value },
                 )
+                VideoPanel(Modifier.aspectRatio(1f))
             }
 
             Spacer(Modifier.height(28.dp))
