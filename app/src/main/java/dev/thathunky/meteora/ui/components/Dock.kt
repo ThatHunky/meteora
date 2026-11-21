@@ -39,6 +39,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ui.theme.Look
 import dev.thathunky.meteora.ui.theme.LookId
@@ -153,21 +155,35 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                             val c = if (on) scheme.onPrimary else scheme.onSurface
                             Icon(item.icon, null, Modifier.size(18.dp), tint = c)
                             Spacer(Modifier.width(4.dp))
+                            // Plain: next to the icon there is about 49 dp at 360 dp wide, too little for
+                            // "НАЛАШТУВАННЯ" even shrunk, and shrinking would only make the tabs unequal.
                             Text(lookLabel(item.label), style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     // tmux-like: "1:home", the selected one inverted. No icons.
                     NavStyle.StatusLine -> Box(cell.then(if (on) Modifier.background(scheme.onSurface) else Modifier), contentAlignment = Alignment.Center) {
-                        Text(
-                            "${i + 1}:${lookLabel(item.label)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (on) scheme.surface else scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        NavLabel("${i + 1}:${lookLabel(item.label)}", if (on) scheme.surface else scheme.onSurfaceVariant, Modifier.padding(horizontal = 2.dp))
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * A tab label that shrinks a little before it ellipsizes: Terminal's mono "4:налаштування"
+ * is about 92 dp at full size, a little more than a quarter of a 360 dp screen.
+ */
+@Composable
+private fun NavLabel(text: String, color: Color, modifier: Modifier = Modifier) {
+    val style = MaterialTheme.typography.labelSmall
+    Text(
+        text,
+        style = style,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
+        modifier = modifier,
+    )
 }

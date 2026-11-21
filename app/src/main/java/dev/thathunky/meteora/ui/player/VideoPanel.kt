@@ -6,20 +6,16 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Fullscreen
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,8 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -46,14 +44,13 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import dev.thathunky.meteora.R
 import dev.thathunky.meteora.ui.components.ArtKind
+import dev.thathunky.meteora.ui.components.MLoading
 import dev.thathunky.meteora.ui.components.artworkShape
 import kotlinx.coroutines.delay
 
 /**
  * The Song | Video switch above the artwork in Now Playing; only on the phone target, for a
- * track with a picture (and while on Video, so there is a way back).
- * Plain Material connected toggle buttons for now; swap for the look-aware `SegmentedChoice`
- * (ui/components) once the looks work is merged.
+ * track with a picture (and while on Video, so there is a way back). Drawn by the look.
  */
 @UnstableApi
 @Composable
@@ -74,42 +71,69 @@ fun SongVideoSwitch(modifier: Modifier = Modifier, vm: VideoViewModel = hiltView
 }
 
 /**
- * The picture in the artwork's place, same size and corners, letterboxed on the theme
- * background. Drawn over the artwork, which keeps the shared-element transition. A tap shows
- * the full-screen button for a few seconds.
+ * The picture in the artwork's place, same corners; Now Playing sizes the slot to the picture.
+ * Drawn over the artwork, which keeps the shared-element transition, and see-through until the
+ * first frame, so the cover shows (with a loader) meanwhile. A tap shows the gear and the
+ * full-screen button for a few seconds; they show once on their own when the picture appears.
  */
 @UnstableApi
 @Composable
 fun VideoPanel(modifier: Modifier = Modifier, vm: VideoViewModel = hiltViewModel()) {
     val show by vm.showVideo.collectAsStateWithLifecycle()
     if (!show) return
-    var controls by remember { mutableStateOf(false) }
+    var controls by remember { mutableStateOf(true) }
     var menu by remember { mutableStateOf(false) }
+    var picture by remember { mutableStateOf(false) }
+    val timeout = controlsTimeout()
     LaunchedEffect(controls, menu) {
         if (controls && !menu) {
-            delay(CONTROLS_MS)
+            delay(timeout)
             controls = false
         }
     }
     Box(
         modifier
             .clip(artworkShape(ArtKind.Player))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .pointerInput(Unit) { detectTapGestures { controls = !controls } },
+            .then(if (picture) Modifier.background(Color.Black) else Modifier)
+            // A click rather than a raw tap detector, so TalkBack can reach the controls too.
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                onClickLabel = stringResource(R.string.action_video_controls),
+                onClick = { controls = !controls },
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        VideoSurface(vm, fullscreen = false)
+        VideoSurface(vm, fullscreen = false, onPicture = { picture = it })
+        if (!picture) MLoading()
         NerdStatsOverlay(vm, Modifier.align(Alignment.TopStart).padding(12.dp))
         // Shown while the menu is open too: the menu lives in here and would vanish with it.
-        AnimatedVisibility(controls || menu, Modifier.align(Alignment.BottomEnd).padding(12.dp), enter = fadeIn(), exit = fadeOut()) {
-            Row {
-                VideoOptionsButton(vm, menu, { menu = it }, MaterialTheme.colorScheme.onSurface)
-                FilledTonalIconButton(onClick = { vm.fullscreen.value = true }) {
-                    Icon(Icons.Outlined.Fullscreen, stringResource(R.string.action_fullscreen))
+        // White on a scrim, as in full screen: these sit on the picture, not on a surface of the look.
+        AnimatedVisibility(controls || menu, Modifier.matchParentSize(), enter = fadeIn(), exit = fadeOut()) {
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.5f)))) {
+                Row(Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
+                    VideoOptionsButton(vm, menu, { menu = it }, Color.White)
+                    IconButton(onClick = { vm.fullscreen.value = true }) {
+                        Icon(Icons.Outlined.Fullscreen, stringResource(R.string.action_fullscreen), tint = Color.White)
+                    }
                 }
             }
         }
     }
+}
+
+/** How long video controls stay up; longer when an accessibility service asks for it. */
+@Composable
+internal fun controlsTimeout(): Long =
+    LocalAccessibilityManager.current?.calculateRecommendedTimeoutMillis(CONTROLS_MS, containsIcons = true, containsControls = true) ?: CONTROLS_MS
+
+/** Width / height of the picture while [show]; null before the player knows it, and in song mode. */
+@UnstableApi
+@Composable
+internal fun pictureAspect(vm: VideoViewModel, show: Boolean): Float? {
+    // Only while showing: reading vm.player builds the phone's player.
+    if (!show) return null
+    return rememberVideoAspect(vm.player) {}.value
 }
 
 /**
@@ -120,11 +144,13 @@ fun VideoPanel(modifier: Modifier = Modifier, vm: VideoViewModel = hiltViewModel
  */
 @UnstableApi
 @Composable
-internal fun VideoSurface(vm: VideoViewModel, fullscreen: Boolean, modifier: Modifier = Modifier) {
+internal fun VideoSurface(vm: VideoViewModel, fullscreen: Boolean, modifier: Modifier = Modifier, onPicture: (Boolean) -> Unit = {}) {
     val context = LocalContext.current
     val view = remember(fullscreen) { if (fullscreen) SurfaceView(context) else TextureView(context) }
     var firstFrame by remember(view) { mutableStateOf(false) }
     val aspect by rememberVideoAspect(vm.player) { firstFrame = true }
+    val picture by rememberUpdatedState(onPicture)
+    LaunchedEffect(firstFrame) { picture(firstFrame) }
     LifecycleStartEffect(view) {
         vm.attach(view)
         onStopOrDispose {

@@ -123,6 +123,23 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import dev.thathunky.meteora.ui.components.MLoading
 import dev.thathunky.meteora.ui.components.ArtKind
 import dev.thathunky.meteora.ui.components.ArtworkFrame
 import dev.thathunky.meteora.ui.components.IconKind
@@ -216,7 +233,7 @@ private fun MiniPlayer(
                     drawRect(scheme.primary, topLeft = Offset(corner, line), size = Size(span * f, w))
                 }
             }
-            .clickable(onClick = onExpand)
+            .clickable(onClickLabel = stringResource(R.string.action_open_player), onClick = onExpand)
             // Thresholds in dp, so a swipe is the same distance on every screen density.
             .pointerInput(Unit) {
                 val open = 24.dp.toPx()
@@ -237,6 +254,8 @@ private fun MiniPlayer(
                     onHorizontalDrag = { _, d -> dragX += d },
                 )
             }
+            // The dock is drawn edge to edge; its content keeps clear of a side navigation bar or cutout in landscape.
+            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal))
             .padding(horizontal = if (terminal) 0.dp else look.screenPadding - 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -322,8 +341,9 @@ private fun FullPlayer(
     val dragDown = remember { Animatable(0f) }
     val settle: FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.fastSpatialSpec()
     val scope = rememberCoroutineScope()
-    var showQueue by remember { mutableStateOf(false) }
-    var showLyrics by remember { mutableStateOf(false) }
+    // Saveable, so the queue and the lyrics stay open through a rotation.
+    var showQueue by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var showLyrics by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     PredictiveBackHandler { events ->
         try {
@@ -370,12 +390,18 @@ private fun FullPlayer(
         // Not inside a Surface, so set the content color ourselves (otherwise text is black).
         CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = look.screenPadding + 8.dp),
+            // The bars and the cutout on every side: in landscape a cutout or a side navigation bar is horizontal.
+            // Not the keyboard, which may still be closing after Search.
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.systemBars.union(androidx.compose.foundation.layout.WindowInsets.displayCutout))
+                .padding(horizontal = look.screenPadding + 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 MIconButton(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse), onClick = onCollapse)
-                Spacer(Modifier.weight(1f))
+                // The chip gets what the buttons leave and ellipsizes, so a long PC name (or the
+                // Ukrainian label) cannot push the queue and More buttons off the row.
+                Box(Modifier.weight(1f).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
                 val pcName = (connection as? ConnectionState.Connected)?.pcName
                 val knownPc by vm.pcName.collectAsStateWithLifecycle()
                 val target by vm.target.collectAsStateWithLifecycle()
@@ -398,6 +424,8 @@ private fun FullPlayer(
                                     pcName != null -> stringResource(R.string.playing_on, pcName)
                                     else -> stringResource(R.string.reconnecting)
                                 },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         },
                     )
@@ -426,7 +454,7 @@ private fun FullPlayer(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                }
                 LyricsButton(onClick = { showLyrics = true })
                 MIconButton(
                     Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue),
@@ -442,6 +470,29 @@ private fun FullPlayer(
                 MaterialTheme.motionScheme.slowSpatialSpec(),
                 label = "artMorph",
             )
+            // The slot is square for the cover and takes the picture's shape in video mode (16:9
+            // until the player knows the size; vertical videos stay square). The ratio animates
+            // and is read in the layout block only, so the animation relayouts without recomposing.
+            val videoVm: VideoViewModel = hiltViewModel()
+            val videoOn by videoVm.showVideo.collectAsStateWithLifecycle()
+            val picture = pictureAspect(videoVm, videoOn)
+            val slotRatio = animateFloatAsState(
+                if (videoOn) (picture ?: (16f / 9f)).coerceIn(1f, 2.4f) else 1f,
+                MaterialTheme.motionScheme.defaultSpatialSpec(),
+                label = "slotRatio",
+            )
+            val slot = Modifier.layout { m, c ->
+                // As aspectRatio(): the full width, unless that is too tall for the space.
+                val r = slotRatio.value.coerceAtLeast(0.5f)
+                var w = c.maxWidth
+                var h = (w / r).roundToInt()
+                if (h > c.maxHeight) {
+                    h = c.maxHeight
+                    w = (h * r).roundToInt()
+                }
+                val p = m.measure(Constraints.fixed(w.coerceAtLeast(0), h.coerceAtLeast(0)))
+                layout(p.width, p.height) { p.place(0, 0) }
+            }
             // The art takes the space the controls leave, so it shrinks on short or landscape
             // screens instead of pushing the controls off the bottom.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -450,12 +501,13 @@ private fun FullPlayer(
                     ArtKind.Player,
                     // Terminal's mini player has no art to fly from, so the art just fades in with the player.
                     (if (look.mini == MiniStyle.StatusLine) Modifier else Modifier.sharedElement(rememberSharedContentState("art"), anim))
-                        .aspectRatio(1f),
+                        .then(slot),
                     contentDescription = track.album,
                     // Read in the layer block: pause redraws the art without recomposing the player.
-                    playing = { morphProgress.value },
+                    // Not under the picture: the scalloped morph would be stretched to its shape.
+                    playing = if (videoOn) null else ({ morphProgress.value }),
                 )
-                VideoPanel(Modifier.aspectRatio(1f))
+                VideoPanel(slot)
             }
 
             Spacer(Modifier.height(28.dp))
@@ -494,7 +546,8 @@ private fun FullPlayer(
 
             SeekBar(s, vm)
 
-            Spacer(Modifier.height(12.dp))
+            // 8, not 12: the seek bar's 48 dp touch area already leaves room under its times.
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -592,10 +645,10 @@ private fun ArtistAlbumLine(track: Track, links: TrackLinks) {
     val album = track.album?.takeIf { it.isNotBlank() }
     Layout(
         content = {
-            LinePart(track.artist, track.artistChannelId?.let { id -> { links.openArtist(id) } })
+            LinePart(track.artist, track.artistChannelId?.let { id -> { links.openArtist(id) } }, stringResource(R.string.action_go_artist))
             if (album != null) {
                 LinePart(" · ", null)
-                LinePart(album, track.albumId?.let { id -> { links.openAlbum(id) } })
+                LinePart(album, track.albumId?.let { id -> { links.openAlbum(id) } }, stringResource(R.string.action_go_album))
             }
         },
         modifier = Modifier.fillMaxWidth(),
@@ -629,13 +682,13 @@ private fun ArtistAlbumLine(track: Track, links: TrackLinks) {
 }
 
 @Composable
-private fun LinePart(text: String, onClick: (() -> Unit)?) {
+private fun LinePart(text: String, onClick: (() -> Unit)?, clickLabel: String? = null) {
     Text(
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
-        modifier = (if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).basicMarquee(),
+        modifier = (if (onClick != null) Modifier.clickable(onClickLabel = clickLabel, role = Role.Button, onClick = onClick) else Modifier).basicMarquee(),
     )
 }
 
@@ -661,11 +714,31 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
         label = "waveAmp",
     )
 
+    // For TalkBack: the position as a value it can set and step, and ±10 s actions.
+    val seekLabel = stringResource(R.string.seek_bar)
+    val seekState = stringResource(R.string.seek_state, formatTime(shownSeconds.toDouble()), formatTime(duration))
+    val back10 = stringResource(R.string.action_rewind)
+    val forward10 = stringResource(R.string.action_forward)
+
     Column(Modifier.fillMaxWidth()) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                // 48 dp: the touch target; the bar is drawn smaller in the middle.
+                .height(48.dp)
+                .clearAndSetSemantics {
+                    contentDescription = seekLabel
+                    stateDescription = seekState
+                    if (duration > 0) {
+                        val at = shownSeconds.toFloat().coerceIn(0f, duration.toFloat())
+                        progressBarRangeInfo = ProgressBarRangeInfo(at, 0f..duration.toFloat())
+                        setProgress { v -> vm.seekTo(v.toDouble().coerceIn(0.0, duration)); true }
+                        customActions = listOf(
+                            CustomAccessibilityAction(back10) { vm.seekTo((at - 10.0).coerceIn(0.0, duration)); true },
+                            CustomAccessibilityAction(forward10) { vm.seekTo((at + 10.0).coerceIn(0.0, duration)); true },
+                        )
+                    }
+                }
                 .pointerInput(duration) {
                     detectTapGestures { o ->
                         if (duration > 0) vm.seekTo(duration * (o.x / size.width).coerceIn(0f, 1f))
@@ -687,10 +760,23 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
         ) {
             MProgress(progress = shown, amplitude = { amplitude })
         }
-        Row(Modifier.fillMaxWidth()) {
+        // Pulled up into the touch area's spare height, so the bar keeps its old distance to the times.
+        Row(Modifier.fillMaxWidth().offset(y = (-6).dp), verticalAlignment = Alignment.CenterVertically) {
             Text(formatTime(shownSeconds.toDouble()), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.weight(1f))
-            Text(formatTime(duration), style = MaterialTheme.typography.labelMedium)
+            // The loader overflows this fixed-height box instead of growing the row, so nothing below moves.
+            Box(Modifier.weight(1f).height(16.dp), contentAlignment = Alignment.Center) {
+                // Only after a moment of buffering, so a quick seek does not flash it.
+                var waiting by remember { mutableStateOf(false) }
+                LaunchedEffect(s.trackState) {
+                    waiting = false
+                    if (s.trackState == TrackState.Buffering) {
+                        kotlinx.coroutines.delay(400)
+                        waiting = true
+                    }
+                }
+                if (waiting) MLoading(Modifier.requiredSize(32.dp))
+            }
+            Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
