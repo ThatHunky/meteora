@@ -34,10 +34,17 @@ rust/meteora-core/
 
 ## Build integration
 
-- Tools already installed on this PC: Rust 1.98.1 with the `aarch64-linux-android` target, `cargo-ndk`, and NDK `30.0.16248370` under the SDK (`sdk.dir` in `local.properties`, `<sdk>/ndk/30.0.16248370`). If one is missing, say so in the report rather than installing something else.
-- Add a Gradle `Exec` task in `app/build.gradle.kts`, `cargoBuildArm64`, that runs in `rust/meteora-core`:
-  `cargo ndk -t arm64-v8a -o <app build dir>/rustJniLibs build --release`
-  with `ANDROID_NDK_HOME` set from the SDK path. Declare inputs (`rust/meteora-core/src`, `Cargo.toml`, `Cargo.lock`) and outputs so Gradle skips it when nothing changed.
+- Tools already installed on this PC: Rust 1.98.1 with the `aarch64-linux-android` target and NDK `30.0.16248370` under the SDK (`sdk.dir` in `local.properties`, `<sdk>/ndk/30.0.16248370`). If one is missing, say so in the report rather than installing something else.
+- **The build recipe, tried on this PC on 2026‑11‑21** with a one-function `rquickjs` crate (result: a 473 KB `.so`). Use plain `cargo`, not `cargo ndk`: `cargo-ndk` 4.1.2 sets its own `BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android` and the extra arguments below never reach clang.
+  - `rquickjs` ships no bindings for `aarch64-linux-android`, so enable its `bindgen` feature. (On the Windows host its bundled bindings are used, so `cargo test` needs nothing special.)
+  - With `<tc>` = `<sdk>/ndk/30.0.16248370/toolchains/llvm/prebuilt/windows-x86_64` (forward slashes), set for the cargo process:
+    - `LIBCLANG_PATH=<tc>/bin`
+    - `CC_aarch64_linux_android=<tc>/bin/aarch64-linux-android31-clang.cmd`
+    - `AR_aarch64_linux_android=<tc>/bin/llvm-ar.exe`
+    - `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=<tc>/bin/aarch64-linux-android31-clang.cmd`
+    - `BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android=--target=aarch64-linux-android31 --sysroot=<tc>/sysroot -resource-dir=<tc>/lib/clang/21`
+  - Then `cargo build --target aarch64-linux-android --release`. Each of the three clang arguments fixed one error in turn: without `-resource-dir`, `stdbool.h` is not found; without the versioned `--target`, the NDK headers stop with "Unversioned target triples are not supported". The `21` is the clang version folder in this NDK; read it from the folder name rather than hard-coding it.
+- Add a Gradle `Exec` task in `app/build.gradle.kts`, `cargoBuildArm64`, that runs that command in `rust/meteora-core` with those variables (paths derived from `sdk.dir` in `local.properties`) and copies `target/aarch64-linux-android/release/libmeteora_core.so` to `<app build dir>/rustJniLibs/arm64-v8a/`. Declare inputs (`rust/meteora-core/src`, `Cargo.toml`, `Cargo.lock`) and outputs so Gradle skips it when nothing changed.
 - Add `<app build dir>/rustJniLibs` to `android.sourceSets["main"].jniLibs.srcDirs` and make the JNI‑libs merge tasks depend on `cargoBuildArm64`. The app is arm64 only (`abiFilters`), so one target is enough.
 - The `.so` is a build output: nothing under `app/src/main/jniLibs` is committed. Add `rust/meteora-core/target/` to `.gitignore`. Commit `Cargo.lock`.
 - JVM unit tests cannot load an Android `.so`. Logic that moves to Rust is tested with `cargo test`, and its Kotlin tests are ported, not kept (see "Tests").
@@ -57,11 +64,13 @@ Read the current Kotlin first: `stream/InnerTubeStreams.kt`, `stream/WebMusicStr
 | `stream_challenges` | a picked format | the `s` value (if ciphered) and the `n` value (if present) to solve |
 | `build_stream_url` | a picked format, solved `s`, solved `n` | the final URL |
 
-Same rules as the Kotlin has today, including: ceilings 56 000 / 160 000 / none on average bitrate, Opus weighted × 1.3, skip `isDrc` and non‑default audio tracks when there is an alternative, fall back to the lowest bitrate when nothing fits. Port them exactly; the Kotlin tests say what "exactly" means.
+The tiers are already named `Low` / `Normal` / `High` in the Kotlin. Same rules as the Kotlin has today, including: ceilings 56 000 / 160 000 / none on average bitrate, Opus weighted × 1.3, skip `isDrc` and non‑default audio tracks when there is an alternative, fall back to the lowest bitrate when nothing fits. Port them exactly; the Kotlin tests say what "exactly" means.
 
 ### Solver (`solver.rs`)
 
-- Embed QuickJS through the `rquickjs` crate. Read its current documentation for the build requirements on Android (it compiles C with the NDK's clang, and may need bindings for `aarch64-linux-android`).
+- Embed QuickJS through the `rquickjs` crate (0.14 at the time of writing; see the build recipe above for Android).
+- **What the WebView solver taught us** (read `stream/JsSolver.kt` as it is now): in a WebView the page lost its globals after every solve, so that solver sends the scripts, the input and the 3.8 MB preprocessed player on every call. Measured on the OnePlus 7T: 450–980 ms per solve, the app at 246 MB while playing on High, plus a 152 MB WebView renderer process. QuickJS has no `window` or document, which is the environment the solver scripts were written for, so keeping the loaded scripts and the preprocessed player alive in the runtime should work; verify it with a test that solves three times in a row on one runtime. These numbers are what R1 is measured against.
+- The Kotlin side already reads the solver scripts out of yt‑dlp's zip (`WebViewJsSolver.readZipApp`, needed because the file has a `#!` line before the zip) and from the assets. Keep that in Kotlin and pass the two script texts to `solver_init`.
 - One JavaScript runtime, owned by one dedicated thread inside the library; JNI calls send work to it over a channel and wait. QuickJS is not thread‑safe.
 - Functions: `solver_init(lib_js, core_js)` evaluates the two scripts once (protocol in high-quality-plan.md); `solver_has_player(player_id)`; `solver_prepare(player_id, player_js)` runs the first solve with `output_preprocessed` and keeps the preprocessed player in a JavaScript global, not in Rust or Kotlin; `solver_solve(player_id, sig_json_array, n_json_array)` returns the two challenge → solved maps.
 - Limits: a memory limit on the runtime (start at 256 MB and report the peak you observe; the preprocessed player alone is a 3.8 MB string and the first solve parses a 2.7 MB script) and an interrupt handler that aborts a solve after 15 s.
