@@ -33,3 +33,16 @@ YouTube Music's responses carry no language and no country for a track or an art
 - **MusicBrainz: yes** (the user, 2026-11-22: "Yes, use MusicBrainz"). The switch exists in Filters and is on by default once a country is hidden; with no hidden country nothing is looked up.
 - **Languages and countries:** assumed Russian and Russia as the first entries; the user has not confirmed. Both lists are editable.
 - **Search results:** not filtered, unless the user asks.
+
+## Fully customizable (the user, 2026-11-22: "it should be fully customizable")
+
+Nothing about any language is built into the behaviour: no default exception for Ukrainian or any other. The app ships detection rules; what to do with each result is the user's setting. This replaces the "Strictness" bullet and the fixed "Hidden languages" list above.
+
+- **Languages:** every language the app can detect is a row with three states: **Show** (default), **Hide**, **Always show**. First set, from telling letters or script: Russian, Ukrainian, Belarusian, Bulgarian, Serbian (Cyrillic), Kazakh, Greek, Arabic, Hebrew, Hindi, Chinese, Japanese, Korean, Thai, Turkish, Polish, German, French, Spanish, Portuguese (the Latin ones only when a telling letter is present). Adding a language is adding a rule object, not code in the filter.
+- **Scripts, for text no language rule decides:** a row per script (Cyrillic, Latin, Greek, Arabic, Hebrew, Devanagari, Han, Kana, Hangul, Thai) with **Show** (default) or **Hide**. So "hide Cyrillic that is not clearly Ukrainian" is: Cyrillic = Hide, Ukrainian = Always show. Nothing else expresses it.
+- **Countries:** any country from the ISO list, each **Hide** or **Always show**; unlisted countries are shown.
+- **Artists:** each **Hidden** or **Always show**.
+- **Custom rules:** the user's own words or characters; a title or artist name containing one is hidden or always shown, as chosen per rule.
+- **Order when rules disagree:** an artist rule wins over a custom rule, then country, then language, then script; inside one level **Always show** wins over **Hide**. One pure function, with tests for each pair.
+- **Where it applies** is also a setting, one switch each: Home, radio and autoplay, artist page shelves, smart downloads, search results (off by default), albums and playlists opened on purpose (off by default).
+- A **Test** field in Filters: type or paste a title and artist and see what the filter decides and which rule decided it.
