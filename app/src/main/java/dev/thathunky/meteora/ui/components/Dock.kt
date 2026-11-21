@@ -155,7 +155,9 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                             val c = if (on) scheme.onPrimary else scheme.onSurface
                             Icon(item.icon, null, Modifier.size(18.dp), tint = c)
                             Spacer(Modifier.width(4.dp))
-                            NavLabel(lookLabel(item.label), c)
+                            // Plain: next to the icon there is about 49 dp at 360 dp wide, too little for
+                            // "НАЛАШТУВАННЯ" even shrunk, and shrinking would only make the tabs unequal.
+                            Text(lookLabel(item.label), style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     // tmux-like: "1:home", the selected one inverted. No icons.
@@ -169,8 +171,8 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
 }
 
 /**
- * A tab label that shrinks a little before it ellipsizes: the capitals of Retro and the mono
- * font of Terminal do not fit "Налаштування" into a quarter of a phone's width at full size.
+ * A tab label that shrinks a little before it ellipsizes: Terminal's mono "4:налаштування"
+ * is about 92 dp at full size, a little more than a quarter of a 360 dp screen.
  */
 @Composable
 private fun NavLabel(text: String, color: Color, modifier: Modifier = Modifier) {
