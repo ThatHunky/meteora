@@ -14,7 +14,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import dev.thathunky.meteora.ytm.YtmAuthProvider
+import dev.thathunky.meteora.ytm.YtmClient
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -40,4 +43,18 @@ object AppModule {
 
     @Provides @Singleton
     fun realtimeClient(okHttp: OkHttpClient): RealtimeClient = RealtimeClient(okHttp)
+
+    /** HTTPS-only client for YouTube Music: no cleartext connection specs at all. */
+    @Provides @Singleton
+    fun ytmClient(okHttp: OkHttpClient, auth: YtmAuthProvider): YtmClient {
+        val https = okHttp.newBuilder()
+            .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS))
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+        return YtmClient(HttpClient(OkHttp.create { preconfigured = https }) { expectSuccess = false }, auth)
+    }
+
+    /** Signed-out until M4b wires the cookie store in. */
+    @Provides @Singleton
+    fun ytmAuth(): YtmAuthProvider = YtmAuthProvider { null }
 }

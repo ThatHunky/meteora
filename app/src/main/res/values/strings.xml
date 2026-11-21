@@ -44,4 +44,17 @@
     <string name="dislike">Dislike</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat">Repeat</string>
+    <string name="search_hint">Songs, albums, artists</string>
+    <string name="top_result">Top result</string>
+    <string name="load_failed">Couldn’t load this. Check your connection and try again.</string>
+    <string name="filter_all">All</string>
+    <string name="filter_songs">Songs</string>
+    <string name="filter_albums">Albums</string>
+    <string name="filter_artists">Artists</string>
+    <string name="filter_playlists">Playlists</string>
+    <string name="action_play_next">Play next</string>
+    <string name="action_add_to_queue">Add to queue</string>
+    <string name="action_radio">Start radio</string>
+    <string name="action_go_album">Go to album</string>
+    <string name="action_go_artist">Go to artist</string>
 </resources>

@@ -43,4 +43,17 @@
     <string name="dislike">Не подобається</string>
     <string name="shuffle">Перемішати</string>
     <string name="repeat">Повтор</string>
+    <string name="search_hint">Пісні, альбоми, виконавці</string>
+    <string name="top_result">Найкращий результат</string>
+    <string name="load_failed">Не вдалося завантажити. Перевірте з’єднання і спробуйте ще.</string>
+    <string name="filter_all">Усе</string>
+    <string name="filter_songs">Пісні</string>
+    <string name="filter_albums">Альбоми</string>
+    <string name="filter_artists">Виконавці</string>
+    <string name="filter_playlists">Плейлисти</string>
+    <string name="action_play_next">Відтворити наступною</string>
+    <string name="action_add_to_queue">Додати в чергу</string>
+    <string name="action_radio">Увімкнути радіо</string>
+    <string name="action_go_album">До альбому</string>
+    <string name="action_go_artist">До виконавця</string>
 </resources>

@@ -14,3 +14,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute : Route
 
 @Serializable data object PairingRoute : Route
+
+@Serializable data class AlbumRoute(val browseId: String) : Route
+
+@Serializable data class PlaylistRoute(val playlistId: String) : Route
+
+@Serializable data class ArtistRoute(val browseId: String) : Route
