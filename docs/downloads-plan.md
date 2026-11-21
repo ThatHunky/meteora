@@ -85,6 +85,8 @@ A switch, a size slider and "Refresh now". Refreshes nightly through WorkManager
 
 A share that cannot be filled passes its room to favourites. At most two songs in a row by one artist in the fresh share.
 
+*Manual downloads are outside the limit.* The size counts smart downloads only. A song the user downloaded by hand (alone or as part of an album or playlist) is left out of the candidates, so it takes no smart slot: with 300 manual songs and a size of 100, the phone holds 400. When a manual download is removed and the song still scores high, it can come back as a smart one at the next refresh; when the user manually downloads a song that is already a smart one, it becomes manual and its slot is refilled.
+
 *Stability*, so the phone does not re-download every night:
 
 - A song already downloaded stays unless its place is taken by one scoring at least 20 % higher.
