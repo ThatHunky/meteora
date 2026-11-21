@@ -43,8 +43,12 @@ data class Palette(
 sealed interface AppTheme {
     val id: String
 
+    /** The look this theme brings unless Settings overrides the Style. */
+    val look: LookId
+
     sealed interface Dynamic : AppTheme {
         @get:StringRes val nameRes: Int?
+        override val look: LookId get() = LookId.Expressive
     }
 
     data object Album : Dynamic {
@@ -63,7 +67,13 @@ sealed interface AppTheme {
         override val nameRes: Int? = null
     }
 
-    data class Fixed(override val id: String, val name: String, val palette: Palette, val author: String? = null) : AppTheme
+    data class Fixed(
+        override val id: String,
+        val name: String,
+        val palette: Palette,
+        override val look: LookId,
+        val author: String? = null,
+    ) : AppTheme
 }
 
 private fun hex(v: Long) = Color(0xFF000000 or v)
@@ -178,14 +188,14 @@ val TokyoNightPalette = Palette(
 )
 
 val FixedThemes: List<AppTheme.Fixed> = listOf(
-    AppTheme.Fixed("mono", "Mono", MonoPalette, author = "N7Art"),
-    AppTheme.Fixed("moonfly", "Moonfly", MoonflyPalette),
-    AppTheme.Fixed("catppuccin", "Catppuccin Mocha", CatppuccinMochaPalette),
-    AppTheme.Fixed("gruvbox", "Gruvbox", GruvboxPalette),
-    AppTheme.Fixed("nord", "Nord", NordPalette),
-    AppTheme.Fixed("rosepine", "Rosé Pine", RosePinePalette),
-    AppTheme.Fixed("tokyonight", "Tokyo Night", TokyoNightPalette),
-    AppTheme.Fixed("latte", "Catppuccin Latte", CatppuccinLattePalette),
+    AppTheme.Fixed("mono", "Mono", MonoPalette, LookId.Terminal, author = "N7Art"),
+    AppTheme.Fixed("moonfly", "Moonfly", MoonflyPalette, LookId.Terminal),
+    AppTheme.Fixed("catppuccin", "Catppuccin Mocha", CatppuccinMochaPalette, LookId.Soft),
+    AppTheme.Fixed("gruvbox", "Gruvbox", GruvboxPalette, LookId.Retro),
+    AppTheme.Fixed("nord", "Nord", NordPalette, LookId.Flat),
+    AppTheme.Fixed("rosepine", "Rosé Pine", RosePinePalette, LookId.Soft),
+    AppTheme.Fixed("tokyonight", "Tokyo Night", TokyoNightPalette, LookId.Flat),
+    AppTheme.Fixed("latte", "Catppuccin Latte", CatppuccinLattePalette, LookId.Soft),
 )
 
 val AllThemes: List<AppTheme> = listOf(AppTheme.Album, AppTheme.System, AppTheme.Meteora) + FixedThemes

@@ -3,10 +3,11 @@ package dev.thathunky.meteora.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.materialkolor.PaletteStyle
@@ -38,13 +39,21 @@ fun MeteoraTheme(
     mode: ThemeMode = ThemeMode.System,
     pureBlack: Boolean = false,
     albumSeed: Color? = null,
+    lookOverride: LookId? = null,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = isDark(theme, mode, isSystemInDarkTheme())
     val target = schemeFor(theme, darkTheme, pureBlack, albumSeed)
-    MaterialExpressiveTheme(
-        colorScheme = target.animated(),
-        motionScheme = MotionScheme.expressive(),
-        content = content,
-    )
+    val look = effectiveLook(theme, lookOverride)
+    val typography = remember(look) { typographyFor(look) }
+    val shapes = remember(look) { shapesFor(look) }
+    CompositionLocalProvider(LocalLook provides look) {
+        MaterialExpressiveTheme(
+            colorScheme = target.animated(),
+            motionScheme = motionFor(look),
+            typography = typography,
+            shapes = shapes,
+            content = content,
+        )
+    }
 }

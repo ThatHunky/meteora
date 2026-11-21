@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 fun parseThemeId(stored: String?): String = AllThemes.firstOrNull { it.id == stored }?.id ?: AppTheme.Album.id
 fun parseThemeMode(stored: String?): ThemeMode = ThemeMode.entries.firstOrNull { it.name == stored } ?: ThemeMode.System
 fun parseArtworkShape(stored: String?): ArtworkShape = ArtworkShape.entries.firstOrNull { it.name == stored } ?: ArtworkShape.Rounded
+/** null = the theme's own look. Stored as "" for that, so unknown values mean the same. */
+fun parseLookOverride(stored: String?): LookId? = LookId.entries.firstOrNull { it.name == stored }
 
 /** The appearance settings. One instance, so every screen sees a change at once. */
 @Singleton
@@ -29,6 +31,14 @@ class ThemeStore @Inject constructor(@ApplicationContext context: Context) {
 
     private val _artworkShape = MutableStateFlow(parseArtworkShape(prefs.getString(KEY_ARTWORK, null)))
     val artworkShape: StateFlow<ArtworkShape> = _artworkShape.asStateFlow()
+
+    private val _look = MutableStateFlow(parseLookOverride(prefs.getString(KEY_LOOK, null)))
+    val look: StateFlow<LookId?> = _look.asStateFlow()
+
+    fun setLook(l: LookId?) {
+        _look.value = l
+        prefs.edit().putString(KEY_LOOK, l?.name ?: "").apply()
+    }
 
     fun setThemeId(id: String) {
         val v = parseThemeId(id)
@@ -56,5 +66,6 @@ class ThemeStore @Inject constructor(@ApplicationContext context: Context) {
         const val KEY_MODE = "mode"
         const val KEY_PURE_BLACK = "pure_black"
         const val KEY_ARTWORK = "artwork_shape"
+        const val KEY_LOOK = "look"
     }
 }

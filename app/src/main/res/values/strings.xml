@@ -109,4 +109,11 @@
     <string name="theme_album">Album art</string>
     <string name="theme_system">System colours</string>
     <string name="theme_by">by %1$s</string>
+    <string name="appearance_style">Style</string>
+    <string name="style_from_theme">From theme</string>
+    <string name="style_expressive">Expressive</string>
+    <string name="style_terminal">Terminal</string>
+    <string name="style_flat">Flat</string>
+    <string name="style_retro">Retro</string>
+    <string name="style_soft">Soft</string>
 </resources>

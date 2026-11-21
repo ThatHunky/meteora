@@ -108,4 +108,11 @@
     <string name="theme_album">Обкладинка альбому</string>
     <string name="theme_system">Кольори системи</string>
     <string name="theme_by">від %1$s</string>
+    <string name="appearance_style">Стиль</string>
+    <string name="style_from_theme">Як у темі</string>
+    <string name="style_expressive">Експресивний</string>
+    <string name="style_terminal">Термінал</string>
+    <string name="style_flat">Плаский</string>
+    <string name="style_retro">Ретро</string>
+    <string name="style_soft">М’який</string>
 </resources>

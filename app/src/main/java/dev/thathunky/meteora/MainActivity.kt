@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
             val mode by appearance.mode.collectAsStateWithLifecycle()
             val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
             val artworkShape by appearance.artworkShape.collectAsStateWithLifecycle()
+            val lookOverride by appearance.look.collectAsStateWithLifecycle()
             val theme = themeById(themeId)
             val dark = isDark(theme, mode, isSystemInDarkTheme())
             // Bar icons follow the app's theme: a dark theme on a light phone needs light icons.
@@ -75,7 +76,7 @@ class MainActivity : AppCompatActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             CompositionLocalProvider(LocalArtworkShape provides artworkShape, LocalAlbumSeed provides seed) {
-                MeteoraTheme(theme = theme, mode = mode, pureBlack = pureBlack, albumSeed = seed) {
+                MeteoraTheme(theme = theme, mode = mode, pureBlack = pureBlack, albumSeed = seed, lookOverride = lookOverride) {
                     MeteoraShell(vm)
                 }
             }

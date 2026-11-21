@@ -49,6 +49,14 @@ import dev.thathunky.meteora.ui.theme.AllThemes
 import dev.thathunky.meteora.ui.theme.AppTheme
 import dev.thathunky.meteora.ui.theme.ArtworkShape
 import dev.thathunky.meteora.ui.theme.LocalAlbumSeed
+import dev.thathunky.meteora.ui.theme.Look
+import dev.thathunky.meteora.ui.theme.LookId
+import dev.thathunky.meteora.ui.theme.Looks
+import dev.thathunky.meteora.ui.theme.SurfaceStyle
+import dev.thathunky.meteora.ui.theme.effectiveLook
+import dev.thathunky.meteora.ui.theme.titleFontFor
+import dev.thathunky.meteora.ui.components.hardShadow
+import androidx.compose.material3.FilterChip
 import dev.thathunky.meteora.ui.theme.ThemeMode
 import dev.thathunky.meteora.ui.theme.ThemeStore
 import dev.thathunky.meteora.ui.theme.isDark
@@ -64,11 +72,13 @@ class AppearanceViewModel @Inject constructor(private val store: ThemeStore) : V
     val mode: StateFlow<ThemeMode> = store.mode
     val pureBlack: StateFlow<Boolean> = store.pureBlack
     val artworkShape: StateFlow<ArtworkShape> = store.artworkShape
+    val look: StateFlow<LookId?> = store.look
 
     fun setTheme(id: String) = store.setThemeId(id)
     fun setMode(m: ThemeMode) = store.setMode(m)
     fun setPureBlack(on: Boolean) = store.setPureBlack(on)
     fun setArtworkShape(s: ArtworkShape) = store.setArtworkShape(s)
+    fun setLook(l: LookId?) = store.setLook(l)
 }
 
 @Composable
@@ -77,6 +87,7 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
     val mode by vm.mode.collectAsStateWithLifecycle()
     val pureBlack by vm.pureBlack.collectAsStateWithLifecycle()
     val artwork by vm.artworkShape.collectAsStateWithLifecycle()
+    val lookOverride by vm.look.collectAsStateWithLifecycle()
     val theme = themeById(themeId)
     val systemDark = isSystemInDarkTheme()
     val fixed = theme is AppTheme.Fixed
@@ -86,11 +97,13 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
         Text(stringResource(R.string.appearance_theme), style = MaterialTheme.typography.labelLarge)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(AllThemes, key = { it.id }) { t ->
-                ThemeCard(t, selected = t.id == theme.id, mode = mode, pureBlack = pureBlack, systemDark = systemDark) {
+                ThemeCard(t, effectiveLook(t, lookOverride), selected = t.id == theme.id, mode = mode, pureBlack = pureBlack, systemDark = systemDark) {
                     vm.setTheme(t.id)
                 }
             }
         }
+        Text(stringResource(R.string.appearance_style), style = MaterialTheme.typography.labelLarge)
+        StyleRow(lookOverride, vm::setLook)
         Text(stringResource(R.string.appearance_mode), style = MaterialTheme.typography.labelLarge)
         // A fixed theme is the mode it was made for, so the choice has no effect then.
         Segmented(
@@ -123,13 +136,45 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
             ),
             selected = artwork,
             onSelect = vm::setArtworkShape,
+            // Shown but fixed while the look decides the shape itself.
+            enabled = effectiveLook(theme, lookOverride).artworkSetting,
         )
+    }
+}
+
+private fun lookName(id: LookId?): Int = when (id) {
+    null -> R.string.style_from_theme
+    LookId.Expressive -> R.string.style_expressive
+    LookId.Terminal -> R.string.style_terminal
+    LookId.Flat -> R.string.style_flat
+    LookId.Retro -> R.string.style_retro
+    LookId.Soft -> R.string.style_soft
+}
+
+/** From theme, then the five looks, each label in its own look's title font. */
+@Composable
+private fun StyleRow(selected: LookId?, onSelect: (LookId?) -> Unit) {
+    val options: List<LookId?> = listOf(null) + LookId.entries
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(options, key = { it?.name ?: "theme" }) { id ->
+            FilterChip(
+                selected = selected == id,
+                onClick = { onSelect(id) },
+                label = {
+                    Text(
+                        stringResource(lookName(id)),
+                        fontFamily = id?.let { titleFontFor(Looks.of(it).typeface) },
+                        maxLines = 1,
+                    )
+                },
+            )
+        }
     }
 }
 
 /** The theme's own background, three accents and a line of its text, with the name below. */
 @Composable
-private fun ThemeCard(t: AppTheme, selected: Boolean, mode: ThemeMode, pureBlack: Boolean, systemDark: Boolean, onClick: () -> Unit) {
+private fun ThemeCard(t: AppTheme, look: Look, selected: Boolean, mode: ThemeMode, pureBlack: Boolean, systemDark: Boolean, onClick: () -> Unit) {
     // Dynamic themes preview as they would look right now, album art included.
     val preview = schemeFor(t, isDark(t, mode, systemDark), pureBlack, LocalAlbumSeed.current)
     val name = when (t) {
@@ -137,7 +182,12 @@ private fun ThemeCard(t: AppTheme, selected: Boolean, mode: ThemeMode, pureBlack
         is AppTheme.Dynamic -> t.nameRes?.let { stringResource(it) } ?: "Meteora"
     }
     val author = (t as? AppTheme.Fixed)?.author?.let { stringResource(R.string.theme_by, it) }
-    val shape = RoundedCornerShape(16.dp)
+    // The card previews the look too: its corner, its surface and its font.
+    val shape = RoundedCornerShape(if (look.id == LookId.Expressive) 16.dp else look.cornerMedium)
+    val unselectedBorder = when (look.surface) {
+        SurfaceStyle.Tonal -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        else -> BorderStroke(look.outline, preview.outline)
+    }
     Column(
         Modifier
             .width(112.dp)
@@ -149,24 +199,30 @@ private fun ThemeCard(t: AppTheme, selected: Boolean, mode: ThemeMode, pureBlack
     ) {
         Box(
             Modifier
+                .padding(end = look.hardShadow, bottom = look.hardShadow)
                 .fillMaxWidth()
                 .height(72.dp)
+                .then(if (look.hardShadow > 0.dp) Modifier.hardShadow(look.hardShadow, shape, preview.outline) else Modifier)
                 .clip(shape)
                 .background(preview.background)
-                .border(
-                    if (selected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary)
-                    else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shape,
-                )
+                .border(if (selected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else unselectedBorder, shape)
                 .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Dots take the look's corner: square in Terminal, round in Soft.
+                    val dot = if (look.pills) CircleShape else RoundedCornerShape(look.cornerSmall / 4)
                     listOf(preview.primary, preview.secondary, preview.tertiary).forEach {
-                        Box(Modifier.size(14.dp).clip(CircleShape).background(it))
+                        Box(Modifier.size(14.dp).clip(dot).background(it))
                     }
                 }
-                Text("Aa", color = preview.onBackground, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(
+                    "Aa",
+                    color = preview.onBackground,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = titleFontFor(look.typeface),
+                    maxLines = 1,
+                )
             }
             if (selected) {
                 Icon(
