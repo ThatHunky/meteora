@@ -348,3 +348,26 @@ Unit tests after the merges: 62 in Kotlin, 31 in Rust.
 - **Debug APK:** 104 MB, mostly the unshrunk debug build with the full icon set; yt-dlp adds ~18 MB. A release build will be much smaller.
 - **License:** yt-dlp comes through `youtubedl-android`, which is GPL‑3.0. That matches the plan's GPL‑3.0 choice.
 - **Terms:** phone playback is against YouTube's terms, so Meteora stays sideload‑only.
+
+## Watching the music video (2026-11-22, docs/video-plan.md)
+
+The user asked for the official app's Song / Video switch. One agent built it in its own worktree while another restyled the UI, so the new UI is in new files (`ui/player/VideoPanel.kt`, `FullscreenVideo.kt`, `VideoViewModel.kt`, `ui/settings/VideoQualitySettings.kt`) and `PlayerHost.kt` only gained three calls.
+
+### What YouTube gives (checked from the PC, anonymous)
+
+- **Same client as audio:** the visionOS `/player` call lists video-only formats in H.264, VP9 and AV1, up to 1080p or 2160p, all with plain URLs. No signature, no `n`, no PO token.
+- **A new throttling limit:** an exact range is fast only up to 10 MiB. 12 MB, 20 MB or a whole 42 MB file came at about 2.4 Mbit/s, as slow as an open-ended request; a 10 MiB range from the middle of the file was fast. So reads now go in 10 MiB requests (`ChunkedDataSource`). Audio files are almost always smaller and pass through unchanged.
+- **Counterparts:** signed out, `next` has none, so the `segmentMap` field names were taken from other clients and are not verified.
+
+### How it works
+
+- **Sources:** in video mode a song with a picture is its usual audio source merged with a video source. The sound does not change. An audio track (ATV) borrows its counterpart's picture only when the segment map gives one constant shift; otherwise it plays audio-only.
+- **Mode:** the switch is for the session. Switching restarts the current item at its position and rebuilds the next two.
+- **Failures:** a picture that cannot be resolved falls back to audio at the same position; the track is never skipped for it.
+- **Data:** the video track is on only while a view shows it. The view is attached while the activity is started, so in the background, with the screen off or with Now Playing closed only audio loads. Each video-mode track still opens its video file once to read the header.
+- **Quality:** 720p on Wi‑Fi, 360p on mobile data, in the phone's hardware codec order. The settings section exists but is not on the Playback screen yet (that file belonged to the looks work).
+- **Full screen:** landscape, system bars hidden, with play/pause, a seek bar and a way back.
+
+### Checked
+
+Build, 89 Kotlin unit tests and 37 Rust tests, all passing (`pick_video`, the queue parser keeping counterparts, the picture-source rules, the chunk boundaries). **Nothing was run on a phone:** whether the picture plays, keeps in sync, survives a mode switch, full screen and rotation, and that no video loads with the screen off are all unchecked.

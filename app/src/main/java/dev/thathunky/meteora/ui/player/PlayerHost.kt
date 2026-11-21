@@ -535,6 +535,7 @@ private fun FullPlayer(
             Spacer(Modifier.height(16.dp))
         }
         }
+        FullscreenVideo(s, vm)
     }
 
     if (showQueue) QueueSheet(s, vm, onDismiss = { showQueue = false })
