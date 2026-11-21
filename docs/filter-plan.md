@@ -28,8 +28,8 @@ YouTube Music's responses carry no language and no country for a track or an art
 - Apply in `ytm` results where shelves and queues are built (`YtmClient.home`, artist page shelves, `watchQueue` consumers in `LocalEngine` for radio and autoplay only) and in the smart downloads wanted list. Not in the parser itself.
 - Strings in English and Ukrainian.
 
-## Decisions for the user
+## Decisions
 
-1. Which languages and countries to hide first (the plan assumes Russian and Russia).
-2. Whether MusicBrainz lookups are acceptable (artist names leave the phone), or the block list and the letter rules are enough.
-3. Whether the filter should also apply to search results.
+- **MusicBrainz: yes** (the user, 2026-11-22: "Yes, use MusicBrainz"). The switch exists in Filters and is on by default once a country is hidden; with no hidden country nothing is looked up.
+- **Languages and countries:** assumed Russian and Russia as the first entries; the user has not confirmed. Both lists are editable.
+- **Search results:** not filtered, unless the user asks.
