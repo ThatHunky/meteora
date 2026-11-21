@@ -49,13 +49,13 @@ class WebMusicStreams(
     suspend fun resolve(videoId: String, quality: StreamQuality): AudioStream = resolvePicked(videoId, quality).first
 
     /** [resolve], plus the picked format for the probe's log. */
-    internal suspend fun resolvePicked(videoId: String, quality: StreamQuality): Pair<AudioStream, InnerTubeStreams.Picked> = withContext(Dispatchers.IO) {
+    internal suspend fun resolvePicked(videoId: String, quality: StreamQuality, container: String = ""): Pair<AudioStream, InnerTubeStreams.Picked> = withContext(Dispatchers.IO) {
         if (!usable) throw StreamException("web music path is off")
         val headers = auth.headers() ?: throw StreamException("not signed in")
         val t = SystemClock.elapsedRealtime()
         val (info, from) = playerInfo(headers)
         try {
-            val answer = InnerTubeStreams.pickAudio(player(videoId, info, headers), quality, allowCipher = true)
+            val answer = InnerTubeStreams.pickAudio(player(videoId, info, headers), quality, allowCipher = true, container = container)
             val status = answer.status
             if (status == "LOGIN_REQUIRED" || answer.reason?.contains("bot", ignoreCase = true) == true) {
                 usable = false

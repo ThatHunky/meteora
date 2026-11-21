@@ -26,6 +26,7 @@ okhttp = "5.5.1"
 reorderable = "3.1.0"
 graphicsShapes = "1.1.0"
 youtubedl = "0.18.1"
+work = "2.12.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom-alpha", version.ref = "composeBomAlpha" }
@@ -49,6 +50,7 @@ media3-common = { module = "androidx.media3:media3-common", version.ref = "media
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
 youtubedl-library = { module = "io.github.junkfood02.youtubedl-android:library", version.ref = "youtubedl" }
+work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }

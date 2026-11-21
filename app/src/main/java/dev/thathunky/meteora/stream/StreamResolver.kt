@@ -128,6 +128,26 @@ class StreamResolver @Inject constructor(
         }
     }
 
+    /**
+     * An AAC (`.m4a`) stream for a download: 141 at High through the signed-in web music client,
+     * else 140. Never cached and never taken from the playback cache, which is keyed by tier and
+     * may hold Opus. No yt-dlp fallback: it is far too slow for a batch and may give Opus.
+     */
+    suspend fun resolveForDownload(videoId: String, quality: StreamQuality): AudioStream {
+        if (quality == StreamQuality.High && webMusic.usable && signedIn()) {
+            try {
+                return webMusic.resolvePicked(videoId, quality, container = AAC).first
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "web music failed for download $videoId, using 140: ${e.message}")
+            }
+        }
+        return innerTube.resolve(videoId, quality, container = AAC)
+    }
+
     private suspend fun lookup(videoId: String, quality: StreamQuality): AudioStream {
         // Only High gains from the web path; Low and Normal stay on the anonymous, faster one.
         if (quality == StreamQuality.High && videoId !in avoidWebMusic && webMusic.usable && signedIn()) {
@@ -165,5 +185,6 @@ class StreamResolver @Inject constructor(
 
     private companion object {
         const val TAG = "StreamResolver"
+        const val AAC = "mp4"
     }
 }

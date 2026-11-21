@@ -56,16 +56,23 @@ fn ceiling(tier: &str) -> Option<i32> {
 /// playable). With `allow_cipher`, formats that only have a `signatureCipher` count too (the
 /// web music client); the caller then has to decipher `cipher` into a URL.
 pub fn pick_audio(player: &str, tier: &str, allow_cipher: bool) -> String {
+    pick_audio_in(player, tier, allow_cipher, "")
+}
+
+/// [pick_audio] among one container only: `mp4` takes AAC (`audio/mp4`), `webm` Opus; empty takes
+/// any. Downloads ask for `mp4`, which plays everywhere and can carry tags.
+pub fn pick_audio_in(player: &str, tier: &str, allow_cipher: bool, container: &str) -> String {
     let Some(max) = ceiling(tier) else { return err("unknown quality tier") };
     let Ok(root) = serde_json::from_str::<Json>(player) else { return err("player response is not JSON") };
     let ps = obj(&root, "playabilityStatus");
     let status = ps.and_then(|p| field(p, "status"));
     let reason = ps.and_then(|p| field(p, "reason"));
-    let format = if status.as_deref() == Some("OK") { pick(&root, max, allow_cipher) } else { None };
+    let format = if status.as_deref() == Some("OK") { pick(&root, max, allow_cipher, container) } else { None };
     ok(json!({ "status": status, "reason": reason, "format": format }))
 }
 
-fn pick(root: &Json, max: i32, allow_cipher: bool) -> Option<Json> {
+fn pick(root: &Json, max: i32, allow_cipher: bool, container: &str) -> Option<Json> {
+    let mime_prefix = if container.is_empty() { "audio/".to_string() } else { format!("audio/{container};") };
     let sd = obj(root, "streamingData")?;
     let all: Vec<&Map<String, Json>> = sd
         .get("adaptiveFormats")
@@ -74,7 +81,7 @@ fn pick(root: &Json, max: i32, allow_cipher: bool) -> Option<Json> {
         .unwrap_or_default();
     let all: Vec<&Map<String, Json>> = all
         .into_iter()
-        .filter(|f| field(f, "mimeType").is_some_and(|m| m.starts_with("audio/")))
+        .filter(|f| field(f, "mimeType").is_some_and(|m| m.starts_with(&mime_prefix)))
         .filter(|f| field(f, "url").is_some() || (allow_cipher && field(f, "signatureCipher").is_some()))
         .collect();
     // Loudness-compressed and dubbed tracks only when nothing else is there.

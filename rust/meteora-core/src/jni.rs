@@ -5,11 +5,12 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use ::jni::EnvUnowned;
 use ::jni::errors::{Result, ThrowRuntimeExAndDefault};
-use ::jni::objects::{JClass, JString};
+use ::jni::objects::{JByteArray, JClass, JString};
 use ::jni::refs::Reference;
 use ::jni::sys::{jboolean, jint};
 use ::jni::Env;
 
+use crate::mp4tags;
 use crate::solver;
 use crate::streams::{self, err};
 
@@ -43,6 +44,35 @@ native!(Java_dev_thathunky_meteora_core_MeteoraCore_pickAudio, |env, player: JSt
     let (player, tier) = (player.try_to_string(env)?, tier.try_to_string(env)?);
     guarded(|| streams::pick_audio(&player, &tier, allow_cipher))
 });
+
+native!(Java_dev_thathunky_meteora_core_MeteoraCore_pickAudioIn, |env, player: JString<'l>, tier: JString<'l>, allow_cipher: jboolean, container: JString<'l>| {
+    let (player, tier, container) = (player.try_to_string(env)?, tier.try_to_string(env)?, container.try_to_string(env)?);
+    guarded(|| streams::pick_audio_in(&player, &tier, allow_cipher, &container))
+});
+
+/// The one entry point that takes and returns bytes (a file's head and a cover image do not fit
+/// the strings-only rule). Result: see [mp4tags::tag_head_packed]; a panic becomes `[1]` + message.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_thathunky_meteora_core_MeteoraCore_mp4Tag<'l>(
+    mut unowned: EnvUnowned<'l>,
+    _class: JClass<'l>,
+    head: JByteArray<'l>,
+    tail: JByteArray<'l>,
+    tags: JString<'l>,
+    cover: JByteArray<'l>,
+) -> JByteArray<'l> {
+    unowned
+        .with_env(|env| -> Result<JByteArray<'l>> {
+            let head = env.convert_byte_array(&head)?;
+            let tail = env.convert_byte_array(&tail)?;
+            let tags = tags.try_to_string(env)?;
+            let cover = if cover.is_null() { None } else { Some(env.convert_byte_array(&cover)?) };
+            let out = catch_unwind(AssertUnwindSafe(|| mp4tags::tag_head_packed(&head, &tail, &tags, cover.as_deref())))
+                .unwrap_or_else(|_| [&[1u8][..], b"native core panicked"].concat());
+            env.byte_array_from_slice(&out)
+        })
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
 
 native!(Java_dev_thathunky_meteora_core_MeteoraCore_pickVideo, |env, player: JString<'l>, max_height: jint, codecs: JString<'l>, allow_cipher: jboolean| {
     let (player, codecs) = (player.try_to_string(env)?, codecs.try_to_string(env)?);

@@ -367,3 +367,35 @@ fn bad_cipher_fails() {
     assert_eq!(error(stream_challenges(&picked("", None))), "no URL for itag 774");
     error(stream_challenges("not json"));
 }
+
+// ---- pick_audio_in (downloads: AAC only) ----
+
+fn pick_in(player: &str, tier: &str, allow_cipher: bool, container: &str) -> Value {
+    ok(pick_audio_in(player, tier, allow_cipher, container))["format"].clone()
+}
+
+#[test]
+fn aac_only_for_downloads() {
+    let player = fixture("ytm/player-visionos.json");
+    // Opus 251 wins for playback; a download takes the AAC 140 instead.
+    assert_eq!(pick_in(&player, "High", false, "mp4")["itag"], 140);
+    assert_eq!(pick_in(&player, "Normal", false, "mp4")["itag"], 140);
+    assert_eq!(pick_in(&player, "High", false, "")["itag"], 251);
+    assert_eq!(pick_in(&player, "High", false, "webm")["itag"], 251);
+}
+
+#[test]
+fn aac_256_with_premium_ciphered_formats() {
+    let r = response(&[format(251, "opus", 127_000, ""), ciphered(140, "mp4a.40.2", 130_000), ciphered(141, "mp4a.40.2", 257_000), ciphered(774, "opus", 258_000)]);
+    assert_eq!(pick_in(&r, "High", true, "mp4")["itag"], 141);
+    assert_eq!(pick_in(&r, "Normal", true, "mp4")["itag"], 140);
+    // Without the cipher allowed nothing AAC is left.
+    assert!(pick_in(&r, "High", false, "mp4").is_null());
+}
+
+#[test]
+fn no_aac_means_nothing_picked() {
+    let r = response(&[format(251, "opus", 127_000, ""), format(250, "opus", 65_000, "")]);
+    assert!(pick_in(&r, "High", false, "mp4").is_null());
+    assert_eq!(ok(pick_audio_in(&r, "High", false, "mp4"))["status"], "OK");
+}

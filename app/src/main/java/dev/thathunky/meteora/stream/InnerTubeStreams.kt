@@ -30,13 +30,14 @@ class InnerTubeStreams(private val http: OkHttpClient) {
     private val visitorLock = Mutex()
     @Volatile private var visitorData: String? = null
 
-    suspend fun resolve(videoId: String, quality: StreamQuality = StreamQuality.High): AudioStream = withContext(Dispatchers.IO) {
+    /** [container]: `mp4` for AAC only (downloads); empty for any. */
+    suspend fun resolve(videoId: String, quality: StreamQuality = StreamQuality.High, container: String = ""): AudioStream = withContext(Dispatchers.IO) {
         val t = SystemClock.elapsedRealtime()
-        var answer = pickAudio(player(videoId, visitor()), quality)
+        var answer = pickAudio(player(videoId, visitor()), quality, container = container)
         if (answer.status == "LOGIN_REQUIRED") {
             // Visitor id may have aged out: get a fresh one once.
             visitorData = null
-            answer = pickAudio(player(videoId, visitor()), quality)
+            answer = pickAudio(player(videoId, visitor()), quality, container = container)
         }
         val picked = answer.picked ?: throw StreamException("player: ${answer.status} ${answer.reason.orEmpty()} for $videoId")
         Log.i(TAG, "resolved $videoId in ${SystemClock.elapsedRealtime() - t} ms: $quality → itag ${picked.itag}, ${picked.bitrate / 1000} kbps")
@@ -161,8 +162,11 @@ class InnerTubeStreams(private val http: OkHttpClient) {
          * rust/meteora-core). [allowCipher]: also take formats that only have a
          * `signatureCipher` (the web music client); the caller then has to decipher [Picked.cipher].
          */
-        fun pickAudio(playerJson: String, quality: StreamQuality, allowCipher: Boolean = false): PlayerAnswer {
-            val r = MeteoraCore.call { MeteoraCore.pickAudio(playerJson, quality.name, allowCipher) }
+        fun pickAudio(playerJson: String, quality: StreamQuality, allowCipher: Boolean = false, container: String = ""): PlayerAnswer {
+            val r = MeteoraCore.call {
+                if (container.isEmpty()) MeteoraCore.pickAudio(playerJson, quality.name, allowCipher)
+                else MeteoraCore.pickAudioIn(playerJson, quality.name, allowCipher, container)
+            }
             val f = r["format"] as? JsonObject
             return PlayerAnswer(
                 status = r.text("status"),

@@ -31,6 +31,29 @@ object MeteoraCore {
 
     @JvmStatic external fun ping(): String?
     @JvmStatic external fun pickAudio(playerJson: String, tier: String, allowCipher: Boolean): String?
+    /** [pickAudio] within one container: `mp4` (AAC, for downloads), `webm`, or empty for any. */
+    @JvmStatic external fun pickAudioIn(playerJson: String, tier: String, allowCipher: Boolean, container: String): String?
+    /**
+     * Bytes, not strings: tags a fragmented `.m4a` from its first bytes, last 16 bytes, tags JSON
+     * and an optional cover. `[0][resume_at u64 BE][new head]` or `[1][error text]`. Use [tagM4a].
+     */
+    @JvmStatic external fun mp4Tag(head: ByteArray, tail: ByteArray, tagsJson: String, cover: ByteArray?): ByteArray?
+
+    /** The new head and where in the original file to continue from; [StreamException] when the file cannot be tagged. */
+    fun tagM4a(head: ByteArray, tail: ByteArray, tagsJson: String, cover: ByteArray?): Pair<ByteArray, Long> {
+        if (!available) throw StreamException("native core unavailable")
+        val out = try {
+            mp4Tag(head, tail, tagsJson, cover)
+        } catch (e: RuntimeException) {
+            throw StreamException("native core: ${e.javaClass.simpleName}")
+        } ?: throw StreamException("native core returned nothing")
+        if (out.isEmpty()) throw StreamException("native core returned nothing")
+        if (out[0].toInt() != 0) throw StreamException("tags: " + String(out, 1, out.size - 1, Charsets.UTF_8))
+        if (out.size < 9) throw StreamException("tags: short result")
+        val resume = java.nio.ByteBuffer.wrap(out, 1, 8).long
+        return out.copyOfRange(9, out.size) to resume
+    }
+
     @JvmStatic external fun pickVideo(playerJson: String, maxHeight: Int, codecs: String, allowCipher: Boolean): String?
     @JvmStatic external fun parseVisitorData(body: String): String?
     @JvmStatic external fun parsePlayerPage(html: String): String?

@@ -150,6 +150,8 @@ dependencies {
     // yt-dlp + embedded Python for phone playback (GPL-3.0; see PLAN.md).
     implementation(libs.youtubedl.library)
     implementation(libs.datastore.preferences)
+    // Downloads and the nightly smart-downloads refresh (docs/downloads-plan.md).
+    implementation(libs.work.runtime)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
