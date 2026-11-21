@@ -29,6 +29,7 @@ class MeteoraApp : Application() {
         fun auth(): YtmAuthProvider
         fun resolver(): StreamResolver
         fun ytm(): dev.thathunky.meteora.ytm.YtmClient
+        fun premium(): dev.thathunky.meteora.ytm.PremiumCheck
     }
 
     override fun onCreate() {
@@ -56,5 +57,13 @@ class MeteoraApp : Application() {
             }
         }
         ContextCompat.registerReceiver(this, likes, IntentFilter("dev.thathunky.meteora.PROBE_LIKES"), ContextCompat.RECEIVER_EXPORTED)
+        // adb shell am broadcast -a dev.thathunky.meteora.PROBE_PREMIUM -p dev.thathunky.meteora ; adb logcat -s PremiumCheck
+        val premium = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val deps = EntryPointAccessors.fromApplication(this@MeteoraApp, ProbeDeps::class.java)
+                CoroutineScope(Dispatchers.IO).launch { deps.premium().probe() }
+            }
+        }
+        ContextCompat.registerReceiver(this, premium, IntentFilter("dev.thathunky.meteora.PROBE_PREMIUM"), ContextCompat.RECEIVER_EXPORTED)
     }
 }

@@ -1,0 +1,131 @@
+{
+ "actions": [
+  {
+   "openPopupAction": {
+    "popup": {
+     "multiPageMenuRenderer": {
+      "sections": [
+       {
+        "multiPageMenuSectionRenderer": {
+         "items": [
+          {
+           "compactLinkRenderer": {
+            "icon": {
+             "iconType": "SETTINGS"
+            },
+            "title": {
+             "runs": [
+              {
+               "text": "Settings"
+              }
+             ]
+            },
+            "navigationEndpoint": {
+             "applicationSettingsEndpoint": {
+              "hack": true
+             }
+            }
+           }
+          },
+          {
+           "compactLinkRenderer": {
+            "icon": {
+             "iconType": "PRIVACY_INFO"
+            },
+            "title": {
+             "runs": [
+              {
+               "text": "Terms & privacy policy"
+              }
+             ]
+            },
+            "navigationEndpoint": {
+             "urlEndpoint": {
+              "url": "https://www.youtube.com/t/terms?gl=UA&chromeless=1"
+             }
+            }
+           }
+          },
+          {
+           "compactLinkRenderer": {
+            "icon": {
+             "iconType": "HELP"
+            },
+            "title": {
+             "runs": [
+              {
+               "text": "Help"
+              }
+             ]
+            },
+            "serviceEndpoint": {
+             "signalServiceEndpoint": {
+              "signal": "CLIENT_SIGNAL",
+              "actions": [
+               {
+                "signalAction": {
+                 "signal": "HELP"
+                }
+               }
+              ]
+             }
+            }
+           }
+          },
+          {
+           "compactLinkRenderer": {
+            "icon": {
+             "iconType": "FEEDBACK"
+            },
+            "title": {
+             "runs": [
+              {
+               "text": "Send feedback"
+              }
+             ]
+            },
+            "serviceEndpoint": {
+             "signalServiceEndpoint": {
+              "signal": "CLIENT_SIGNAL",
+              "actions": [
+               {
+                "sendFeedbackAction": {
+                 "bucket": "Kevlar"
+                }
+               }
+              ]
+             }
+            }
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "style": "MULTI_PAGE_MENU_STYLE_TYPE_ACCOUNT",
+      "header": {
+       "activeAccountHeaderRenderer": {
+        "accountName": {
+         "runs": [
+          {
+           "text": "Test Person"
+          }
+         ]
+        },
+        "channelHandle": {
+         "runs": [
+          {
+           "text": "@test"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "popupType": "DROPDOWN",
+    "reusePopup": true
+   }
+  }
+ ]
+}
