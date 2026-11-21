@@ -118,7 +118,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.thathunky.meteora.R
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
@@ -206,14 +206,14 @@ private fun MiniPlayer(
             .fillMaxWidth()
             .height(look.miniSpace)
             // The top of the dock: its corners and hairline, the tabs right below.
-            .dockRow(top = true)
-            // A 2 dp progress line along the top edge; decorative, so no semantics.
-            .drawWithContent {
-                drawContent()
+            // A 2 dp progress line just under the hairline, between the rounded corners;
+            // decorative, so no semantics. live is read here only, at draw time.
+            .dockRow(top = true) { corner, line ->
                 if (!terminal && duration > 0) {
                     val w = (if (look.id == LookId.Retro) 3.dp else 2.dp).toPx()
                     val f = (live.value / duration).toFloat().coerceIn(0f, 1f)
-                    drawRect(scheme.primary, size = Size(size.width * f, w))
+                    val span = size.width - 2 * corner
+                    drawRect(scheme.primary, topLeft = Offset(corner, line), size = Size(span * f, w))
                 }
             }
             .clickable(onClick = onExpand)

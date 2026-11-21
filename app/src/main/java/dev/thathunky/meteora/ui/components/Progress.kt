@@ -114,7 +114,8 @@ private fun BlockProgress(progress: () -> Float, modifier: Modifier) {
                 // Whole cells only, as blockBar() fills them.
                 val filled = blockBar(progress(), cells).count { it == '█' }
                 drawText(empty, topLeft = Offset(0f, y))
-                clipRect(right = filled * cell.toFloat()) { drawText(full, topLeft = Offset(0f, y)) }
+                // From the laid-out row, so a fractional glyph advance cannot drift the clip.
+                clipRect(right = full.size.width.toFloat() * filled / cells.coerceAtLeast(1)) { drawText(full, topLeft = Offset(0f, y)) }
             }
         },
     )

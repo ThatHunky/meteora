@@ -61,6 +61,7 @@ import dev.thathunky.meteora.ui.components.MSurface
 import dev.thathunky.meteora.ui.components.Tone
 import dev.thathunky.meteora.ui.components.surfaceContentColor
 import dev.thathunky.meteora.ui.theme.LocalLook
+import dev.thathunky.meteora.ui.theme.SurfaceStyle
 import dev.thathunky.meteora.companion.discovery.DiscoveredPc
 
 @Composable
@@ -176,7 +177,11 @@ private fun ChooseStep(found: List<DiscoveredPc>, onPick: (DiscoveredPc) -> Unit
                     supportingContent = { Text(pc.addresses.joinToString(" · ")) },
                     leadingContent = { Icon(Icons.Outlined.Computer, null) },
                     // Transparent, so the surface's own fill or outline shows.
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent, headlineColor = LocalContentColor.current, supportingColor = LocalContentColor.current, leadingIconColor = LocalContentColor.current),
+                    colors = if (LocalLook.current.surface == SurfaceStyle.Outline) {
+                        ListItemDefaults.colors(containerColor = Color.Transparent, headlineColor = LocalContentColor.current, supportingColor = LocalContentColor.current, leadingIconColor = LocalContentColor.current)
+                    } else {
+                        ListItemDefaults.colors(containerColor = Color.Transparent)
+                    },
                 )
             }
         }

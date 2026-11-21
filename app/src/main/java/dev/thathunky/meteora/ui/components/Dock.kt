@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,13 +63,16 @@ fun dockCorner(look: Look): Dp = when (look.id) {
     LookId.Soft -> 32.dp
 }
 
-/** Background of a dock row; with [top] also the dock's top corners and its hairline. */
+/**
+ * Background of a dock row; with [top] also the dock's top corners and its hairline. [overlay]
+ * draws after the hairline (the mini player's progress line), with the corner size and line width.
+ */
 @Composable
-fun Modifier.dockRow(top: Boolean): Modifier {
+fun Modifier.dockRow(top: Boolean, overlay: DrawScope.(corner: Float, line: Float) -> Unit = { _, _ -> }): Modifier {
     val look = LocalLook.current
     val scheme = MaterialTheme.colorScheme
     val color = dockColor()
-    if (!top) return background(color)
+    if (!top) return background(color).drawWithContent { drawContent(); overlay(0f, 0f) }
     val corner = dockCorner(look)
     val shape = RoundedCornerShape(topStart = corner, topEnd = corner)
     val (lineColor, lineWidth) = when (look.surface) {
@@ -86,6 +90,7 @@ fun Modifier.dockRow(top: Boolean): Modifier {
                 drawOutline(shape.createOutline(size, layoutDirection, this), lineColor, style = Stroke(w * 2))
             }
         }
+        overlay(corner.toPx(), w)
     }
 }
 
