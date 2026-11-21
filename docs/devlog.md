@@ -397,3 +397,9 @@ The user asked for the official app's Song / Video switch. One agent built it in
 ### Checked
 
 Build, 89 Kotlin unit tests and 37 Rust tests, all passing (`pick_video`, the queue parser keeping counterparts, the picture-source rules, the chunk boundaries). **Nothing was run on a phone:** whether the picture plays, keeps in sync, survives a mode switch, full screen and rotation, and that no video loads with the screen off are all unchecked.
+### Video, checked on the OP7T (00:55)
+
+Merged into `main` after the looks work; the quality setting went onto Settings → Playback and the Song | Video switch now uses the look-aware `SegmentedChoice`.
+
+- **Seen working:** a user-upload video from Home ("Corey Taylor - Lovesong"). The switch appears; Video put a moving picture in the artwork slot within a few seconds, at the same position (1:30 → 1:43 on screen). Logcat: `itag 247, vp9 720p`, looked up in about 100 ms. The full-screen button shows on tap; full screen is landscape with seek and play/pause, and Back returns to portrait. Screen off logged "video track off" while the session stayed PLAYING; waking logged "video track on".
+- **Not checked:** an audio track that borrows its counterpart's video (the `segmentMap` names are still unverified), sync by ear, the mobile-data ceiling, seeking in a long track with the 10 MiB chunked fetching, other looks, and the picture in the letterboxed square looks small: a 16:9 slot in video mode would use the space better.
