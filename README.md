@@ -2,7 +2,7 @@
 
 A YouTube Music app for Android that I made for myself.
 
-It started as a remote for [YTMDesktop](https://github.com/ytmdesktop/ytmdesktop) on my PC. Then it learned to play music on the phone too)
+It started as a remote for [YTMDesktop](https://github.com/ytmdesktop/ytmdesktop) on my PC. Then it learned to play music on the phone too.
 
 Not affiliated with YTMDesktop, YouTube or Google. It's a personal project.
 
