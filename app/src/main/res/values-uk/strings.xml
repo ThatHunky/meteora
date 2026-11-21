@@ -123,6 +123,8 @@
     <string name="mode_song">Пісня</string>
     <string name="mode_video">Відео</string>
     <string name="action_fullscreen">На весь екран</string>
+    <string name="action_video_options">Параметри відео</string>
+    <string name="stats_for_nerds">Статистика для сисадмінів</string>
     <string name="action_rewind">Назад на 10 секунд</string>
     <string name="action_forward">Вперед на 10 секунд</string>
     <string name="action_exit_fullscreen">Вийти з повноекранного режиму</string>
@@ -131,5 +133,5 @@
     <string name="video_quality_normal">480p</string>
     <string name="video_quality_high">720p</string>
     <string name="video_quality_highest">1080p</string>
-    <string name="video_quality_note">Для перемикача «Відео» на екрані «Зараз грає». Звук зберігає свою якість. Зміна діє з наступного відео.</string>
+    <string name="video_quality_note">Для перемикача «Відео» на екрані «Зараз грає». Звук зберігає свою якість. Шестірня на відео теж її змінює.</string>
 </resources>

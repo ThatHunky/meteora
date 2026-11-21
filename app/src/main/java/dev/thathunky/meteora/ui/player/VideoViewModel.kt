@@ -8,6 +8,8 @@ import androidx.media3.common.util.UnstableApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.data.PlaybackRouter
 import dev.thathunky.meteora.data.PlaybackTarget
+import dev.thathunky.meteora.playback.NerdStats
+import dev.thathunky.meteora.stream.VideoQuality
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,6 +42,17 @@ class VideoViewModel @Inject constructor(private val router: PlaybackRouter) : V
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val fullscreen = MutableStateFlow(false)
+
+    /** The stats overlay, kept while the app runs. */
+    val stats = MutableStateFlow(false)
+
+    fun quality(): VideoQuality = router.local.videoQuality()
+
+    fun setQuality(q: VideoQuality) {
+        router.local.setVideoQuality(q)
+    }
+
+    fun nerdStats(): NerdStats? = if (router.isPhone) router.local.nerdStats() else null
 
     fun setVideoMode(on: Boolean) {
         if (!router.isPhone) return

@@ -84,8 +84,9 @@ fun VideoPanel(modifier: Modifier = Modifier, vm: VideoViewModel = hiltViewModel
     val show by vm.showVideo.collectAsStateWithLifecycle()
     if (!show) return
     var controls by remember { mutableStateOf(false) }
-    LaunchedEffect(controls) {
-        if (controls) {
+    var menu by remember { mutableStateOf(false) }
+    LaunchedEffect(controls, menu) {
+        if (controls && !menu) {
             delay(CONTROLS_MS)
             controls = false
         }
@@ -98,9 +99,13 @@ fun VideoPanel(modifier: Modifier = Modifier, vm: VideoViewModel = hiltViewModel
         contentAlignment = Alignment.Center,
     ) {
         VideoSurface(vm, fullscreen = false)
+        NerdStatsOverlay(vm, Modifier.align(Alignment.TopStart).padding(12.dp))
         AnimatedVisibility(controls, Modifier.align(Alignment.BottomEnd).padding(12.dp), enter = fadeIn(), exit = fadeOut()) {
-            FilledTonalIconButton(onClick = { vm.fullscreen.value = true }) {
-                Icon(Icons.Outlined.Fullscreen, stringResource(R.string.action_fullscreen))
+            Row {
+                VideoOptionsButton(vm, menu, { menu = it }, MaterialTheme.colorScheme.onSurface)
+                FilledTonalIconButton(onClick = { vm.fullscreen.value = true }) {
+                    Icon(Icons.Outlined.Fullscreen, stringResource(R.string.action_fullscreen))
+                }
             }
         }
     }

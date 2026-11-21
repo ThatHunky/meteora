@@ -86,6 +86,8 @@ class StreamResolver @Inject constructor(
 
     private fun videoKey(videoId: String, quality: VideoQuality) = "$videoId/v/${quality.name}"
 
+    fun cachedVideo(videoId: String, quality: VideoQuality): VideoStream? = videoCache[videoKey(videoId, quality)]
+
     fun invalidateVideo(videoId: String) {
         VideoQuality.entries.forEach { videoCache.remove(videoKey(videoId, it)) }
     }

@@ -74,6 +74,9 @@ class StreamQualityStore @Inject constructor(@ApplicationContext private val con
     }
 
     /** Video ceiling for the network in use: 720p on Wi-Fi and 360p on mobile data by default. */
+    /** Sets the ceiling for the network in use now (the picker on the picture). */
+    fun setCurrentVideo(q: VideoQuality) = if (metered()) setVideoMobile(q) else setVideoWifi(q)
+
     fun currentVideo(): VideoQuality = if (metered()) videoMobile.value else videoWifi.value
 
     private fun metered(): Boolean = context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered == true

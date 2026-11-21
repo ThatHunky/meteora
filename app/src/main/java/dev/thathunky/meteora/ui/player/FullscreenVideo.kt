@@ -101,8 +101,9 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
             player.seekTo((current.progressAt(SystemClock.elapsedRealtime()) + by).coerceIn(0.0, duration))
         }
     }
-    LaunchedEffect(controls, s.isPlaying) {
-        if (controls && s.isPlaying) {
+    var menu by remember { mutableStateOf(false) }
+    LaunchedEffect(controls, s.isPlaying, menu) {
+        if (controls && s.isPlaying && !menu) {
             delay(CONTROLS_MS)
             controls = false
         }
@@ -123,6 +124,7 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
         contentAlignment = Alignment.Center,
     ) {
         VideoSurface(vm, fullscreen = true)
+        NerdStatsOverlay(vm, Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 24.dp, top = 64.dp))
         AnimatedVisibility(controls, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))) {
                 Row(
@@ -137,6 +139,7 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
                     IconButton(onClick = player::toggleLike) {
                         Icon(if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp, stringResource(R.string.like), tint = Color.White)
                     }
+                    VideoOptionsButton(vm, menu, { menu = it }, Color.White)
                     IconButton(onClick = { vm.fullscreen.value = false }) {
                         Icon(Icons.Outlined.FullscreenExit, stringResource(R.string.action_exit_fullscreen), tint = Color.White)
                     }

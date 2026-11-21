@@ -291,6 +291,53 @@ class LocalEngine @Inject constructor(
             else super.getRetryDelayMsFor(loadErrorInfo)
     }
 
+    /** Bumped when the user picks a picture quality: video items get a new URI, so they reload. Main thread. */
+    private var videoRev = 0
+
+    fun videoQuality(): VideoQuality = resolver.quality.currentVideo()
+
+    /** The picker on the picture: applies now, to the current track too, and is kept for this kind of network. */
+    fun setVideoQuality(q: VideoQuality) = scope.launch(Dispatchers.Main) {
+        if (resolver.quality.currentVideo() == q) return@launch
+        resolver.quality.setCurrentVideo(q)
+        pinnedVideo.clear()
+        videoRev++
+        Log.i(TAG, "video quality $q")
+        _player?.let { syncVideoModes(it) }
+    }
+
+    /** For the stats overlay. Main thread. */
+    fun nerdStats(): NerdStats? {
+        val p = _player ?: return null
+        val song = p.currentMediaItem?.toLocalSong() ?: return null
+        val audio = pinned[song.videoId]?.let { resolver.cached(song.videoId, it) }
+        val pictureId = song.videoPlan?.videoId
+        val video = pictureId?.let { id -> pinnedVideo[id]?.let { resolver.cachedVideo(id, it) } }
+        val vf = p.videoFormat
+        val af = p.audioFormat
+        val counters = p.videoDecoderCounters
+        return NerdStats(
+            videoId = song.videoId,
+            pictureId = pictureId,
+            videoCodec = vf?.codecs ?: video?.codec,
+            videoItag = video?.itag,
+            width = vf?.width?.coerceAtLeast(0) ?: 0,
+            height = vf?.height?.coerceAtLeast(0) ?: 0,
+            fps = vf?.frameRate ?: 0f,
+            videoBytes = video?.contentLength,
+            audioCodec = af?.codecs ?: af?.sampleMimeType?.substringAfter("/"),
+            audioItag = audio?.cacheKey?.substringAfter("/", "")?.toIntOrNull(),
+            sampleRate = af?.sampleRate?.coerceAtLeast(0) ?: 0,
+            audioBytes = audio?.contentLength,
+            audioSource = audio?.source,
+            durationSec = song.durationSec,
+            bufferSec = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0) / 1000.0,
+            droppedFrames = counters?.droppedBufferCount ?: 0,
+            renderedFrames = counters?.renderedOutputBufferCount ?: 0,
+            ceiling = "${videoQuality().maxHeight}p",
+        )
+    }
+
     fun setVideoMode(on: Boolean) = scope.launch(Dispatchers.Main) {
         if (videoMode == on) return@launch
         videoMode = on
@@ -875,7 +922,7 @@ class LocalEngine @Inject constructor(
     /** In video mode, a song with a picture gets [Q_VIDEO] on its URI, which [MediaSources] reads. */
     private fun mediaItem(s: LocalSong): MediaItem = MediaItem.Builder()
         .setMediaId(s.videoId)
-        .setUri(if (videoMode && s.videoId !in noVideo && s.videoPlan != null) "$SCHEME://${s.videoId}?$Q_VIDEO=1" else "$SCHEME://${s.videoId}")
+        .setUri(if (videoMode && s.videoId !in noVideo && s.videoPlan != null) "$SCHEME://${s.videoId}?$Q_VIDEO=1&r=$videoRev" else "$SCHEME://${s.videoId}")
         .setCustomCacheKey(s.videoId)
         .setMediaMetadata(
             MediaMetadata.Builder()

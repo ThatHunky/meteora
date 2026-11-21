@@ -403,3 +403,12 @@ Merged into `main` after the looks work; the quality setting went onto Settings 
 
 - **Seen working:** a user-upload video from Home ("Corey Taylor - Lovesong"). The switch appears; Video put a moving picture in the artwork slot within a few seconds, at the same position (1:30 → 1:43 on screen). Logcat: `itag 247, vp9 720p`, looked up in about 100 ms. The full-screen button shows on tap; full screen is landscape with seek and play/pause, and Back returns to portrait. Screen off logged "video track off" while the session stayed PLAYING; waking logged "video track on".
 - **Not checked:** an audio track that borrows its counterpart's video (the `segmentMap` names are still unverified), sync by ear, the mobile-data ceiling, seeking in a long track with the 10 MiB chunked fetching, other looks, and the picture in the letterboxed square looks small: a 16:9 slot in video mode would use the space better.
+
+### Video controls, quality picker and stats (01:15)
+
+The user: full screen was "missing more controls", then "Quality, etc. also 'stats for nerds' would be nice."
+
+- **Full screen** gained the title and artist, like, previous / next, 10‑second jumps as buttons and as a double tap on either half.
+- **A gear on the picture** (inline and full screen): 1080p / 720p / 480p / 360p and a Stats for nerds switch. Picking a quality applies to the playing track at once and is stored as the setting for the network in use (Wi‑Fi or mobile data). Video items carry a revision number in their URI so ExoPlayer reloads them; the sound's source is untouched.
+- **Stats** are read from the player once a second: ids, decoded resolution and the limit, codec, itag, average bitrate from the file size, dropped frames, audio format and where it came from, buffer length. The labels are English only, as technical field names.
+- **Checked on the OP7T:** the full-screen layout; the gear menu inline; stats showing `1280x720, vp9, itag 247` and, after picking 360p, `640x360, itag 243` within a few seconds, with the log line "video quality Low". Not checked: each full-screen button, the double tap, the gear menu in full screen.

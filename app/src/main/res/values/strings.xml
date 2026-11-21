@@ -124,6 +124,8 @@
     <string name="mode_song">Song</string>
     <string name="mode_video">Video</string>
     <string name="action_fullscreen">Full screen</string>
+    <string name="action_video_options">Video options</string>
+    <string name="stats_for_nerds">Stats for nerds</string>
     <string name="action_rewind">Back 10 seconds</string>
     <string name="action_forward">Forward 10 seconds</string>
     <string name="action_exit_fullscreen">Exit full screen</string>
@@ -132,5 +134,5 @@
     <string name="video_quality_normal">480p</string>
     <string name="video_quality_high">720p</string>
     <string name="video_quality_highest">1080p</string>
-    <string name="video_quality_note">For the Video switch in Now Playing. The sound keeps its own quality. A change applies from the next video.</string>
+    <string name="video_quality_note">For the Video switch in Now Playing. The sound keeps its own quality. The gear on the picture changes it too.</string>
 </resources>
