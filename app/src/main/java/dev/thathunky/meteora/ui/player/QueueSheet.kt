@@ -178,12 +178,7 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
             }
             if (s.automix.isNotEmpty()) {
                 item {
-                    Text(
-                        stringResource(R.string.automix),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                    )
+                    SectionHeader(stringResource(R.string.automix), padding = PaddingValues(start = look.screenPadding + 8.dp, end = look.screenPadding + 8.dp, top = 20.dp, bottom = 8.dp))
                 }
                 itemsIndexed(s.automix, key = { i, it -> "automix:$i:${it.videoId}" }) { _, e ->
                     MRow(

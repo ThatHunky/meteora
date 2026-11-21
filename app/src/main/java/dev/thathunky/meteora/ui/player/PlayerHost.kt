@@ -468,6 +468,29 @@ private fun FullPlayer(
                 MaterialTheme.motionScheme.slowSpatialSpec(),
                 label = "artMorph",
             )
+            // The slot is square for the cover and takes the picture's shape in video mode (16:9
+            // until the player knows the size; vertical videos stay square). The ratio animates
+            // and is read in the layout block only, so the animation relayouts without recomposing.
+            val videoVm: VideoViewModel = hiltViewModel()
+            val videoOn by videoVm.showVideo.collectAsStateWithLifecycle()
+            val picture = pictureAspect(videoVm, videoOn)
+            val slotRatio = animateFloatAsState(
+                if (videoOn) (picture ?: (16f / 9f)).coerceIn(1f, 2.4f) else 1f,
+                MaterialTheme.motionScheme.defaultSpatialSpec(),
+                label = "slotRatio",
+            )
+            val slot = Modifier.layout { m, c ->
+                // As aspectRatio(): the full width, unless that is too tall for the space.
+                val r = slotRatio.value.coerceAtLeast(0.5f)
+                var w = c.maxWidth
+                var h = (w / r).roundToInt()
+                if (h > c.maxHeight) {
+                    h = c.maxHeight
+                    w = (h * r).roundToInt()
+                }
+                val p = m.measure(Constraints.fixed(w.coerceAtLeast(0), h.coerceAtLeast(0)))
+                layout(p.width, p.height) { p.place(0, 0) }
+            }
             // The art takes the space the controls leave, so it shrinks on short or landscape
             // screens instead of pushing the controls off the bottom.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -476,12 +499,13 @@ private fun FullPlayer(
                     ArtKind.Player,
                     // Terminal's mini player has no art to fly from, so the art just fades in with the player.
                     (if (look.mini == MiniStyle.StatusLine) Modifier else Modifier.sharedElement(rememberSharedContentState("art"), anim))
-                        .aspectRatio(1f),
+                        .then(slot),
                     contentDescription = track.album,
                     // Read in the layer block: pause redraws the art without recomposing the player.
-                    playing = { morphProgress.value },
+                    // Not under the picture: the scalloped morph would be stretched to its shape.
+                    playing = if (videoOn) null else ({ morphProgress.value }),
                 )
-                VideoPanel(Modifier.aspectRatio(1f))
+                VideoPanel(slot)
             }
 
             Spacer(Modifier.height(28.dp))
@@ -520,7 +544,8 @@ private fun FullPlayer(
 
             SeekBar(s, vm)
 
-            Spacer(Modifier.height(12.dp))
+            // 8, not 12: the seek bar's 48 dp touch area already leaves room under its times.
+            Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -732,10 +757,23 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
         ) {
             MProgress(progress = shown, amplitude = { amplitude })
         }
-        Row(Modifier.fillMaxWidth()) {
+        // Pulled up into the touch area's spare height, so the bar keeps its old distance to the times.
+        Row(Modifier.fillMaxWidth().offset(y = (-6).dp), verticalAlignment = Alignment.CenterVertically) {
             Text(formatTime(shownSeconds.toDouble()), style = MaterialTheme.typography.labelMedium)
-            Spacer(Modifier.weight(1f))
-            Text(formatTime(duration), style = MaterialTheme.typography.labelMedium)
+            // The loader overflows this fixed-height box instead of growing the row, so nothing below moves.
+            Box(Modifier.weight(1f).height(16.dp), contentAlignment = Alignment.Center) {
+                // Only after a moment of buffering, so a quick seek does not flash it.
+                var waiting by remember { mutableStateOf(false) }
+                LaunchedEffect(s.trackState) {
+                    waiting = false
+                    if (s.trackState == TrackState.Buffering) {
+                        kotlinx.coroutines.delay(400)
+                        waiting = true
+                    }
+                }
+                if (waiting) MLoading(Modifier.requiredSize(32.dp))
+            }
+            Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
