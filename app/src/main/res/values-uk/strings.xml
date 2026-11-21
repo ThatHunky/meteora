@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">Головна</string>
+    <string name="nav_search">Пошук</string>
+    <string name="nav_library">Бібліотека</string>
+    <string name="nav_settings">Налаштування</string>
+    <string name="placeholder_coming">З’явиться в %1$s</string>
+    <string name="not_connected">Немає з’єднання з ПК</string>
+    <string name="action_play">Відтворити</string>
+    <string name="action_pause">Пауза</string>
+    <string name="action_next">Далі</string>
+    <string name="action_previous">Назад</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Meteora: a meteor (disc + tail) over a play triangle. 108dp adaptive canvas, safe zone 66dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.35"
+        android:pathData="M30,34 L58,52 L54,58 Z" />
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.55"
+        android:pathData="M36,28 L62,47 L58,53 Z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M64,60m-16,0a16,16 0,1 1,32 0a16,16 0,1 1,-32 0" />
+    <path android:fillColor="#FF1F1B3A"
+        android:pathData="M60,52 L72,60 L60,68 Z" />
+</vector>

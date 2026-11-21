@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The YTMDesktop companion server is plain HTTP on a user-provided LAN/Tailscale address.
+  NSC cannot express IP ranges, so cleartext is allowed here and CompanionClient itself
+  refuses any host that is not private / link-local / CGNAT / .local (see PLAN.md §5).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
