@@ -86,15 +86,28 @@ Under the hood: `changeVideo` → `yt-navigate` with `{watchEndpoint:{videoId, p
 | `queueRemove` | int index | *New in 2.x.* |
 | `queueMove` | `{fromIndex, toIndex}` | *New in 2.x.* |
 
-Useful `changeVideo` recipes. **⚠ Unverified: these come from YTM web conventions. Spike S1 marks each one ✅ against the real PC.**
+`changeVideo` / `queueAdd` recipes, **verified by spike S1 on 2026‑11‑21 against YTMDesktop 2.1.0**:
 
-| Intent | data |
-|---|---|
-| Play one song + radio | `{videoId, playlistId: "RDAMVM" + videoId}` |
-| Play album / playlist from top | `{playlistId}` (albums: use the album's `OLAK5uy_…` audio playlist id) |
-| Play track N of a playlist | `{videoId, playlistId}` |
-| Liked songs | `{playlistId: "LM"}` |
-| Shuffle a playlist | `changeVideo {playlistId}`, then `shuffle` once the state shows the new queue |
+| Intent | data | Result |
+|---|---|---|
+| Play one song + radio | `{videoId, playlistId: "RDAMVM" + videoId}` | ✅ plays it; queue = 50‑item radio; `playlistId` = `RDAMVM…` |
+| Play one song only | `{videoId}` | ✅ but the queue holds **just that song** (`playlistId` null). Not what a "song tap" should do. |
+| Play album from top | `{playlistId: "OLAK5uy_…"}` | ✅ queue = album tracks + `automixItems` (50) |
+| Play track N of album/playlist | `{videoId, playlistId}` | ✅ |
+| Liked songs | `{playlistId: "LM"}` | ✅ |
+| Shuffle | `shuffle` | ✅ a **toggle** of `shuffleEnabled` (it reorders the queue in place) |
+| Play next | `queueAdd {videoId, index: selected+1}` | ✅ inserted at that index |
+| Add playlist/album to queue | `queueAdd {playlistId, index}` | ✅ all tracks spliced in at `index` |
+| Reorder / remove | `queueMove {fromIndex,toIndex}` / `queueRemove i` | ✅ |
+
+**Caveat:** `changeVideo` with the video that is **already loaded** is effectively a no‑op. The queue regenerates, but `playlistId` doesn't change and playback doesn't start. If the user taps the current song, send `playQueueIndex`/`play` instead.
+
+Other verified behavior:
+- `volumeUp` / `volumeDown` step by **10**. `mute`, `unmute`, `repeatMode` 0/1/2, `seekTo` and `toggleLike` (likeStatus 1↔2) all show up in state within about 1 s.
+- `next` / `previous` / `playQueueIndex` ✅. After them, `trackState` passes through `-1 → 2 → 1`, and `video.id` changes about 100 ms *after* `selectedItemIndex`.
+- **⚠ `null` is dangerous:** `{"videoId": null}` is **accepted (204)**. Ajv coerces it to `""`, and YTM navigates to an empty watch endpoint, which **wipes the queue and stops playback**. Never serialize nulls (`explicitNulls = false`).
+- Errors: `{}` → 400 `INVALID_CHANGE_REQUEST`. Both ids in `queueAdd` → 400 `INVALID_QUEUE_ADD_REQUEST`. Out of range → 400 `FST_ERR_VALIDATION` with a long `anyOf` message (map it by `statusCode` and treat the message as opaque).
+- Rate limit confirmed: the 3rd command within 1 s → 429 `"Rate limit exceeded, retry in 1 second"`.
 
 ### Error codes
 
@@ -112,7 +125,7 @@ Connect to `http://<host>:9863/api/v1/realtime` with Socket.IO v4, `auth: { toke
 
 | Event | Payload |
 |---|---|
-| `state-update` | State object (below), sent on every store change (frequent while playing: progress ticks) |
+| `state-update` | The **full** state object (below) on every store change. Measured: **4–7 updates/s while playing, 10–15/s during track changes**, each **~50 KB** (up to 79 KB with a 50‑item queue × 6 thumbnails). That is roughly 250–750 KB/s. |
 | `playlist-created` | playlist info |
 | `playlist-deleted` | playlist id |
 
@@ -153,7 +166,15 @@ Client library: `io.socket:socket.io-client` 2.x (Java, supports server v3/v4).
 }
 ```
 
-Capture a real `state-update` (with queue items) into `app/src/test/resources/fixtures/companion/` during M1. The exact queue-item shape is only partly confirmed.
+Queue item (verified): `{thumbnails[], title, author, duration: "3:39" (string!), selected: bool, videoId, counterparts: null | [...]}`. When `videoType` is MusicVideo, `counterparts` holds the audio/video twin.
+
+**Consequences for the client:**
+- Parse off the main thread.
+- **Conflate**: keep the latest state, and recompute the queue UI only when the list of `videoId`s or `selected` changes.
+- Ignore transient states during track changes (`qlen 0`, `sel -1`, `trackState -1`) for about 300 ms before showing them.
+- The socket must be closed when nothing needs it, which is the battery reason behind the idle disconnect.
+
+Fixtures (state changes only, deduplicated) live in `app/src/test/resources/fixtures/companion/`: `state-paused-unknown.json` and `realtime-{next,album,queueAdd-next,queueMove,volume,shuffle}.json` (each `[{dtMs, state}]`).
 
 ---
 

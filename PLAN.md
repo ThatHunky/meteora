@@ -222,7 +222,7 @@ All song rows: tap = play with radio, long‑press = action sheet.
 
 | M | Scope | Done when |
 |---|---|---|
-| **S1** spike | Pair with `curl` against the real PC (you toggle authorization and click Allow). Send every command once. Try each `changeVideo` / `queueAdd` recipe. Capture `/state` and a realtime `state-update` stream (with queue) as fixtures. | Every recipe in api-notes is marked ✅ or replaced; fixtures saved |
+| **S1** spike ✅ 2026-11-21 | Pair with `curl` against the real PC (you toggle authorization and click Allow). Send every command once. Try each `changeVideo` / `queueAdd` recipe. Capture `/state` and a realtime `state-update` stream (with queue) as fixtures. | Every recipe in api-notes is marked ✅ or replaced; fixtures saved |
 | **S2** spike | A throwaway WebView activity on the OP7T: Google sign‑in → `music.youtube.com`, read cookies, one authenticated `browse FEmusic_home` call. Record the fixtures for the parsers. | Sign‑in works, or a fallback from §10 is chosen |
 | **M0** | Project skeleton: Gradle, catalog, Hilt, theme with Expressive + dynamic/album color plumbing, nav shell with a placeholder for every screen, en/uk resources, Spotless/detekt | `./gradlew assembleDebug` installs on the OP7T and shows the themed shell |
 | **M1** | Companion: discovery, pairing, REST commands, realtime, `ConnectionManager` (LAN→Tailscale, backoff), throttler, fake server. **Capture real `state-update` fixtures.** | Pairing with the real PC works; play/pause/next/seek/volume work from a debug screen |
