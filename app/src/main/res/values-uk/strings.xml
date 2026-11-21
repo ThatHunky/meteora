@@ -10,4 +10,28 @@
     <string name="action_pause">Пауза</string>
     <string name="action_next">Далі</string>
     <string name="action_previous">Назад</string>
+    <string name="action_try_again">Спробувати ще</string>
+    <string name="action_continue">Продовжити</string>
+    <string name="action_connect">Під’єднатися</string>
+
+    <string name="pair_title">Під’єднання до ПК</string>
+    <string name="pair_subtitle">Meteora керує YouTube Music Desktop на вашому комп’ютері. Переконайтеся, що в його налаштуваннях Integrations увімкнено «Companion server».</string>
+    <string name="pair_searching">Шукаю YTMDesktop у мережі…</string>
+    <string name="pair_manual">Або введіть адресу</string>
+    <string name="pair_manual_hint">IP або ім’я хоста, напр. 192.168.1.2</string>
+    <string name="pair_probing">З’єднуюся з %1$s…</string>
+    <string name="pair_enable_auth_title">Увімкніть «Enable companion authorization»</string>
+    <string name="pair_enable_auth_body">У YTMDesktop: Settings → Integrations. Meteora продовжить автоматично.</string>
+    <string name="pair_code_title">Код під’єднання</string>
+    <string name="pair_code_body">Перевірте, що %1$s показує той самий код, і натисніть Allow.</string>
+    <string name="pair_done">Під’єднано до %1$s</string>
+    <string name="pair_fail_unreachable">Не вдалося зв’язатися з ПК. Чи запущено YTMDesktop з увімкненим companion server, і чи ви в тій самій мережі або tailnet?</string>
+    <string name="pair_fail_denied">Запит відхилено або час очікування на ПК вичерпано.</string>
+    <string name="pair_fail_too_many">На ПК відкрито забагато вікон під’єднання. Закрийте їх і спробуйте ще.</string>
+    <string name="pair_fail_other">Не вдалося під’єднатися. Спробуйте ще.</string>
+
+    <string name="settings_pc">ПК</string>
+    <string name="settings_repair">Під’єднати знову</string>
+    <string name="settings_forget">Забути цей ПК</string>
+    <string name="settings_forget_note">Також видаліть Meteora в «Authorized companions» у YTMDesktop, щоб відкликати доступ.</string>
 </resources>

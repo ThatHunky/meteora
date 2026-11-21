@@ -22,6 +22,7 @@ Reverify on every YTMDesktop update by grepping the bundle for `` `/command` `` 
 | Realtime | Socket.IO **v4** (`EIO=4`), namespace `/api/v1/realtime` |
 | Discovery | mDNS service `_ytmdesktop._tcp.local`, instance `<hostname>._ytmdesktop._tcp.local`, answers PTR/SRV/TXT(empty)/A. **A records = every non‑internal IPv4, computed once at server start** (yours: `172.19.128.1` WSL, `192.168.1.2` LAN, `100.95.146.127` Tailscale). Probe each. The server only starts if Electron `safeStorage` is available. |
 | Auth header | `Authorization: <token>` (**raw token, no `Bearer ` prefix**) |
+| **mDNS in practice** | **Doesn't work on V's PC** (2026‑11‑21): `main.log` shows `mdns: received _ytmdesktop._tcp.local query` for every phone query, but no reply reaches the phone, and a query from the PC itself gets none either. Most likely multicast egress picks the wrong adapter (WSL/Hyper‑V/Tailscale). Meteora therefore falls back to a /24 sweep of `/metadata` after 2.5 s (`LanScanner`), which finds the PC in about 2 s. |
 
 Toggles in YTMDesktop → Settings → Integrations:
 - **Companion server**: must be on.

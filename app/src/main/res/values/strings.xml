@@ -11,4 +11,28 @@
     <string name="action_pause">Pause</string>
     <string name="action_next">Next</string>
     <string name="action_previous">Previous</string>
+    <string name="action_try_again">Try again</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_connect">Connect</string>
+
+    <string name="pair_title">Connect to your PC</string>
+    <string name="pair_subtitle">Meteora controls YouTube Music Desktop on your computer. Make sure “Companion server” is on in its Integrations settings.</string>
+    <string name="pair_searching">Looking for YTMDesktop on your network…</string>
+    <string name="pair_manual">Or enter an address</string>
+    <string name="pair_manual_hint">IP or hostname, e.g. 192.168.1.2</string>
+    <string name="pair_probing">Reaching %1$s…</string>
+    <string name="pair_enable_auth_title">Turn on “Enable companion authorization”</string>
+    <string name="pair_enable_auth_body">In YTMDesktop: Settings → Integrations. Meteora will continue automatically.</string>
+    <string name="pair_code_title">Pairing code</string>
+    <string name="pair_code_body">Check that %1$s shows the same code, then click Allow.</string>
+    <string name="pair_done">Connected to %1$s</string>
+    <string name="pair_fail_unreachable">Couldn’t reach the PC. Is YTMDesktop running with the companion server on, and are you on the same network or tailnet?</string>
+    <string name="pair_fail_denied">The request was denied or timed out on the PC.</string>
+    <string name="pair_fail_too_many">Too many pairing windows are open on the PC. Close them and try again.</string>
+    <string name="pair_fail_other">Pairing failed. Try again.</string>
+
+    <string name="settings_pc">Paired PC</string>
+    <string name="settings_repair">Pair again</string>
+    <string name="settings_forget">Forget this PC</string>
+    <string name="settings_forget_note">Also remove Meteora under “Authorized companions” in YTMDesktop to revoke its access.</string>
 </resources>
