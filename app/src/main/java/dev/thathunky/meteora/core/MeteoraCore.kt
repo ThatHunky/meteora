@@ -31,6 +31,7 @@ object MeteoraCore {
 
     @JvmStatic external fun ping(): String?
     @JvmStatic external fun pickAudio(playerJson: String, tier: String, allowCipher: Boolean): String?
+    @JvmStatic external fun pickVideo(playerJson: String, maxHeight: Int, codecs: String, allowCipher: Boolean): String?
     @JvmStatic external fun parseVisitorData(body: String): String?
     @JvmStatic external fun parsePlayerPage(html: String): String?
     @JvmStatic external fun signatureTimestamp(js: String): String?

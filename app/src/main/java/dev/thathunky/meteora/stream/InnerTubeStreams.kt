@@ -52,6 +52,40 @@ class InnerTubeStreams(private val http: OkHttpClient) {
         )
     }
 
+    /**
+     * The video-only format for [videoId] up to [quality]'s height, in the first of [codecs] that
+     * has that height. Same call as for audio: visionOS video URLs need no solving either
+     * (docs/api-notes.md, "Video formats").
+     */
+    suspend fun resolveVideo(videoId: String, quality: VideoQuality, codecs: String): VideoStream = withContext(Dispatchers.IO) {
+        val t = SystemClock.elapsedRealtime()
+        var json = player(videoId, visitor())
+        var r = MeteoraCore.call { MeteoraCore.pickVideo(json, quality.maxHeight, codecs, false) }
+        if (r.text("status") == "LOGIN_REQUIRED") {
+            visitorData = null
+            json = player(videoId, visitor())
+            r = MeteoraCore.call { MeteoraCore.pickVideo(json, quality.maxHeight, codecs, false) }
+        }
+        val f = r["format"] as? JsonObject
+            ?: throw StreamException("player: no video for $videoId (${r.text("status")} ${r.text("reason").orEmpty()})")
+        val itag = f.text("itag")?.toIntOrNull() ?: 0
+        val expires = f.text("expires_in_sec")?.toLongOrNull() ?: 6 * 3600
+        val stream = VideoStream(
+            videoId = videoId,
+            url = f.text("url") ?: throw StreamException("no video URL for $videoId"),
+            headers = mapOf("User-Agent" to USER_AGENT),
+            staleAtMs = SystemClock.elapsedRealtime() + (expires * 1000 - 10 * 60_000).coerceAtLeast(60_000),
+            itag = itag,
+            height = f.text("height")?.toIntOrNull() ?: 0,
+            codec = f.text("codec").orEmpty(),
+            cacheKey = "$videoId/$itag",
+            quality = quality,
+            contentLength = f.text("content_length")?.toLongOrNull(),
+        )
+        Log.i(TAG, "video $videoId in ${SystemClock.elapsedRealtime() - t} ms: $quality → itag $itag, ${stream.codec} ${stream.height}p, ${(f.text("bitrate")?.toLongOrNull() ?: 0) / 1000} kbps")
+        stream
+    }
+
     /** Fetch the visitor id (and open the connection to youtube.com) before the first track needs it. */
     suspend fun warmUp() {
         withContext(Dispatchers.IO) { visitor() }

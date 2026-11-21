@@ -70,6 +70,43 @@ class WatchQueueTest {
         )
         assertEquals(listOf("aaaaaaaaaaa", "bbbbbbbbbbb"), q.songs.map { it.videoId })
         assertTrue(q.songs.none { it.isVideo })
+        // The counterpart is kept on the song it belongs to, not queued.
+        assertEquals("vvvvvvvvvvv", q.songs[0].videoCounterpartId)
+        assertTrue(q.songs[0].segments.isEmpty())
+        assertNull(q.songs[1].videoCounterpartId)
+    }
+
+    @Test fun counterpartKeepsItsSegmentMap() {
+        fun r(id: String, type: String) = """{"playlistPanelVideoRenderer":{"videoId":"$id","title":{"runs":[{"text":"T"}]},
+            "navigationEndpoint":{"watchEndpoint":{"watchEndpointMusicSupportedConfigs":{"watchEndpointMusicConfig":{"musicVideoType":"$type"}}}}}}"""
+        val q = YtmParser.watchQueue(
+            Json.parseToJsonElement(
+                """{"contents":[
+                  {"playlistPanelVideoWrapperRenderer":{"primaryRenderer":${r("aaaaaaaaaaa", "MUSIC_VIDEO_TYPE_ATV")},
+                    "counterpart":[{"counterpartRenderer":${r("vvvvvvvvvvv", "MUSIC_VIDEO_TYPE_OMV")},
+                      "segmentMap":{"segment":[
+                        {"primaryVideoStartTimeMilliseconds":"0","counterpartVideoStartTimeMilliseconds":"4000","durationMilliseconds":"200000"},
+                        {"primaryVideoStartTimeMilliseconds":"200000","counterpartVideoStartTimeMilliseconds":"204000","durationMilliseconds":"30000"}]}}]}}]}""",
+            ),
+        )
+        val song = q.songs.single()
+        assertEquals("vvvvvvvvvvv", song.videoCounterpartId)
+        assertEquals(listOf(VideoSegment(0, 4000, 200000), VideoSegment(200000, 204000, 30000)), song.segments)
+    }
+
+    @Test fun unreadableSegmentMapIsDropped() {
+        val q = YtmParser.watchQueue(
+            Json.parseToJsonElement(
+                """{"contents":[{"playlistPanelVideoWrapperRenderer":{
+                  "primaryRenderer":{"playlistPanelVideoRenderer":{"videoId":"aaaaaaaaaaa","title":{"runs":[{"text":"T"}]}}},
+                  "counterpart":[{"counterpartRenderer":{"playlistPanelVideoRenderer":{"videoId":"vvvvvvvvvvv","title":{"runs":[{"text":"T"}]}}},
+                    "segmentMap":{"segment":[
+                      {"primaryVideoStartTimeMilliseconds":"0","counterpartVideoStartTimeMilliseconds":"0","durationMilliseconds":"1000"},
+                      {"primaryVideoStartTimeMilliseconds":"1000","durationMilliseconds":"bad"}]}}]}}]}""",
+            ),
+        )
+        assertEquals("vvvvvvvvvvv", q.songs.single().videoCounterpartId)
+        assertTrue(q.songs.single().segments.isEmpty())
     }
 
     /** The shape seen signed in on 2026-11-21: a liked-songs toggle per item, the overlay for the current one. */

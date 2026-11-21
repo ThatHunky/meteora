@@ -23,6 +23,15 @@ enum class StreamQuality {
     }
 }
 
+/** Video picture ceiling, separate from the audio tier: the sound never changes with it. */
+enum class VideoQuality(val maxHeight: Int) {
+    Low(360), Normal(480), High(720), Highest(1080);
+
+    companion object {
+        fun fromStored(name: String?): VideoQuality? = entries.firstOrNull { it.name == name }
+    }
+}
+
 /** The user's quality choice for Wi-Fi and for mobile data. */
 @Singleton
 class StreamQualityStore @Inject constructor(@ApplicationContext private val context: Context) {
@@ -46,10 +55,28 @@ class StreamQualityStore @Inject constructor(@ApplicationContext private val con
     }
 
     /** "Mobile data" is any metered network, so a metered Wi-Fi hotspot counts too. */
-    fun current(): StreamQuality {
-        val cm = context.getSystemService(ConnectivityManager::class.java)
-        return if (cm?.isActiveNetworkMetered == true) mobile.value else wifi.value
+    fun current(): StreamQuality = if (metered()) mobile.value else wifi.value
+
+    private val _videoWifi = MutableStateFlow(VideoQuality.fromStored(prefs.getString(KEY_VIDEO_WIFI, null)) ?: VideoQuality.High)
+    val videoWifi: StateFlow<VideoQuality> = _videoWifi.asStateFlow()
+
+    private val _videoMobile = MutableStateFlow(VideoQuality.fromStored(prefs.getString(KEY_VIDEO_MOBILE, null)) ?: VideoQuality.Low)
+    val videoMobile: StateFlow<VideoQuality> = _videoMobile.asStateFlow()
+
+    fun setVideoWifi(q: VideoQuality) {
+        _videoWifi.value = q
+        prefs.edit().putString(KEY_VIDEO_WIFI, q.name).apply()
     }
+
+    fun setVideoMobile(q: VideoQuality) {
+        _videoMobile.value = q
+        prefs.edit().putString(KEY_VIDEO_MOBILE, q.name).apply()
+    }
+
+    /** Video ceiling for the network in use: 720p on Wi-Fi and 360p on mobile data by default. */
+    fun currentVideo(): VideoQuality = if (metered()) videoMobile.value else videoWifi.value
+
+    private fun metered(): Boolean = context.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered == true
 
     private fun read(key: String, default: StreamQuality): StreamQuality =
         StreamQuality.fromStored(prefs.getString(key, null)) ?: default
@@ -57,5 +84,7 @@ class StreamQualityStore @Inject constructor(@ApplicationContext private val con
     private companion object {
         const val KEY_WIFI = "quality_wifi"
         const val KEY_MOBILE = "quality_mobile"
+        const val KEY_VIDEO_WIFI = "video_quality_wifi"
+        const val KEY_VIDEO_MOBILE = "video_quality_mobile"
     }
 }

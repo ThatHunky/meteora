@@ -159,6 +159,94 @@ fn low_falls_back_to_lowest() {
     assert_eq!(p["bitrate"], 130_000);
 }
 
+// ---- pick_video ----
+
+fn video(player: &str, max_height: i32, codecs: &str, allow_cipher: bool) -> Value {
+    ok(pick_video(player, max_height, codecs, allow_cipher))["format"].clone()
+}
+
+fn vformat(itag: i32, mime: &str, height: i32, bitrate: i32, extra: &str) -> String {
+    format!(r#"{{"itag":{itag},"mimeType":"{mime}","url":"https://v/b?itag={itag}","height":{height},"averageBitrate":{bitrate}{extra}}}"#)
+}
+
+#[test]
+fn video_height_ceiling() {
+    // The visionOS fixture lists avc1, vp9 and av01 at 144p…1080p.
+    let player = fixture("ytm/player-visionos.json");
+    let p = video(&player, 720, "avc1", false);
+    assert_eq!(p["itag"], 136);
+    assert_eq!(p["height"], 720);
+    assert_eq!(p["codec"], "avc1");
+    assert_eq!(p["content_length"], 1460642);
+    assert!(p["url"].as_str().unwrap().contains("itag=136"));
+    assert_eq!(video(&player, 1080, "avc1", false)["itag"], 137);
+    assert_eq!(video(&player, 360, "avc1", false)["itag"], 134);
+    // 600 is not a height there: the next one down.
+    assert_eq!(video(&player, 600, "avc1", false)["itag"], 135);
+    // Below every height: the lowest one.
+    assert_eq!(video(&player, 100, "avc1", false)["itag"], 160);
+}
+
+#[test]
+fn video_codec_order() {
+    let player = fixture("ytm/player-visionos.json");
+    assert_eq!(video(&player, 720, "vp9,avc1", false)["itag"], 247);
+    assert_eq!(video(&player, 480, "av01,vp9,avc1", false)["itag"], 397);
+    assert_eq!(video(&player, 480, "av01,vp9,avc1", false)["codec"], "av01");
+    // A codec the phone does not list is never taken.
+    assert!(video(&player, 720, "hevc", false).is_null());
+    // Height wins over codec order: a 720p avc1 beats a 480p av01 when av01 stops lower.
+    let r = response(&[
+        vformat(397, r#"video/mp4; codecs=\"av01.0.04M.08\""#, 480, 500_000, ""),
+        vformat(136, r#"video/mp4; codecs=\"avc1.4D401F\""#, 720, 900_000, ""),
+    ]);
+    assert_eq!(video(&r, 720, "av01,avc1", false)["itag"], 136);
+}
+
+#[test]
+fn video_bitrate_breaks_ties_and_audio_is_ignored() {
+    let r = response(&[
+        format(251, "opus", 130_000, ""),
+        vformat(779, r#"video/webm; codecs=\"vp9\""#, 608, 500_000, ""),
+        vformat(780, r#"video/webm; codecs=\"vp9\""#, 608, 850_000, ""),
+    ]);
+    let p = video(&r, 720, "vp9", false);
+    assert_eq!(p["itag"], 780);
+    assert_eq!(p["bitrate"], 850_000);
+}
+
+#[test]
+fn video_hdr_and_ten_bit_are_skipped() {
+    let r = response(&[
+        vformat(337, r#"video/webm; codecs=\"vp09.02.51.10.01.09.16.09.00\""#, 720, 2_000_000, r#","qualityLabel":"720p HDR""#),
+        vformat(701, r#"video/mp4; codecs=\"av01.0.08M.10.0.110.09.16.09.0\""#, 720, 1_500_000, ""),
+        vformat(247, r#"video/webm; codecs=\"vp9\""#, 720, 700_000, r#","qualityLabel":"720p""#),
+    ]);
+    assert_eq!(video(&r, 720, "av01,vp9", false)["itag"], 247);
+}
+
+#[test]
+fn video_ciphered_only_when_allowed() {
+    let r = r#"{"playabilityStatus":{"status":"OK"},"streamingData":{"adaptiveFormats":[
+        {"itag":136,"mimeType":"video/mp4; codecs=\"avc1.4D401F\"","height":720,"averageBitrate":900000,"signatureCipher":"s=abc&sp=sig&url=https%3A%2F%2Fr%2Fv%3Fitag%3D136"},
+        {"itag":134,"mimeType":"video/mp4; codecs=\"avc1.4D401E\"","height":360,"averageBitrate":300000,"url":"https://v/b?itag=134"}]}}"#;
+    assert_eq!(video(r, 720, "avc1", false)["itag"], 134);
+    let p = video(r, 720, "avc1", true);
+    assert_eq!(p["itag"], 136);
+    assert!(p["url"].is_null());
+    assert!(p["cipher"].as_str().unwrap().starts_with("s=abc"));
+}
+
+#[test]
+fn video_not_playable() {
+    let r = ok(pick_video(r#"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"bot"}}"#, 720, "avc1", false));
+    assert_eq!(r["status"], "LOGIN_REQUIRED");
+    assert!(r["format"].is_null());
+    error(pick_video("not json", 720, "avc1", false));
+    // An audio-only response.
+    assert!(video(&response(&[format(251, "opus", 130_000, "")]), 720, "avc1", false).is_null());
+}
+
 // ---- visitor data, player page, signature timestamp ----
 
 #[test]
