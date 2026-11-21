@@ -66,7 +66,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -247,6 +249,8 @@ private fun FullPlayer(
                 )
             },
     ) {
+        // Not inside a Surface, so set the content color ourselves (otherwise text is black).
+        CompositionLocalProvider(LocalContentColor provides scheme.onSurface) {
         Column(
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -350,6 +354,7 @@ private fun FullPlayer(
             Spacer(Modifier.weight(1f))
             VolumeRow(s, vm)
             Spacer(Modifier.height(16.dp))
+        }
         }
     }
 
