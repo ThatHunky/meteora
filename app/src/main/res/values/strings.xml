@@ -138,4 +138,6 @@
     <string name="lyrics_source">Source: %s</string>
     <string name="lyrics_error">Could not load the lyrics</string>
     <string name="action_retry">Try again</string>
+    <string name="lrclib_title">Find synced lyrics on LRCLIB</string>
+    <string name="lrclib_note">Sends the track\'s title, artist, album and length to lrclib.net when YouTube has no synced lyrics.</string>
 </resources>

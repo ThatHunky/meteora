@@ -30,10 +30,13 @@ class LyricsViewModel @Inject constructor(private val repository: LyricsReposito
     val ui: StateFlow<Pair<String, LyricsUi>?> = _ui.asStateFlow()
 
     private var job: Job? = null
+    private var lastKey: String? = null
 
+    /** Asks again only for another track, after a failure, or when the LRCLIB setting changed. */
     fun load(track: Track, force: Boolean = false) {
-        val current = _ui.value
-        if (!force && current?.first == track.videoId && current.second != LyricsUi.Failed) return
+        val key = repository.answerKey(track)
+        if (!force && key == lastKey && _ui.value?.second != LyricsUi.Failed) return
+        lastKey = key
         job?.cancel()
         _ui.value = track.videoId to LyricsUi.Loading
         job = viewModelScope.launch {

@@ -37,6 +37,51 @@ class LyricsRepositoryTest {
         assertEquals(plain, repo.lyrics(track()))
     }
 
+    private val lrcTimed = Lyrics(listOf(LyricLine(0, "x")), synced = true, source = null, provider = dev.thathunky.meteora.domain.LyricsProvider.LrcLib)
+
+    @Test fun `youtube timed wins and lrclib is not asked`() = runTest {
+        var asked = 0
+        val repo = LyricsRepository({ timed }, { asked++; lrcTimed }, { true })
+        assertEquals(timed, repo.lyrics(track()))
+        assertEquals(0, asked)
+    }
+
+    @Test fun `lrclib off keeps youtube plain and is never asked`() = runTest {
+        var asked = 0
+        val repo = LyricsRepository({ plain }, { asked++; lrcTimed }, { false })
+        assertEquals(plain, repo.lyrics(track()))
+        assertEquals(0, asked)
+    }
+
+    @Test fun `lrclib timed replaces youtube plain or none`() = runTest {
+        assertEquals(lrcTimed, LyricsRepository({ plain }, { lrcTimed }, { true }).lyrics(track()))
+        assertEquals(lrcTimed, LyricsRepository({ null }, { lrcTimed }, { true }).lyrics(track()))
+    }
+
+    @Test fun `lrclib miss or failure keeps youtube`() = runTest {
+        assertEquals(plain, LyricsRepository({ plain }, { null }, { true }).lyrics(track()))
+        assertNull(LyricsRepository({ null }, { null }, { true }).lyrics(track()))
+        var fail = true
+        var asked = 0
+        val repo = LyricsRepository({ plain }, { asked++; if (fail) throw IOException("down") else lrcTimed }, { true })
+        assertEquals(plain, repo.lyrics(track()))
+        fail = false
+        assertEquals(lrcTimed, repo.lyrics(track())) // the failure was not kept
+        assertEquals(2, asked)
+    }
+
+    @Test fun `turning lrclib on asks it for a track youtube already answered`() = runTest {
+        var on = false
+        var ytCalls = 0
+        val repo = LyricsRepository({ ytCalls++; plain }, { lrcTimed }, { on })
+        val before = repo.answerKey(track())
+        assertEquals(plain, repo.lyrics(track()))
+        on = true
+        assertTrue(before != repo.answerKey(track()))
+        assertEquals(lrcTimed, repo.lyrics(track()))
+        assertEquals(1, ytCalls)
+    }
+
     @Test fun `the cache keeps the last tracks only`() = runTest {
         var calls = 0
         val repo = LyricsRepository({ calls++; plain })

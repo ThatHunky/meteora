@@ -403,3 +403,24 @@ Merged into `main` after the looks work; the quality setting went onto Settings 
 
 - **Seen working:** a user-upload video from Home ("Corey Taylor - Lovesong"). The switch appears; Video put a moving picture in the artwork slot within a few seconds, at the same position (1:30 → 1:43 on screen). Logcat: `itag 247, vp9 720p`, looked up in about 100 ms. The full-screen button shows on tap; full screen is landscape with seek and play/pause, and Back returns to portrait. Screen off logged "video track off" while the session stayed PLAYING; waking logged "video track on".
 - **Not checked:** an audio track that borrows its counterpart's video (the `segmentMap` names are still unverified), sync by ear, the mobile-data ceiling, seeking in a long track with the 10 MiB chunked fetching, other looks, and the picture in the letterboxed square looks small: a 16:9 slot in video mode would use the space better.
+
+## Lyrics, synced where available (2026-11-22)
+
+The user asked for synced lyrics. Built from `docs/lyrics-plan.md` on a branch, without a phone.
+
+### What YouTube gives (checked from the PC, anonymous)
+
+- **Timed lyrics are there signed out:** the `MPLY…` id from the lyrics tab in `next`, then `browse` as `ANDROID_MUSIC` 7.27.52, returns `timedLyricsModel` with a start and end time per line and "Source: Musixmatch". `IOS_MUSIC` gives the same; an old Android version (5.01) gets HTTP 400. The web client only ever gives plain text.
+- **Unsynced and none:** an unsynced track comes in the same model without times (`staticLayout: true`); a track with no lyrics gets a "not available" message. Instrumental gaps are their own `♪` lines.
+- Details, the test tracks and the trimmed fixtures are in `docs/api-notes.md` › Lyrics.
+
+### How it works
+
+- **Fetching:** only when the lyrics page opens or its track changes: one `next` for the lyrics id, one signed-out Android `browse`, and the web client's plain text if that call fails. The Android client never gets the account's cookies.
+- **Cache:** the answers for the last 30 tracks, "none" included, per source. Failures are not kept, so an offline open tries again.
+- **Page:** a Lyrics button next to the queue opens it over Now Playing. Timed lines follow the interpolated position (PC or phone): the current line sits in the upper third, past lines are dimmed, a tap seeks. A hand scroll pauses the follow for 4 s. Unsynced lyrics are static with a note. The source line sits at the bottom. Terminal marks the current line with `>`.
+- **LRCLIB:** Settings → Playback → "Find synced lyrics on LRCLIB", off by default. When it is on and YouTube has no timed lyrics, the title, artist, album and rounded length go to `lrclib.net/api/get` from a TLS-only client with the User-Agent `Meteora/<version>`. A result counts only if it is timed and its length is within 2 s of the track's, because LRCLIB answered a request 10 s off. Turning the switch on asks LRCLIB for tracks YouTube already answered.
+
+### Checked
+
+Build, and 119 Kotlin unit tests passing (30 new: the parser on the four fixtures, `currentLine`, LRC parsing, the LRCLIB duration rule and request, the repository order and cache). **Nothing was run on a phone:** following the music and seeking on tap on both targets, the auto-follow pause, back closing only the lyrics page, the Terminal top row with the extra text button (also in Ukrainian), Ukrainian lyrics, and the LRCLIB switch are all unchecked.
