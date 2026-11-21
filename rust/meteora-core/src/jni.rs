@@ -7,7 +7,7 @@ use ::jni::EnvUnowned;
 use ::jni::errors::{Result, ThrowRuntimeExAndDefault};
 use ::jni::objects::{JClass, JString};
 use ::jni::refs::Reference;
-use ::jni::sys::jboolean;
+use ::jni::sys::{jboolean, jint};
 use ::jni::Env;
 
 use crate::solver;
@@ -42,6 +42,11 @@ native!(Java_dev_thathunky_meteora_core_MeteoraCore_ping, |env| guarded(|| strea
 native!(Java_dev_thathunky_meteora_core_MeteoraCore_pickAudio, |env, player: JString<'l>, tier: JString<'l>, allow_cipher: jboolean| {
     let (player, tier) = (player.try_to_string(env)?, tier.try_to_string(env)?);
     guarded(|| streams::pick_audio(&player, &tier, allow_cipher))
+});
+
+native!(Java_dev_thathunky_meteora_core_MeteoraCore_pickVideo, |env, player: JString<'l>, max_height: jint, codecs: JString<'l>, allow_cipher: jboolean| {
+    let (player, codecs) = (player.try_to_string(env)?, codecs.try_to_string(env)?);
+    guarded(|| streams::pick_video(&player, max_height, &codecs, allow_cipher))
 });
 
 native!(Java_dev_thathunky_meteora_core_MeteoraCore_parseVisitorData, |env, body: JString<'l>| {

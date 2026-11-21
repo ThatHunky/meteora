@@ -75,10 +75,14 @@ object YtmParser {
 
     /** The `next` endpoint's watch queue (radio / album / playlist as the player would queue it). */
     fun watchQueue(root: JsonElement): WatchQueue {
+        val counterparts = counterparts(root)
         val songs = root.queueItems().mapNotNull { r ->
             val videoId = r.str("videoId") ?: return@mapNotNull null
             val byline = r["longBylineText"]["runs"].array()
+            val counterpart = counterparts[videoId]
             MusicItem.Song(
+                videoCounterpartId = counterpart?.first,
+                segments = counterpart?.second.orEmpty(),
                 videoId = videoId,
                 title = r["title"].runsText().ifBlank { return@mapNotNull null },
                 artists = artistRefs(byline.takeWhile { it.str("text")?.trim() != "•" }.ifEmpty { byline }),
@@ -95,6 +99,32 @@ object YtmParser {
         val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
             ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
         return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root), automix(root))
+    }
+
+    /**
+     * Primary video id → its counterpart's id and segment map, from the signed-in wrapper
+     * `playlistPanelVideoWrapperRenderer { primaryRenderer, counterpart: [{ counterpartRenderer, segmentMap }] }`.
+     * The segment field names are not verified against a recorded response (docs/api-notes.md);
+     * a map that does not parse is left empty.
+     */
+    private fun counterparts(root: JsonElement): Map<String, Pair<String, List<VideoSegment>>> {
+        val out = HashMap<String, Pair<String, List<VideoSegment>>>()
+        for (w in root.findAll("playlistPanelVideoWrapperRenderer")) {
+            val primary = w["primaryRenderer"]["playlistPanelVideoRenderer"].str("videoId") ?: continue
+            val c = (w["counterpart"] as? JsonArray)?.firstOrNull() ?: continue
+            val id = c["counterpartRenderer"]["playlistPanelVideoRenderer"].str("videoId") ?: continue
+            val raw = c["segmentMap"]["segment"].array()
+            val segments = raw.mapNotNull { s ->
+                VideoSegment(
+                    audioStartMs = s.str("primaryVideoStartTimeMilliseconds")?.toLongOrNull() ?: return@mapNotNull null,
+                    videoStartMs = s.str("counterpartVideoStartTimeMilliseconds")?.toLongOrNull() ?: return@mapNotNull null,
+                    durationMs = s.str("durationMilliseconds")?.toLongOrNull() ?: return@mapNotNull null,
+                )
+            }
+            // One unreadable segment and the map can't be trusted for the rest either.
+            out[primary] = id to segments.takeIf { it.size == raw.size }.orEmpty()
+        }
+        return out
     }
 
     /** The item after the last track of an album or playlist queue (seen signed out on 2026-11-21). */

@@ -151,7 +151,8 @@ class LocalEngine @Inject constructor(
         val media = okHttp.newBuilder().readTimeout(MEDIA_READ_TIMEOUT_S, TimeUnit.SECONDS).build()
         val cached = CacheDataSource.Factory()
             .setCache(diskCache)
-            .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(media))
+            // Ranges over 10 MiB are throttled: video files (and very long tracks) go in chunks.
+            .setUpstreamDataSourceFactory(ChunkedDataSource.Factory(OkHttpDataSource.Factory(media)))
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         // Resolve first, cache second: the cache key includes the format the resolver picked.
         val resolving = ResolvingDataSource.Factory(cached) { spec ->

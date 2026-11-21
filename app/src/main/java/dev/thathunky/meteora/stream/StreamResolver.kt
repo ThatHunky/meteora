@@ -81,6 +81,34 @@ class StreamResolver @Inject constructor(
         return lookup.await()
     }
 
+    private val videoCache = ConcurrentHashMap<String, VideoStream>()
+    private val videoInFlight = ConcurrentHashMap<String, Deferred<VideoStream>>()
+
+    private fun videoKey(videoId: String, quality: VideoQuality) = "$videoId/v/${quality.name}"
+
+    fun invalidateVideo(videoId: String) {
+        VideoQuality.entries.forEach { videoCache.remove(videoKey(videoId, it)) }
+    }
+
+    /**
+     * The picture for [videoId], cached and shared like [resolve]. InnerTube only: yt-dlp takes
+     * about 15 s, too long to wait for a picture, so a failure here means the track plays as audio.
+     */
+    suspend fun resolveVideo(videoId: String, quality: VideoQuality = this.quality.currentVideo()): VideoStream {
+        val k = videoKey(videoId, quality)
+        videoCache[k]?.takeIf { SystemClock.elapsedRealtime() < it.staleAtMs }?.let { return it }
+        val lookup = videoInFlight.computeIfAbsent(k) {
+            scope.async(start = CoroutineStart.LAZY) {
+                try {
+                    innerTube.resolveVideo(videoId, quality, VideoCodecs.preferred).also { videoCache[k] = it }
+                } finally {
+                    videoInFlight.remove(k)
+                }
+            }
+        }
+        return lookup.await()
+    }
+
     /** Start resolving [videoId] now so the URL is ready when the player asks for it. */
     fun warm(videoId: String) {
         val q = quality.current()

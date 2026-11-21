@@ -13,6 +13,10 @@ sealed interface MusicItem {
         val duration: String?,
         override val thumbnail: String?,
         val isVideo: Boolean,
+        /** Signed in, queue items only: the music video of this audio track (the Song / Video switch). */
+        val videoCounterpartId: String? = null,
+        /** How this track's time lines up with [videoCounterpartId]'s; empty when YouTube gave none. */
+        val segments: List<VideoSegment> = emptyList(),
     ) : MusicItem
 
     data class Album(
@@ -43,6 +47,9 @@ sealed interface MusicItem {
 
 data class ArtistRef(val name: String, val browseId: String?)
 data class AlbumRef(val name: String, val browseId: String?)
+
+/** One piece of a `segmentMap`: from [audioStartMs] in the song, [durationMs] long, is [videoStartMs] in its video. */
+data class VideoSegment(val audioStartMs: Long, val videoStartMs: Long, val durationMs: Long)
 
 data class Shelf(val title: String, val items: List<MusicItem>, val moreBrowseId: String? = null)
 

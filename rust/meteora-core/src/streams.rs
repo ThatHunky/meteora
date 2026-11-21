@@ -132,6 +132,86 @@ fn pick(root: &Json, max: i32, allow_cipher: bool) -> Option<Json> {
     }))
 }
 
+/// The codec family of a video `mimeType` (`video/mp4; codecs="avc1.4D401F"` → `avc1`), or
+/// `None` for anything else, including 10-bit / HDR variants (`vp09.02…`, `av01.….10`).
+fn video_codec(mime: &str) -> Option<&'static str> {
+    let codecs = mime.split_once("codecs=\"")?.1.split('"').next()?;
+    let c = codecs.split(',').next()?.trim();
+    if c.starts_with("avc1") {
+        Some("avc1")
+    } else if c == "vp9" || c.starts_with("vp09.00") {
+        Some("vp9")
+    } else if c.starts_with("av01") {
+        // av01.<profile>.<level><tier>.<bit depth>
+        (c.split('.').nth(3) == Some("08")).then_some("av01")
+    } else {
+        None
+    }
+}
+
+/// `/player` response → `status`, `reason` and the picked video-only `format` (null when no
+/// format fits). Taken: the highest height up to `max_height` (the lowest height when none is
+/// that low), then the earliest codec in `codecs` (comma-separated: `avc1`, `vp9`, `av01`), then
+/// the highest bitrate. HDR formats are left out. `allow_cipher` as in [pick_audio].
+pub fn pick_video(player: &str, max_height: i32, codecs: &str, allow_cipher: bool) -> String {
+    let Ok(root) = serde_json::from_str::<Json>(player) else { return err("player response is not JSON") };
+    let ps = obj(&root, "playabilityStatus");
+    let status = ps.and_then(|p| field(p, "status"));
+    let reason = ps.and_then(|p| field(p, "reason"));
+    let order: Vec<&str> = codecs.split(',').map(str::trim).filter(|c| !c.is_empty()).collect();
+    let format = if status.as_deref() == Some("OK") { pick_video_format(&root, max_height, &order, allow_cipher) } else { None };
+    ok(json!({ "status": status, "reason": reason, "format": format }))
+}
+
+fn pick_video_format(root: &Json, max_height: i32, order: &[&str], allow_cipher: bool) -> Option<Json> {
+    let sd = obj(root, "streamingData")?;
+    let num = |f: &Map<String, Json>, k: &str| field(f, k).and_then(|s| s.parse::<i64>().ok());
+    // (format, height, codec rank, bitrate)
+    let candidates: Vec<(&Map<String, Json>, i64, usize, i64)> = sd
+        .get("adaptiveFormats")
+        .and_then(Json::as_array)
+        .map(|a| a.iter().filter_map(Json::as_object).collect::<Vec<_>>())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|f| field(f, "url").is_some() || (allow_cipher && field(f, "signatureCipher").is_some()))
+        .filter(|f| !field(f, "qualityLabel").is_some_and(|q| q.contains("HDR")))
+        .filter_map(|f| {
+            let codec = video_codec(&field(f, "mimeType")?)?;
+            let rank = order.iter().position(|c| *c == codec)?;
+            let bitrate = num(f, "averageBitrate").or_else(|| num(f, "bitrate")).unwrap_or(0);
+            Some((f, num(f, "height")?, rank, bitrate))
+        })
+        .collect();
+    let max = max_height as i64;
+    let height = candidates
+        .iter()
+        .map(|c| c.1)
+        .filter(|&h| h <= max)
+        .max()
+        .or_else(|| candidates.iter().map(|c| c.1).min())?;
+    // Strict comparisons: the first of equal formats wins.
+    let mut best: Option<&(&Map<String, Json>, i64, usize, i64)> = None;
+    for c in candidates.iter().filter(|c| c.1 == height) {
+        if best.is_none_or(|b| c.2 < b.2 || (c.2 == b.2 && c.3 > b.3)) {
+            best = Some(c);
+        }
+    }
+    let (f, height, rank, bitrate) = *best?;
+    let url = field(f, "url");
+    let cipher = if url.is_none() { field(f, "signatureCipher") } else { None };
+    Some(json!({
+        "itag": num(f, "itag").unwrap_or(0),
+        "bitrate": bitrate,
+        "height": height,
+        "codec": order[rank],
+        "mime_type": field(f, "mimeType"),
+        "url": url,
+        "cipher": cipher,
+        "content_length": num(f, "contentLength").filter(|&n| n > 0),
+        "expires_in_sec": field(sd, "expiresInSeconds").and_then(|s| s.parse::<i64>().ok()).unwrap_or(DEFAULT_EXPIRES_SEC),
+    }))
+}
+
 /// `sw.js_data` body (`)]}'` + JSON array) → `visitor_data`, the first `Cg…` string in it.
 pub fn parse_visitor_data(body: &str) -> String {
     ok(json!({ "visitor_data": visitor_data(body) }))
