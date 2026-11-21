@@ -187,7 +187,7 @@ I have no number for the build as it was this morning: I only added the timing l
 
 ### Is the official app's quality higher?
 
-It can be, for Premium accounts, and only when set to High. Google's help page gives the official app's tiers as up to 48, 128 and 256 kbps (Low, Normal, High). Meteora's `/player` call as the signed-out visionOS client returns five audio formats, and the best is itag 251: Opus at about 127 kbps, which YouTube labels medium quality. So Meteora plays the Normal tier. The 256 kbps formats would need a signed-in request from a client that serves Premium formats; I did not attempt that.
+It can be, for Premium accounts, and only when set to High. (Meteora reached that tier later the same evening; see "256 kbps after all".) Google's help page gives the official app's tiers as up to 48, 128 and 256 kbps (Low, Normal, High). Meteora's `/player` call as the signed-out visionOS client returns five audio formats, and the best is itag 251: Opus at about 127 kbps, which YouTube labels medium quality. So Meteora plays the Normal tier. The 256 kbps formats would need a signed-in request from a client that serves Premium formats; I did not attempt that.
 
 The user installed the official app on the OP7T and signed in, so I looked at its settings (and changed nothing):
 
@@ -229,9 +229,50 @@ The user asked for the switch to be implemented by Opus from a detailed plan. Th
 - The PC target after these changes. The PC was paused throughout, and the OP7T is back on "PC".
 - Unit tests: 40 pass, including four new ones for format picking.
 
+## 256 kbps after all (22:35 → 23:15)
+
+I had written that the 256 kbps tier "would need a signed-in request from a client that serves Premium formats" and left it. The user pushed back: the web player has High, YTMDesktop plays it, so it can be done. They were right.
+
+### Finding the formats
+
+- **A probe in the app.** The session cookies never leave the phone, so the test had to run there: a debug-only broadcast that asks `/player` as several clients with the user's sign-in and logs only itags, bitrates and whether each URL is plain. As the web music client the answer included itag 141 (AAC, 257 kbps) and 774 (Opus, 258 kbps), both marked high quality, every URL behind a signature. The plain web client listed no high formats, the TV client was unplayable, and the iOS and visionOS clients reject cookies with HTTP 400.
+- **No PO token for Premium.** yt-dlp's client table on the phone marks the web music client's token as not required for Premium accounts. That left the JavaScript step: decipher the signature and transform the `n` parameter.
+- **The solver was already on the phone.** yt-dlp ships its challenge solver as two scripts. Under Node, against that day's player script, they solved both challenges: 311 ms the first time, 68 ms after.
+
+### Building it
+
+The plan is [high-quality-plan.md](high-quality-plan.md); an Opus agent implemented it. The solver runs in a hidden WebView, the one JavaScript engine the app already has. Tiers were renamed to match the official app: Low (about 50 kbps), Normal (about 130), High (about 256 with Premium and a sign-in, otherwise the same as Normal). The web path is used only for High and falls back to the anonymous path on any failure.
+
+### What broke on the phone
+
+The probe passed first time: itag 774, HTTP 206, 1 MB in 290 ms. Real playback did not. Every track fell back to 130 kbps, with two errors alternating in the log.
+
+- **yt-dlp's file is not a plain zip.** It is a zip with a `#!` line in front, and Java's `ZipFile` refuses it. The solver now finds the first zip entry and reads forward from there.
+- **The page forgot everything after each solve.** The agent's wrapper loaded the solver once and kept the preprocessed player inside the page. After the first solve `jsc` was undefined. My guess, not confirmed: the player's code runs with a real `window` in a WebView, unlike in Node, and replaces the document. I rewrote the wrapper so nothing lives in the page between calls: each call carries the solver, the input and the answer, and the preprocessed player is kept in Kotlin.
+
+After that, on the OP7T over Wi‑Fi: every track resolved to itag 774 at 238–262 kbps. A solve takes 450–980 ms, and a tap to sound on High takes 1.3–1.7 s, against 0.7–0.9 s on Normal.
+
+### What it costs
+
+`dumpsys meminfo` while playing on High: the app at 246 MB (76 MB of it Java heap), plus a WebView renderer process of 152 MB. Earlier in the evening, idle in the background and without the solver, the app was at 60 MB. Those two are not the same situation, so the difference is not all the solver's, but each solve builds a script of several megabytes and the renderer is there only for this.
+
+### Rust
+
+The user asked for the backend in Rust. I said it would not make playback faster, since the time is network wait, and that it would lower memory in two places: this solver, and the PC's state updates. They chose to do it anyway. The plan is [rust-core-plan.md](rust-core-plan.md): Rust does no networking, and the first slice moves format picking and the solver (on QuickJS) into a library built into the APK. The numbers above are the baseline it has to beat.
+
+RustyPipe, a Rust client for YouTube Music, looked like a shortcut. It is not: its last code change is from June 2025, it has no Home feed and no like button. Notes in [api-notes.md](api-notes.md).
+
+### Also
+
+- **Commits.** Nothing had been committed all evening. The user asked for a commit per step; the four steps so far had touched the same files, so they went in as one commit, and it is one per step from here.
+- **APKs by Telegram.** A script on the VPS sends a file through the user's admin bot. The first build went out at 23:15.
+- **README.** A short placeholder until the user writes the real one.
+
 ### Known gaps
 
-- **256 kbps:** not available to Meteora; see above.
+- **Solver in a WebView:** slow (about half a second a track) and heavy; the Rust core is meant to replace it.
+- **High without Premium:** a signed-in account without Premium was not tried. It may pay one failed open per track before falling back.
+- **Web path after a failure:** a video that fails once on the web path stays on the anonymous path until the app restarts, and a "confirm you're not a bot" answer turns the web path off for the session.
 - **Untested:** handing off to the PC *while the phone is playing*, which would have started music on the PC. Review found that switching back on the same track would have done nothing (`changeVideo` ignores the loaded track), so it now sends play.
 - **Release build:** not built yet.
 - **Signed-out streams:** audio URLs are fetched without your cookies, so age-restricted or private tracks may not play.
