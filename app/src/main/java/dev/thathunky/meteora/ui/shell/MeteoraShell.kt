@@ -273,6 +273,7 @@ private fun SettingsScreen(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).padding(bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        dev.thathunky.meteora.ui.settings.AppearanceSection()
         ListItem(headlineContent = { Text(stringResource(R.string.play_on)) })
         TargetSelector(target, name, onTarget, Modifier.fillMaxWidth())
         Text(stringResource(R.string.quality_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))

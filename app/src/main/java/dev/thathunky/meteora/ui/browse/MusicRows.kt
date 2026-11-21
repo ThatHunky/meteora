@@ -79,7 +79,9 @@ fun MusicRow(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, modi
                 modifier = Modifier.size(52.dp).clip(
                     when (item) {
                         is MusicItem.Artist -> CircleShape
-                        is MusicItem.Album -> MaterialShapes.Cookie9Sided.toShape()
+                        is MusicItem.Album ->
+                            if (dev.thathunky.meteora.ui.theme.LocalArtworkShape.current == dev.thathunky.meteora.ui.theme.ArtworkShape.Scalloped) MaterialShapes.Cookie9Sided.toShape()
+                            else RoundedCornerShape(10.dp)
                         else -> RoundedCornerShape(10.dp)
                     },
                 ),
