@@ -1,5 +1,6 @@
 package dev.thathunky.meteora.ui.shell
 
+import dev.thathunky.meteora.ui.settings.VideoQualitySection
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -157,6 +158,7 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        VideoQualitySection()
         ListItem(
             headlineContent = { Text(stringResource(R.string.autoplay_title)) },
             supportingContent = { Text(stringResource(R.string.autoplay_note)) },

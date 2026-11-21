@@ -61,18 +61,15 @@ fun SongVideoSwitch(modifier: Modifier = Modifier, vm: VideoViewModel = hiltView
     val show by vm.showSwitch.collectAsStateWithLifecycle()
     val video by vm.videoMode.collectAsStateWithLifecycle()
     AnimatedVisibility(show, modifier, enter = fadeIn(), exit = fadeOut()) {
-        Row(Modifier.padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-            ToggleButton(
-                checked = !video,
-                onCheckedChange = { if (it) vm.setVideoMode(false) },
-                shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-            ) { Text(stringResource(R.string.mode_song), maxLines = 1) }
-            ToggleButton(
-                checked = video,
-                onCheckedChange = { if (it) vm.setVideoMode(true) },
-                shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-            ) { Text(stringResource(R.string.mode_video), maxLines = 1) }
-        }
+        dev.thathunky.meteora.ui.components.SegmentedChoice(
+            listOf(
+                dev.thathunky.meteora.ui.components.Choice(false, stringResource(R.string.mode_song)),
+                dev.thathunky.meteora.ui.components.Choice(true, stringResource(R.string.mode_video)),
+            ),
+            video,
+            vm::setVideoMode,
+            Modifier.padding(bottom = 12.dp),
+        )
     }
 }
 
