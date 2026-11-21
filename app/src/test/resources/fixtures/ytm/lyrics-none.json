@@ -1,0 +1,33 @@
+{
+ "responseContext": {},
+ "contents": {
+  "elementRenderer": {
+   "newElement": {
+    "type": {
+     "componentType": {
+      "templateConfig": {
+       "uriTemplateConfig": {
+        "uri": "music_message.eml|1c73fd22acfe5c7b"
+       }
+      },
+      "model": {
+       "musicMessageModel": {
+        "text": "Lyrics not available at this time.",
+        "style": "MUSIC_MESSAGE_STYLE_ZERO_STATE",
+        "backgroundImageData": {
+         "primaryImage": {
+          "sources": [
+           {
+            "url": "https://yt3.googleusercontent.com/BRPkpvUn35vnskC-5D93B5YuxyE4ofBd8Q8WqPejld9FZ8X88aEH24Ct8_eB8sYOrPpC0mI86EXOm5ah=w544-h544-l90-rj"
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -412,3 +412,23 @@ The user: full screen was "missing more controls", then "Quality, etc. also 'sta
 - **A gear on the picture** (inline and full screen): 1080p / 720p / 480p / 360p and a Stats for nerds switch. Picking a quality applies to the playing track at once and is stored as the setting for the network in use (Wi‑Fi or mobile data). Video items carry a revision number in their URI so ExoPlayer reloads them; the sound's source is untouched.
 - **Stats** are read from the player once a second: ids, decoded resolution and the limit, codec, itag, average bitrate from the file size, dropped frames, audio format and where it came from, buffer length. The labels are English only, as technical field names.
 - **Checked on the OP7T:** the full-screen layout; the gear menu inline; stats showing `1280x720, vp9, itag 247` and, after picking 360p, `640x360, itag 243` within a few seconds, with the log line "video quality Low". Not checked: each full-screen button, the double tap, the gear menu in full screen.
+## Lyrics, synced where available (2026-11-22)
+
+The user asked for synced lyrics. Built from `docs/lyrics-plan.md` on a branch, without a phone.
+
+### What YouTube gives (checked from the PC, anonymous)
+
+- **Timed lyrics are there signed out:** the `MPLY…` id from the lyrics tab in `next`, then `browse` as `ANDROID_MUSIC` 7.27.52, returns `timedLyricsModel` with a start and end time per line and "Source: Musixmatch". `IOS_MUSIC` gives the same; an old Android version (5.01) gets HTTP 400. The web client only ever gives plain text.
+- **Unsynced and none:** an unsynced track comes in the same model without times (`staticLayout: true`); a track with no lyrics gets a "not available" message. Instrumental gaps are their own `♪` lines.
+- Details, the test tracks and the trimmed fixtures are in `docs/api-notes.md` › Lyrics.
+
+### How it works
+
+- **Fetching:** only when the lyrics page opens or its track changes: one `next` for the lyrics id, one signed-out Android `browse`, and the web client's plain text if that call fails. The Android client never gets the account's cookies.
+- **Cache:** the answers for the last 30 tracks, "none" included, per source. Failures are not kept, so an offline open tries again.
+- **Page:** a Lyrics button next to the queue opens it over Now Playing. Timed lines follow the interpolated position (PC or phone): the current line sits in the upper third, past lines are dimmed, a tap seeks. A hand scroll pauses the follow for 4 s. Unsynced lyrics are static with a note. The source line sits at the bottom. Terminal marks the current line with `>`.
+- **LRCLIB:** Settings → Playback → "Find synced lyrics on LRCLIB", off by default. When it is on and YouTube has no timed lyrics, the title, artist, album and rounded length go to `lrclib.net/api/get` from a TLS-only client with the User-Agent `Meteora/<version>`. A result counts only if it is timed and its length is within 2 s of the track's, because LRCLIB answered a request 10 s off. Turning the switch on asks LRCLIB for tracks YouTube already answered.
+
+### Checked
+
+Build, and 123 Kotlin unit tests passing (34 new: the parser on the four fixtures, `currentLine`, LRC parsing, the LRCLIB duration rule and request, the repository order and cache, and the lyrics browse going out without the account's headers and falling back to the web client). With `hl=uk` YouTube gives the same lyrics and translates only the source line. LRCLIB has timed lyrics for `dQw4w9WgXcQ` (unsynced on YouTube), so that track shows the switch working. **Nothing was run on a phone:** following the music and seeking on tap on both targets, the auto-follow pause, back closing only the lyrics page, the Terminal top row with the extra text button (also in Ukrainian), Ukrainian lyrics, and the LRCLIB switch are all unchecked, and so is whether a signed-in `next` still carries the lyrics tab.

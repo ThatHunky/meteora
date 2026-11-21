@@ -1,0 +1,37 @@
+{
+ "responseContext": {},
+ "contents": {
+  "elementRenderer": {
+   "newElement": {
+    "type": {
+     "componentType": {
+      "templateConfig": {
+       "uriTemplateConfig": {
+        "uri": "timed_lyrics.eml-ja|46cafd83166c0873"
+       }
+      },
+      "model": {
+       "timedLyricsModel": {
+        "lyricsData": {
+         "timedLyricsData": [
+          {
+           "lyricLine": "We're no strangers to love"
+          },
+          {
+           "lyricLine": "You know the rules and so do I"
+          },
+          {
+           "lyricLine": "A full commitment's what I'm thinking of"
+          }
+         ],
+         "sourceMessage": "Source: Musixmatch",
+         "staticLayout": true
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,6 +1,8 @@
 package dev.thathunky.meteora.ytm
 
 import dev.thathunky.meteora.domain.LikeStatus
+import dev.thathunky.meteora.domain.LyricLine
+import dev.thathunky.meteora.domain.Lyrics
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -268,6 +270,40 @@ object YtmParser {
     private fun mostFrequentPlaylistId(root: JsonElement): String? =
         root.findAll("watchEndpoint").mapNotNull { it.str("playlistId") }
             .groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+
+    /** The `MPLY…` browse id of the lyrics tab in a `next` response (it belongs to the requested track). */
+    fun lyricsId(root: JsonElement): String? =
+        root.findAll("browseEndpoint").firstNotNullOfOrNull { e -> e.str("browseId")?.takeIf { it.startsWith("MPLY") } }
+
+    /**
+     * Lyrics from a lyrics `browse` (docs/api-notes.md › Lyrics). As ANDROID_MUSIC: a
+     * `timedLyricsModel`, timed when its lines carry cue ranges. As WEB_REMIX: plain text in a
+     * `musicDescriptionShelfRenderer`. Null when the track has none.
+     */
+    fun lyrics(root: JsonElement): Lyrics? {
+        // The first model only: the share sheet in the same response repeats the lyrics.
+        root.findAll("timedLyricsModel").firstOrNull()?.get("lyricsData")?.let { data ->
+            val raw = data["timedLyricsData"].array()
+            val lines = raw.map { LyricLine(it["cueRange"].str("startTimeMilliseconds")?.toLongOrNull(), it.str("lyricLine").orEmpty()) }
+            if (lines.isNotEmpty()) {
+                val synced = data.str("staticLayout") != "true" && lines.all { it.startMs != null } &&
+                    lines.zipWithNext().all { (a, b) -> a.startMs!! <= b.startMs!! }
+                return Lyrics(
+                    lines = if (synced) lines else lines.map { it.copy(startMs = null) },
+                    synced = synced,
+                    source = data.str("sourceMessage")?.ifBlank { null },
+                )
+            }
+        }
+        val shelf = root.findAll("musicDescriptionShelfRenderer").firstOrNull() ?: return null
+        val text = shelf["description"].runsText()
+        if (text.isBlank()) return null
+        return Lyrics(
+            lines = text.trim().lines().map { LyricLine(null, it.trimEnd()) },
+            synced = false,
+            source = shelf["footer"].runsText().ifBlank { null },
+        )
+    }
 
     fun bestThumbnail(o: JsonElement): String? {
         val all = o.findArrays("thumbnails").flatMap { arr -> arr.mapNotNull { it as? JsonObject } }

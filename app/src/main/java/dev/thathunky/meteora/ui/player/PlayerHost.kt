@@ -323,6 +323,7 @@ private fun FullPlayer(
     val settle: FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.fastSpatialSpec()
     val scope = rememberCoroutineScope()
     var showQueue by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
 
     PredictiveBackHandler { events ->
         try {
@@ -426,6 +427,7 @@ private fun FullPlayer(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                LyricsButton(onClick = { showLyrics = true })
                 MIconButton(
                     Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue),
                     onClick = { showQueue = true }, text = stringResource(R.string.queue),
@@ -538,6 +540,7 @@ private fun FullPlayer(
         FullscreenVideo(s, vm)
     }
 
+    if (showLyrics) LyricsScreen(s, vm, onClose = { showLyrics = false })
     if (showQueue) QueueSheet(s, vm, onDismiss = { showQueue = false })
 }
 

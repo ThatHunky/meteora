@@ -1,0 +1,67 @@
+{
+ "responseContext": {},
+ "contents": {
+  "elementRenderer": {
+   "newElement": {
+    "type": {
+     "componentType": {
+      "templateConfig": {
+       "uriTemplateConfig": {
+        "uri": "timed_lyrics.eml-js-fe|401aeaeac15ae96f"
+       }
+      },
+      "model": {
+       "timedLyricsModel": {
+        "lyricsData": {
+         "timedLyricsData": [
+          {
+           "lyricLine": "♪",
+           "cueRange": {
+            "startTimeMilliseconds": "0",
+            "endTimeMilliseconds": "13520",
+            "metadata": {
+             "id": "0"
+            }
+           }
+          },
+          {
+           "lyricLine": "Yeah",
+           "cueRange": {
+            "startTimeMilliseconds": "13520",
+            "endTimeMilliseconds": "16240",
+            "metadata": {
+             "id": "1"
+            }
+           }
+          },
+          {
+           "lyricLine": "♪",
+           "cueRange": {
+            "startTimeMilliseconds": "16240",
+            "endTimeMilliseconds": "27330",
+            "metadata": {
+             "id": "2"
+            }
+           }
+          },
+          {
+           "lyricLine": "I've been tryna call",
+           "cueRange": {
+            "startTimeMilliseconds": "27330",
+            "endTimeMilliseconds": "30180",
+            "metadata": {
+             "id": "3"
+            }
+           }
+          }
+         ],
+         "sourceMessage": "Source: Musixmatch"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

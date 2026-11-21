@@ -135,4 +135,13 @@
     <string name="video_quality_high">720p</string>
     <string name="video_quality_highest">1080p</string>
     <string name="video_quality_note">For the Video switch in Now Playing. The sound keeps its own quality. The gear on the picture changes it too.</string>
+    <string name="action_lyrics">Lyrics</string>
+    <string name="action_close_lyrics">Close lyrics</string>
+    <string name="lyrics_none">No lyrics for this track</string>
+    <string name="lyrics_not_synced">These lyrics are not synced</string>
+    <string name="lyrics_source">Source: %s</string>
+    <string name="lyrics_error">Could not load the lyrics</string>
+    <string name="action_retry">Try again</string>
+    <string name="lrclib_title">Find synced lyrics on LRCLIB</string>
+    <string name="lrclib_note">Sends the track\'s title, artist, album and length to lrclib.net when YouTube has no synced lyrics.</string>
 </resources>

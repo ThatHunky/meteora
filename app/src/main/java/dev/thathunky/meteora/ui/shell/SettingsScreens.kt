@@ -165,6 +165,7 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
             trailingContent = { Switch(checked = autoplay, onCheckedChange = null) },
             modifier = Modifier.toggleable(value = autoplay, role = Role.Switch, onValueChange = vm::setAutoplay),
         )
+        dev.thathunky.meteora.ui.settings.LrcLibSetting()
     }
 }
 
