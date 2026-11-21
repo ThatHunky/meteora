@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import dev.thathunky.meteora.share.share
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
@@ -89,6 +93,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
     val hasPlayer by vm.hasTrack.collectAsStateWithLifecycle()
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
     val actions = actionsVm.actions
+    val context = LocalContext.current
 
     LifecycleStartEffect(Unit) {
         vm.onForeground()
@@ -183,9 +188,10 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                         val target by vm.target.collectAsStateWithLifecycle()
                         val qualityWifi by vm.qualityWifi.collectAsStateWithLifecycle()
                         val qualityMobile by vm.qualityMobile.collectAsStateWithLifecycle()
+                        val autoplay by vm.autoplay.collectAsStateWithLifecycle()
                         SettingsScreen(
                             pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm, target, vm::setTarget,
-                            qualityWifi, vm::setQualityWifi, qualityMobile, vm::setQualityMobile, contentBottom,
+                            qualityWifi, vm::setQualityWifi, qualityMobile, vm::setQualityMobile, autoplay, vm::setAutoplay, contentBottom,
                         )
                     }
                     entry<PairingRoute> {
@@ -209,6 +215,16 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 expanded = playerExpanded,
                 onExpandedChange = { playerExpanded = it },
                 miniBottomPadding = bottomBarHeight,
+                // The player covers the pages: collapse it so the opened page shows.
+                onOpenAlbum = { id ->
+                    playerExpanded = false
+                    backStack.add(AlbumRoute(id))
+                },
+                onOpenArtist = { id ->
+                    playerExpanded = false
+                    backStack.add(ArtistRoute(id))
+                },
+                onRadio = actions::radioFromCurrent,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -219,9 +235,12 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
             item = item,
             onAction = { a ->
                 when (a) {
+                    ItemAction.Play -> actions.play(item)
+                    ItemAction.Shuffle -> actions.shuffle(item)
                     ItemAction.PlayNext -> actions.playNext(item)
                     ItemAction.AddToQueue -> actions.addToQueue(item)
-                    ItemAction.Radio -> (item as? MusicItem.Song)?.let(actions::radio)
+                    ItemAction.Radio -> actions.radio(item)
+                    ItemAction.Share -> context.share(item)
                     ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { backStack.add(AlbumRoute(it)) }
                     ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { backStack.add(ArtistRoute(it)) }
                 }
@@ -245,6 +264,8 @@ private fun SettingsScreen(
     onQualityWifi: (StreamQuality) -> Unit,
     qualityMobile: StreamQuality,
     onQualityMobile: (StreamQuality) -> Unit,
+    autoplay: Boolean,
+    onAutoplay: (Boolean) -> Unit,
     bottomPadding: Dp,
 ) {
     // Scrolls, and leaves room for the mini player, so the last rows are reachable on short screens.
@@ -263,6 +284,12 @@ private fun SettingsScreen(
             stringResource(R.string.quality_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.autoplay_title)) },
+            supportingContent = { Text(stringResource(R.string.autoplay_note)) },
+            trailingContent = { androidx.compose.material3.Switch(checked = autoplay, onCheckedChange = null) },
+            modifier = Modifier.toggleable(value = autoplay, role = Role.Switch, onValueChange = onAutoplay),
         )
         ListItem(
             headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },

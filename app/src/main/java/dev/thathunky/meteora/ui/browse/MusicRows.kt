@@ -13,9 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Radio
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -23,9 +26,12 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -36,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.thathunky.meteora.R
 import dev.thathunky.meteora.ytm.MusicItem
+import kotlinx.coroutines.launch
 
 fun MusicItem.subtitleText(): String = when (this) {
     is MusicItem.Song -> listOfNotNull(artists.joinToString(", ") { it.name }.ifBlank { null }, album?.name, duration).joinToString(" · ")
@@ -109,17 +116,22 @@ fun MusicCard(item: MusicItem, onClick: () -> Unit, onLongClick: () -> Unit, mod
     }
 }
 
-sealed interface ItemAction {
-    data object PlayNext : ItemAction
-    data object AddToQueue : ItemAction
-    data object Radio : ItemAction
-    data object GoToAlbum : ItemAction
-    data object GoToArtist : ItemAction
+private fun ItemAction.label(): Pair<Int, ImageVector> = when (this) {
+    ItemAction.Play -> R.string.action_play to Icons.Filled.PlayArrow
+    ItemAction.Shuffle -> R.string.shuffle to Icons.Outlined.Shuffle
+    ItemAction.PlayNext -> R.string.action_play_next to Icons.AutoMirrored.Outlined.QueueMusic
+    ItemAction.AddToQueue -> R.string.action_add_to_queue to Icons.AutoMirrored.Outlined.PlaylistAdd
+    ItemAction.Radio -> R.string.action_radio to Icons.Outlined.Radio
+    ItemAction.GoToAlbum -> R.string.action_go_album to Icons.Outlined.Album
+    ItemAction.GoToArtist -> R.string.action_go_artist to Icons.Outlined.Person
+    ItemAction.Share -> R.string.action_share to Icons.Outlined.Share
 }
 
 @Composable
 fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         ListItem(
             headlineContent = { Text(item.title, style = MaterialTheme.typography.titleMediumEmphasized) },
             supportingContent = { Text(item.subtitleText(), maxLines = 1) },
@@ -127,22 +139,16 @@ fun ItemActionsSheet(item: MusicItem, onAction: (ItemAction) -> Unit, onDismiss:
                 AsyncImage(item.thumbnail, null, contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)))
             },
         )
-        val actions = buildList {
-            if (item !is MusicItem.Artist) {
-                add(Triple(ItemAction.PlayNext, R.string.action_play_next, Icons.AutoMirrored.Outlined.QueueMusic))
-                add(Triple(ItemAction.AddToQueue, R.string.action_add_to_queue, Icons.AutoMirrored.Outlined.PlaylistAdd))
-            }
-            if (item is MusicItem.Song) {
-                add(Triple(ItemAction.Radio, R.string.action_radio, Icons.Outlined.Radio))
-                if (item.album?.browseId != null) add(Triple(ItemAction.GoToAlbum, R.string.action_go_album, Icons.Outlined.Album))
-                if (item.artists.any { it.browseId != null }) add(Triple(ItemAction.GoToArtist, R.string.action_go_artist, Icons.Outlined.Person))
-            }
-        }
-        actions.forEach { (action, label, icon) ->
+        itemActions(item).forEach { action ->
+            val (label, icon) = action.label()
             ListItem(
                 headlineContent = { Text(stringResource(label)) },
                 leadingContent = { Icon(icon, null) },
-                modifier = Modifier.combinedClickable(onClick = { onAction(action); onDismiss() }),
+                modifier = Modifier.combinedClickable(onClick = {
+                    onAction(action)
+                    // Slide the sheet away before removing it, instead of cutting it off.
+                    scope.launch { sheet.hide() }.invokeOnCompletion { if (!sheet.isVisible) onDismiss() }
+                }),
             )
         }
         Spacer(Modifier.height(24.dp))

@@ -29,7 +29,11 @@ class ShellViewModel @Inject constructor(
     seeds: AlbumSeedExtractor,
     private val ytmAuth: dev.thathunky.meteora.ytm.YtmAuthStore,
     private val quality: dev.thathunky.meteora.stream.StreamQualityStore,
+    private val autoplayStore: dev.thathunky.meteora.playback.AutoplayStore,
 ) : ViewModel() {
+    val autoplay: StateFlow<Boolean> = autoplayStore.enabled
+    fun setAutoplay(on: Boolean) = autoplayStore.set(on)
+
     val qualityWifi: StateFlow<dev.thathunky.meteora.stream.StreamQuality> = quality.wifi
     val qualityMobile: StateFlow<dev.thathunky.meteora.stream.StreamQuality> = quality.mobile
     fun setQualityWifi(q: dev.thathunky.meteora.stream.StreamQuality) = quality.setWifi(q)

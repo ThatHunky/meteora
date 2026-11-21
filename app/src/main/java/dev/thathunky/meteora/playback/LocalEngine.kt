@@ -34,6 +34,7 @@ import dev.thathunky.meteora.domain.TrackState
 import dev.thathunky.meteora.domain.withArtSize
 import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.stream.StreamResolver
+import dev.thathunky.meteora.ytm.AutomixRef
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.WatchQueue
 import dev.thathunky.meteora.ytm.YtmClient
@@ -105,6 +106,7 @@ class LocalEngine @Inject constructor(
     private val ytm: YtmClient,
     private val okHttp: OkHttpClient,
     @AppScope private val scope: CoroutineScope,
+    private val autoplay: AutoplayStore,
 ) {
     private val _state = MutableStateFlow<PlaybackState?>(null)
     val state: StateFlow<PlaybackState?> = _state.asStateFlow()
@@ -118,6 +120,8 @@ class LocalEngine @Inject constructor(
 
     private var playlistId: String? = null
     private var radioContinuation: String? = null
+    /** What to append once an album or playlist runs out (autoplay). Used once, then its radio continues. */
+    private var automix: AutomixRef? = null
     private var extending = false
     private var unshuffled: List<String>? = null
     private val likes = HashMap<String, LikeStatus>()
@@ -289,6 +293,7 @@ class LocalEngine @Inject constructor(
         if (first != null && first.videoId == startId) {
             scope.launch(Dispatchers.Main) {
                 radioContinuation = null
+                automix = null
                 apply(Loaded(listOf(first), 0, null, false), 0, true)
                 startedAlone = first.videoId
             }
@@ -319,7 +324,39 @@ class LocalEngine @Inject constructor(
             is PlayIntent.Collection -> ytm.watchQueue(intent.startVideoId, intent.playlistId)
             PlayIntent.LikedSongs -> ytm.watchQueue(playlistId = "LM")
         }.also { playlistId = (intent as? PlayIntent.Collection)?.playlistId ?: (intent as? PlayIntent.SongRadio)?.let { "RDAMVM${it.videoId}" } ?: "LM" }
-            .let { q -> Loaded(q.songs.map { it.toLocal() }, q.startIndex, q.continuation, shuffle, q.likes) }
+            .let { q ->
+                // Shuffle without a chosen track (from a list's menu): start on a random one, as YTM does.
+                val randomStart = shuffle && intent is PlayIntent.Collection && intent.startVideoId == null && q.songs.isNotEmpty()
+                val start = if (randomStart) q.songs.indices.random() else q.startIndex
+                Loaded(q.songs.map { it.toLocal() }, start, q.continuation, shuffle, q.likes, q.automix)
+            }
+
+    /**
+     * Start radio from the track playing now. It keeps playing; the rest of the queue is replaced
+     * by its radio once YouTube answers. Ignored if another track is playing by then.
+     */
+    fun radioAroundCurrent(videoId: String) {
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            val loaded = runCatching { queueFor(PlayIntent.SongRadio(videoId), false) }.onFailure {
+                Log.w(TAG, "radio load failed", it)
+                _errors.tryEmit(it)
+            }.getOrNull() ?: return@launch
+            withContext(Dispatchers.Main) {
+                val p = _player ?: return@withContext
+                if (p.currentMediaItem?.mediaId != videoId) return@withContext
+                radioContinuation = loaded.continuation
+                automix = null
+                mergeLikes(loaded.likes)
+                unshuffled = null
+                val current = p.currentMediaItemIndex
+                if (current + 1 < p.mediaItemCount) p.removeMediaItems(current + 1, p.mediaItemCount)
+                if (current > 0) p.removeMediaItems(0, current)
+                p.addMediaItems(loaded.songs.filter { it.videoId != videoId }.map(::mediaItem))
+                publish()
+            }
+        }
+    }
 
     /** One-off stream setup, done when the phone becomes the target instead of on the first tap. */
     fun prewarm() = resolver.prewarm()
@@ -339,6 +376,7 @@ class LocalEngine @Inject constructor(
             mergeLikes(likes)
             playlistId = source
             radioContinuation = null
+            automix = null
             apply(Loaded(songs, startIndex, null, false), positionMs, playWhenReady)
         }
     }
@@ -349,6 +387,7 @@ class LocalEngine @Inject constructor(
         val continuation: String?,
         val shuffle: Boolean,
         val likes: Map<String, LikeStatus> = emptyMap(),
+        val automix: AutomixRef? = null,
     )
 
     /** Take YouTube's like statuses, except for tracks rated here since: ours is newer. Main thread. */
@@ -371,8 +410,11 @@ class LocalEngine @Inject constructor(
             resolver.warm(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId)
             withContext(Dispatchers.Main) {
                 radioContinuation = loaded.continuation
+                automix = loaded.automix
                 mergeLikes(loaded.likes)
                 if (!putQueueAround(loaded)) apply(loaded, 0, true)
+                // A single or a short EP is near its end from the start, with no track change to notice it.
+                maybeExtendRadio()
             }
         }
     }
@@ -417,18 +459,31 @@ class LocalEngine @Inject constructor(
             .onFailure { _errors.tryEmit(it) }
     }
 
-    /** Radios are endless: fetch more when we get near the end. */
+    /**
+     * Radios are endless: fetch more when we get near the end. A queue without a continuation
+     * (an album or playlist) goes on with its automix once, if autoplay is on, and then that radio's
+     * continuation. Repeat-all wins over autoplay. Main thread.
+     */
     private fun maybeExtendRadio() {
         val p = _player ?: return
-        val token = radioContinuation ?: return
         if (extending || p.mediaItemCount - p.currentMediaItemIndex > 3) return
+        val token = radioContinuation
+        val mix = automix.takeIf { token == null && autoplay.enabled.value && p.repeatMode != Player.REPEAT_MODE_ALL }
+        if (token == null && mix == null) return
         extending = true
         scope.launch {
-            val more: WatchQueue? = runCatching { ytm.watchQueueContinuation(token) }.getOrNull()
+            val more: WatchQueue? = runCatching {
+                if (token != null) ytm.watchQueueContinuation(token) else ytm.watchQueue(playlistId = mix!!.playlistId, params = mix.params)
+            }.getOrNull()
             withContext(Dispatchers.Main) {
                 extending = false
                 if (more == null) return@withContext
+                // Another queue was loaded while this was out: it is not ours to extend.
+                if (if (token != null) radioContinuation != token else automix != mix) return@withContext
                 radioContinuation = more.continuation
+                // A long playlist pages through continuations first; its automix may come on a later page.
+                automix = if (token == null) null else more.automix ?: automix
+                if (token == null) Log.i(TAG, "autoplay: ${mix?.playlistId}, ${more.songs.size} tracks")
                 mergeLikes(more.likes)
                 val have = (0 until p.mediaItemCount).map { p.getMediaItemAt(it).mediaId }.toSet()
                 val fresh = more.songs.filter { it.videoId !in have }.map { it.toLocal() }
@@ -454,10 +509,14 @@ class LocalEngine @Inject constructor(
             Command.Previous -> p.seekToPrevious()
             is Command.SeekTo -> p.seekTo((command.seconds * 1000).toLong())
             is Command.SetVolume -> p.volume = command.volume / 100f
-            is Command.SetRepeat -> p.repeatMode = when (command.mode) {
-                RepeatMode.All -> Player.REPEAT_MODE_ALL
-                RepeatMode.One -> Player.REPEAT_MODE_ONE
-                else -> Player.REPEAT_MODE_OFF
+            is Command.SetRepeat -> {
+                p.repeatMode = when (command.mode) {
+                    RepeatMode.All -> Player.REPEAT_MODE_ALL
+                    RepeatMode.One -> Player.REPEAT_MODE_ONE
+                    else -> Player.REPEAT_MODE_OFF
+                }
+                // Repeat-all off near the end of an album: autoplay may now go on.
+                maybeExtendRadio()
             }
             Command.ToggleShuffle -> shuffle(unshuffled == null)
             is Command.PlayQueueIndex -> if (command.index in 0 until p.mediaItemCount) {
@@ -544,6 +603,7 @@ class LocalEngine @Inject constructor(
         }
         playlistId = null
         radioContinuation = null
+        automix = null
         publish()
     }
 

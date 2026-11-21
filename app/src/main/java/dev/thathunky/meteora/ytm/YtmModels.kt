@@ -75,4 +75,15 @@ data class WatchQueue(
     val startIndex: Int,
     val continuation: String?,
     val likes: Map<String, dev.thathunky.meteora.domain.LikeStatus> = emptyMap(),
+    /** What YouTube plays after an album or playlist ends (its "autoplay"), if the response says. */
+    val automix: AutomixRef? = null,
 )
+
+/** A `watchPlaylistEndpoint` to fetch once a collection runs out, e.g. `RDAMPL<playlistId>`. */
+data class AutomixRef(val playlistId: String, val params: String?)
+
+/** The radio for a playlist or album id. Already a radio (`RDAMVM…`, `RDAMPL…`): itself. Verified for OLAK5uy_, PL and RDCLAK ids. */
+fun collectionRadioId(playlistId: String): String {
+    val id = playlistId.removePrefix("VL")
+    return if (id.startsWith("RDAM")) id else "RDAMPL$id"
+}

@@ -5,8 +5,10 @@ import dev.thathunky.meteora.companion.Command
 import dev.thathunky.meteora.di.AppScope
 import dev.thathunky.meteora.domain.PlayIntent
 import dev.thathunky.meteora.playback.toLocal
+import dev.thathunky.meteora.ytm.ArtistPage
 import dev.thathunky.meteora.ytm.MusicItem
 import dev.thathunky.meteora.ytm.YtmClient
+import dev.thathunky.meteora.ytm.collectionRadioId
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -33,10 +35,8 @@ class MusicActions @Inject constructor(
             is MusicItem.Song -> router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
             is MusicItem.Playlist -> router.play(PlayIntent.Collection(item.playlistId, startVideoId))
             is MusicItem.Album -> withAlbumPlaylist(item) { router.play(PlayIntent.Collection(it, startVideoId)) }
-            is MusicItem.Artist -> scope.launch {
-                runCatching { ytm.artist(item.browseId) }.getOrNull()?.let { page ->
-                    (page.shufflePlaylistId ?: page.radioPlaylistId)?.let { router.play(PlayIntent.Collection(it)) }
-                }
+            is MusicItem.Artist -> withArtistPage(item) { page ->
+                (page.shufflePlaylistId ?: page.radioPlaylistId)?.let { router.play(PlayIntent.Collection(it)) }
             }
         }
     }
@@ -47,8 +47,27 @@ class MusicActions @Inject constructor(
     fun shuffleCollection(playlistId: String, videoIds: List<String>) {
         val start = videoIds.randomOrNull() ?: return
         if (router.isPhone) return router.play(PlayIntent.Collection(playlistId, start), shuffle = true)
-        // changeVideo has no shuffle flag: start from a random track, then turn shuffle on once loaded.
-        pc.play(PlayIntent.Collection(playlistId, start))
+        shuffleOnPc(playlistId, start)
+    }
+
+    /** Shuffle for an album, playlist or artist opened from a list, with no track list in hand. */
+    fun shuffle(item: MusicItem) {
+        when (item) {
+            is MusicItem.Song -> Unit
+            is MusicItem.Playlist -> shuffleWhole(item.playlistId)
+            is MusicItem.Album -> withAlbumPlaylist(item, ::shuffleWhole)
+            // The artist's shuffle playlist is already in random order.
+            is MusicItem.Artist -> withArtistPage(item) { page -> page.shufflePlaylistId?.let { router.play(PlayIntent.Collection(it)) } }
+        }
+    }
+
+    private fun shuffleWhole(playlistId: String) {
+        if (router.isPhone) router.play(PlayIntent.Collection(playlistId), shuffle = true) else shuffleOnPc(playlistId, null)
+    }
+
+    /** changeVideo has no shuffle flag: start it, then turn shuffle on once it has loaded. */
+    private fun shuffleOnPc(playlistId: String, startVideoId: String?) {
+        pc.play(PlayIntent.Collection(playlistId, startVideoId))
         scope.launch {
             withTimeoutOrNull(8_000) {
                 pc.state.first { it?.playlistId == playlistId && it.queue.isNotEmpty() && !it.isGenerating }
@@ -59,7 +78,26 @@ class MusicActions @Inject constructor(
     fun playNext(item: MusicItem) = enqueue(item, next = true)
     fun addToQueue(item: MusicItem) = enqueue(item, next = false)
 
-    fun radio(item: MusicItem.Song) = router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
+    /** Start radio: a song's radio, a collection's (`RDAMPL…`), or the artist's own. */
+    fun radio(item: MusicItem) {
+        when (item) {
+            is MusicItem.Song -> router.play(PlayIntent.SongRadio(item.videoId), first = item.toLocal())
+            is MusicItem.Playlist -> router.play(PlayIntent.Collection(collectionRadioId(item.playlistId)))
+            is MusicItem.Album -> withAlbumPlaylist(item) { router.play(PlayIntent.Collection(collectionRadioId(it))) }
+            is MusicItem.Artist -> withArtistPage(item) { page -> page.radioPlaylistId?.let { router.play(PlayIntent.Collection(it)) } }
+        }
+    }
+
+    /** Start radio from the track that is playing now, without restarting it on the phone. */
+    fun radioFromCurrent(videoId: String) {
+        if (router.isPhone) router.local.radioAroundCurrent(videoId)
+        // Not PlayIntent.SongRadio: on the loaded video that becomes a plain Play. Playlist only, so it is not a no-op.
+        else pc.send(Command.ChangeVideo(playlistId = "RDAMVM$videoId"))
+    }
+
+    private fun withArtistPage(artist: MusicItem.Artist, block: (ArtistPage) -> Unit) {
+        scope.launch { runCatching { ytm.artist(artist.browseId) }.getOrNull()?.let(block) }
+    }
 
     private fun enqueue(item: MusicItem, next: Boolean) {
         if (router.isPhone) {

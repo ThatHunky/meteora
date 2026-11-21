@@ -57,6 +57,9 @@
     <string name="action_radio">Увімкнути радіо</string>
     <string name="action_go_album">До альбому</string>
     <string name="action_go_artist">До виконавця</string>
+    <string name="action_share">Поділитися</string>
+    <string name="action_more">Ще</string>
+    <string name="share_chooser">Поділитися через</string>
     <string name="share_label">Грати на ПК</string>
     <string name="share_unsupported">Meteora не може відтворити це посилання</string>
     <string name="share_no_pc">ПК не під’єднано. Відкрийте Meteora, щоб під’єднатися.</string>
@@ -87,4 +90,6 @@
     <string name="quality_normal">Звичайна</string>
     <string name="quality_low">Низька</string>
     <string name="quality_note">«Висока» — приблизно 256 кбіт/с, потрібні YouTube Music Premium і вхід в обліковий запис; інакше вона така сама, як «Звичайна», приблизно 130 кбіт/с. «Низька» — приблизно 50 кбіт/с. Зміна діє з наступного треку.</string>
+    <string name="autoplay_title">Автовідтворення</string>
+    <string name="autoplay_note">Коли альбом чи плейлист на цьому телефоні закінчується, грати схожу музику далі.</string>
 </resources>
