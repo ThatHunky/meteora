@@ -61,4 +61,14 @@
     <string name="share_no_pc">ПК не під’єднано. Відкрийте Meteora, щоб під’єднатися.</string>
     <string name="share_playing">Грає на %1$s</string>
     <string name="pair_code_retry">Попереднє вікно на ПК закрилося за таймаутом, тож ось новий код. Він з’являється у вікні YTMDesktop (перевірте панель завдань).</string>
+    <string name="library_liked">Вподобані пісні</string>
+    <string name="signin_title">Вхід у YouTube Music</string>
+    <string name="signin_prompt">Увійдіть, щоб бачити свою Головну, вподобані пісні й плейлисти. Пошук і відтворення працюють і без цього.</string>
+    <string name="signin_action">Увійти в YouTube Music</string>
+    <string name="signout_action">Вийти з YouTube Music</string>
+    <string name="ytm_account">Обліковий запис YouTube Music</string>
+    <string name="ytm_signed_in">Вхід виконано</string>
+    <string name="ytm_signed_out">Вхід не виконано</string>
+    <string name="pc_offline">Не вдається зв’язатися з ПК</string>
+    <string name="action_reconnect">Перепідключити</string>
 </resources>

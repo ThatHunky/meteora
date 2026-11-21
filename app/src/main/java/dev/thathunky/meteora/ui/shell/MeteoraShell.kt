@@ -54,7 +54,9 @@ import dev.thathunky.meteora.ui.browse.ItemAction
 import dev.thathunky.meteora.ui.browse.ItemActionsSheet
 import dev.thathunky.meteora.ui.browse.Opener
 import dev.thathunky.meteora.ui.browse.SearchScreen
-import dev.thathunky.meteora.ui.debug.DebugPlayerCard
+import dev.thathunky.meteora.ui.browse.HomeScreen
+import dev.thathunky.meteora.ui.browse.LibraryScreen
+import dev.thathunky.meteora.ui.signin.SignInScreen
 import dev.thathunky.meteora.ui.pairing.PairingScreen
 import dev.thathunky.meteora.ui.player.PlayerHost
 import dev.thathunky.meteora.ytm.MusicItem
@@ -139,16 +141,30 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()),
                 entryProvider = entryProvider {
                     entry<HomeRoute> {
-                        Column(Modifier.fillMaxSize().padding(16.dp)) {
-                            if (!hasPlayer) DebugPlayerCard(connection, playback, vm::send) else Placeholder("M5")
-                        }
+                        HomeScreen(opener, longPress, onSignIn = { backStack.add(SignInRoute) }, contentBottom, header = {
+                            if (connection !is ConnectionState.Connected) ConnectionBanner(connection) { vm.reconnect() }
+                        })
                     }
                     entry<SearchRoute> { SearchScreen(opener, longPress, contentBottom) }
-                    entry<LibraryRoute> { Placeholder("M5") }
+                    entry<LibraryRoute> {
+                        LibraryScreen(
+                            opener, longPress,
+                            onSignIn = { backStack.add(SignInRoute) },
+                            onPlayLiked = { shuffle, ids ->
+                                if (shuffle) actions.shuffleCollection("LM", ids)
+                                else ids.firstOrNull()?.let { actions.playCollectionTrack("LM", it) }
+                            },
+                            bottomPadding = contentBottom,
+                        )
+                    }
+                    entry<SignInRoute> { SignInScreen(onDone = { backStack.removeAt(backStack.lastIndex) }) }
                     entry<AlbumRoute> { r -> CollectionScreen(r.browseId, isAlbum = true, opener, longPress, contentBottom) }
                     entry<PlaylistRoute> { r -> CollectionScreen(r.playlistId, isAlbum = false, opener, longPress, contentBottom) }
                     entry<ArtistRoute> { r -> ArtistScreen(r.browseId, opener, longPress, contentBottom) }
-                    entry<SettingsRoute> { SettingsScreen(pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc) }
+                    entry<SettingsRoute> {
+                        val ytmSignedIn by vm.ytmSignedIn.collectAsStateWithLifecycle()
+                        SettingsScreen(pc?.name, pc?.preferredOrder(), backStack, vm::forgetPc, ytmSignedIn, vm::signOutYtm)
+                    }
                     entry<PairingRoute> {
                         PairingScreen(onDone = {
                             backStack.clear()
@@ -186,8 +202,21 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
 }
 
 @Composable
-private fun SettingsScreen(name: String?, addresses: List<String>?, backStack: NavBackStack<NavKey>, onForget: () -> Unit) {
+private fun SettingsScreen(
+    name: String?,
+    addresses: List<String>?,
+    backStack: NavBackStack<NavKey>,
+    onForget: () -> Unit,
+    ytmSignedIn: Boolean,
+    onSignOut: () -> Unit,
+) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ListItem(
+            headlineContent = { Text(stringResource(if (ytmSignedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)) },
+            overlineContent = { Text(stringResource(R.string.ytm_account)) },
+        )
+        if (ytmSignedIn) OutlinedButton(onClick = onSignOut) { Text(stringResource(R.string.signout_action)) }
+        else Button(onClick = { backStack.add(SignInRoute) }, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.signin_action)) }
         ListItem(
             headlineContent = { Text(name ?: stringResource(R.string.not_connected)) },
             supportingContent = { Text(addresses?.joinToString(" · ").orEmpty()) },
@@ -217,5 +246,26 @@ private fun Placeholder(milestone: String) {
     }
 }
 
-@Suppress("unused")
-private val unusedDp: Dp = 0.dp
+@Composable
+private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
+    androidx.compose.material3.Card(
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.padding(16.dp),
+    ) {
+        androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(
+                    when (connection) {
+                        ConnectionState.Connecting, ConnectionState.Idle -> R.string.reconnecting
+                        else -> R.string.pc_offline
+                    },
+                ),
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            if (connection is ConnectionState.Offline) {
+                androidx.compose.material3.TextButton(onClick = onRetry) { Text(stringResource(R.string.action_reconnect)) }
+            }
+        }
+    }
+}

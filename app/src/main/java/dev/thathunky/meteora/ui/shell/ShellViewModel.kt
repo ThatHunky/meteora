@@ -26,7 +26,13 @@ class ShellViewModel @Inject constructor(
     private val player: PlayerRepository,
     private val store: PairedPcStore,
     seeds: AlbumSeedExtractor,
+    private val ytmAuth: dev.thathunky.meteora.ytm.YtmAuthStore,
 ) : ViewModel() {
+    val ytmSignedIn: StateFlow<Boolean> = ytmAuth.signedIn.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun signOutYtm() {
+        viewModelScope.launch { ytmAuth.signOut() }
+    }
     val connection: StateFlow<ConnectionState> = player.connection
     val playback: StateFlow<PlaybackState?> = player.state
     val pairedPc: StateFlow<PairedPc?> = store.pc.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -45,6 +51,8 @@ class ShellViewModel @Inject constructor(
     fun onBackground() = player.release()
 
     fun send(command: Command) = player.send(command)
+
+    fun reconnect() = player.reconnect()
 
     fun forgetPc() {
         viewModelScope.launch {

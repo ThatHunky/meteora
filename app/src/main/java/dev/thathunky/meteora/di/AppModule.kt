@@ -54,7 +54,6 @@ object AppModule {
         return YtmClient(HttpClient(OkHttp.create { preconfigured = https }) { expectSuccess = false }, auth)
     }
 
-    /** Signed-out until M4b wires the cookie store in. */
     @Provides @Singleton
-    fun ytmAuth(): YtmAuthProvider = YtmAuthProvider { null }
+    fun ytmAuth(store: dev.thathunky.meteora.ytm.YtmAuthStore): YtmAuthProvider = store
 }
