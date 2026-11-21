@@ -29,13 +29,16 @@ data class NerdStats(
         if (width > 0) {
             val rate = if (fps > 0) "@" + String.format(Locale.ROOT, "%.0f", fps) else ""
             add("Resolution" to "${width}x$height$rate (limit $ceiling)")
-            add("Video" to listOfNotNull(videoCodec, videoItag?.let { "itag $it" }, kbps(videoBytes)).joinToString(", "))
+            add("Video" to listOfNotNull(videoCodec, videoItag?.let { "itag $it" }, videoKbps()).joinToString(", "))
             add("Frames" to "$droppedFrames dropped of ${droppedFrames + renderedFrames}")
         }
         add("Audio" to listOfNotNull(audioCodec, audioItag?.let { "itag $it" }, if (sampleRate > 0) "$sampleRate Hz" else null, kbps(audioBytes)).joinToString(", "))
         audioSource?.let { add("Source" to it) }
         add("Buffer" to String.format(Locale.ROOT, "%.1f s", bufferSec))
     }
+
+    /** Not for a counterpart's picture: that video's length is not the song's, so the average would be wrong. */
+    private fun videoKbps(): String? = if (pictureId == null || pictureId == videoId) kbps(videoBytes) else null
 
     /** Average bitrate from the file size: the container does not always carry one. */
     private fun kbps(bytes: Long?): String? =

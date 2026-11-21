@@ -95,7 +95,9 @@ object YtmParser {
                     ?.let { it != "MUSIC_VIDEO_TYPE_ATV" } ?: false,
             )
         }.distinctBy { it.videoId }
-        val selected = root.queueItems().indexOfFirst { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }
+        // By id, in the list without duplicates: an index into the raw items would be off by the duplicates before it.
+        val selectedId = root.queueItems().firstOrNull { (it["selected"] as? JsonPrimitive)?.contentOrNull == "true" }?.str("videoId")
+        val selected = songs.indexOfFirst { it.videoId == selectedId }
         val continuation = root.findAll("nextRadioContinuationData").firstOrNull()?.str("continuation")
             ?: root.findAll("nextContinuationData").firstOrNull()?.str("continuation")
         return WatchQueue(songs, selected.coerceAtLeast(0), continuation, queueLikes(root), automix(root))

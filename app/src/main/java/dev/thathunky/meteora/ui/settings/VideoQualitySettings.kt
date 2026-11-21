@@ -32,7 +32,7 @@ class VideoQualityViewModel @Inject constructor(private val store: StreamQuality
 /**
  * Settings → Playback, next to the audio quality: the picture's ceiling on Wi-Fi and on mobile
  * data (720p and 360p by default). Meant to sit right after `quality_note` in
- * `PlaybackSettingsScreen` (ui/shell/SettingsScreens.kt); not called from there yet.
+ * `PlaybackSettingsScreen` (ui/shell/SettingsScreens.kt).
  */
 @Composable
 fun ColumnScope.VideoQualitySection(vm: VideoQualityViewModel = hiltViewModel()) {

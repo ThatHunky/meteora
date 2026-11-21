@@ -334,7 +334,8 @@ class LocalEngine @Inject constructor(
             bufferSec = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0) / 1000.0,
             droppedFrames = counters?.droppedBufferCount ?: 0,
             renderedFrames = counters?.renderedOutputBufferCount ?: 0,
-            ceiling = "${videoQuality().maxHeight}p",
+            // The ceiling this track was opened with; it keeps it when the setting or the network changes.
+            ceiling = "${(pictureId?.let { pinnedVideo[it] } ?: videoQuality()).maxHeight}p",
         )
     }
 

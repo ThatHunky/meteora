@@ -100,7 +100,8 @@ fun VideoPanel(modifier: Modifier = Modifier, vm: VideoViewModel = hiltViewModel
     ) {
         VideoSurface(vm, fullscreen = false)
         NerdStatsOverlay(vm, Modifier.align(Alignment.TopStart).padding(12.dp))
-        AnimatedVisibility(controls, Modifier.align(Alignment.BottomEnd).padding(12.dp), enter = fadeIn(), exit = fadeOut()) {
+        // Shown while the menu is open too: the menu lives in here and would vanish with it.
+        AnimatedVisibility(controls || menu, Modifier.align(Alignment.BottomEnd).padding(12.dp), enter = fadeIn(), exit = fadeOut()) {
             Row {
                 VideoOptionsButton(vm, menu, { menu = it }, MaterialTheme.colorScheme.onSurface)
                 FilledTonalIconButton(onClick = { vm.fullscreen.value = true }) {

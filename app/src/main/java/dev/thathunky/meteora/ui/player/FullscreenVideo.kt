@@ -125,7 +125,8 @@ fun FullscreenVideo(s: PlaybackState, player: PlayerViewModel, vm: VideoViewMode
     ) {
         VideoSurface(vm, fullscreen = true)
         NerdStatsOverlay(vm, Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 24.dp, top = 64.dp))
-        AnimatedVisibility(controls, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
+        // Shown while the menu is open too: the menu lives in here and would vanish with it.
+        AnimatedVisibility(controls || menu, Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))) {
                 Row(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth().safeDrawingPadding().padding(start = 24.dp, end = 8.dp, top = 8.dp),
