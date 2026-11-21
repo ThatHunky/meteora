@@ -2,18 +2,14 @@ package dev.thathunky.meteora.stream
 
 import android.os.SystemClock
 import android.util.Log
+import dev.thathunky.meteora.core.MeteoraCore
+import dev.thathunky.meteora.core.text
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaType
@@ -27,22 +23,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * default) returns plain googlevideo URLs: no signature / n-parameter cipher and no PO token.
  * Needs a visitor id, else YouTube answers "Sign in to confirm you're not a bot".
  * Verified 2026-11-21: ~0.3 s per track, ranged reads and mid-file seeks return 206.
+ * The response is read by the Rust core ([MeteoraCore]); this class only does the HTTP.
  */
 class InnerTubeStreams(private val http: OkHttpClient) {
 
-    private val json = Json { ignoreUnknownKeys = true }
     private val visitorLock = Mutex()
     @Volatile private var visitorData: String? = null
 
     suspend fun resolve(videoId: String, quality: StreamQuality = StreamQuality.High): AudioStream = withContext(Dispatchers.IO) {
         val t = SystemClock.elapsedRealtime()
-        var root = player(videoId, visitor())
-        if (status(root) == "LOGIN_REQUIRED") {
+        var answer = pickAudio(player(videoId, visitor()), quality)
+        if (answer.status == "LOGIN_REQUIRED") {
             // Visitor id may have aged out: get a fresh one once.
             visitorData = null
-            root = player(videoId, visitor())
+            answer = pickAudio(player(videoId, visitor()), quality)
         }
-        val picked = pickAudio(root, quality) ?: throw StreamException("player: ${status(root)} ${reason(root).orEmpty()} for $videoId")
+        val picked = answer.picked ?: throw StreamException("player: ${answer.status} ${answer.reason.orEmpty()} for $videoId")
         Log.i(TAG, "resolved $videoId in ${SystemClock.elapsedRealtime() - t} ms: $quality → itag ${picked.itag}, ${picked.bitrate / 1000} kbps")
         AudioStream(
             videoId = videoId,
@@ -69,10 +65,11 @@ class InnerTubeStreams(private val http: OkHttpClient) {
     private fun fetchVisitorData(): String {
         val body = http.newCall(Request.Builder().url("https://www.youtube.com/sw.js_data").header("User-Agent", USER_AGENT).build())
             .execute().use { if (!it.isSuccessful) throw StreamException("sw.js_data HTTP ${it.code}") else it.body.string() }
-        return parseVisitorData(body) ?: throw StreamException("no visitor data")
+        return MeteoraCore.call { parseVisitorData(body) }.text("visitor_data") ?: throw StreamException("no visitor data")
     }
 
-    private fun player(videoId: String, visitor: String): JsonElement {
+    /** The `/player` response text. */
+    private fun player(videoId: String, visitor: String): String {
         val payload = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
@@ -99,15 +96,24 @@ class InnerTubeStreams(private val http: OkHttpClient) {
             .header("Origin", "https://www.youtube.com")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val text = http.newCall(req).execute().use {
+        return http.newCall(req).execute().use {
             if (!it.isSuccessful) throw StreamException("player HTTP ${it.code}")
             it.body.string()
         }
-        return json.parseToJsonElement(text)
     }
 
     /** [url] is empty when the format only has a [cipher] (`signatureCipher` query string). */
-    data class Picked(val itag: Int, val url: String, val expiresInSec: Long, val bitrate: Int, val contentLength: Long? = null, val cipher: String? = null)
+    data class Picked(val itag: Int, val url: String, val expiresInSec: Long, val bitrate: Int, val contentLength: Long? = null, val cipher: String? = null) {
+        /** The form the core takes it back in. */
+        fun toCoreJson(): String = buildJsonObject {
+            put("itag", itag)
+            put("url", url)
+            put("cipher", cipher)
+        }.toString()
+    }
+
+    /** What `/player` said: [status] and [reason] from `playabilityStatus`, and the picked format, null when nothing is playable. */
+    class PlayerAnswer(val status: String?, val reason: String?, val picked: Picked?)
 
     companion object {
         private const val TAG = "InnerTubeStreams"
@@ -116,65 +122,28 @@ class InnerTubeStreams(private val http: OkHttpClient) {
         const val CLIENT_VERSION = "1.02"
         const val USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 
-        /** Opus sounds better per bit, so it wins near-ties; a much higher-bitrate AAC still wins. */
-        private const val OPUS_WEIGHT = 1.3
-
-        fun status(root: JsonElement): String? = root.obj("playabilityStatus")?.string("status")
-        fun reason(root: JsonElement): String? = root.obj("playabilityStatus")?.string("reason")
-
-        private fun ceiling(quality: StreamQuality): Int = when (quality) {
-            StreamQuality.Low -> 56_000
-            StreamQuality.Normal -> 160_000
-            StreamQuality.High -> Int.MAX_VALUE
-        }
-
         /**
-         * [allowCipher]: also take formats that only have a `signatureCipher` (the web music
-         * client); the caller then has to decipher [Picked.cipher] into a URL.
+         * The tier's format from a `/player` response, picked by the core (rules and tests in
+         * rust/meteora-core). [allowCipher]: also take formats that only have a
+         * `signatureCipher` (the web music client); the caller then has to decipher [Picked.cipher].
          */
-        fun pickAudio(root: JsonElement, quality: StreamQuality = StreamQuality.High, allowCipher: Boolean = false): Picked? {
-            if (status(root) != "OK") return null
-            val sd = root.obj("streamingData") ?: return null
-            val all = (sd["adaptiveFormats"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-                .filter { it.string("mimeType")?.startsWith("audio/") == true }
-                .filter { it.string("url") != null || (allowCipher && it.string("signatureCipher") != null) }
-            // Loudness-compressed and dubbed tracks only when nothing else is there.
-            val formats = all.filter { it.string("isDrc") != "true" && it.obj("audioTrack")?.string("audioIsDefault") != "false" }
-                .ifEmpty { all }
-            fun bitrate(f: JsonObject) = f.string("averageBitrate")?.toIntOrNull() ?: f.string("bitrate")?.toIntOrNull() ?: 0
-            fun score(f: JsonObject) = bitrate(f) * (if (f.string("mimeType")?.contains("opus") == true) OPUS_WEIGHT else 1.0)
-            val max = ceiling(quality)
-            val best = formats.filter { bitrate(it) <= max }.maxByOrNull(::score)
-                ?: formats.minByOrNull(::bitrate)
-                ?: return null
-            val url = best.string("url")
-            return Picked(
-                itag = best.string("itag")?.toIntOrNull() ?: 0,
-                url = url.orEmpty(),
-                cipher = if (url == null) best.string("signatureCipher") else null,
-                expiresInSec = sd.string("expiresInSeconds")?.toLongOrNull() ?: 6 * 3600,
-                bitrate = bitrate(best),
-                contentLength = best.string("contentLength")?.toLongOrNull()?.takeIf { it > 0 },
+        fun pickAudio(playerJson: String, quality: StreamQuality, allowCipher: Boolean = false): PlayerAnswer {
+            val r = MeteoraCore.call { MeteoraCore.pickAudio(playerJson, quality.name, allowCipher) }
+            val f = r["format"] as? JsonObject
+            return PlayerAnswer(
+                status = r.text("status"),
+                reason = r.text("reason"),
+                picked = f?.let {
+                    Picked(
+                        itag = it.text("itag")?.toIntOrNull() ?: 0,
+                        url = it.text("url").orEmpty(),
+                        cipher = it.text("cipher"),
+                        expiresInSec = it.text("expires_in_sec")?.toLongOrNull() ?: 6 * 3600,
+                        bitrate = it.text("bitrate")?.toIntOrNull() ?: 0,
+                        contentLength = it.text("content_length")?.toLongOrNull(),
+                    )
+                },
             )
         }
-
-        /** `)]}'` + JSON array; the visitor id is the first `Cg…` string in it. */
-        fun parseVisitorData(body: String): String? {
-            val start = body.indexOf('[')
-            if (start < 0) return null
-            val root = runCatching { Json.parseToJsonElement(body.substring(start)) }.getOrNull() ?: return null
-            runCatching {
-                root.jsonArray[0].jsonArray[2].jsonArray[0].jsonArray[0].jsonArray[13].let { (it as JsonPrimitive).contentOrNull }
-            }.getOrNull()?.let { return it }
-            fun walk(e: JsonElement): String? = when (e) {
-                is JsonPrimitive -> e.contentOrNull?.takeIf { it.startsWith("Cg") && it.length in 20..64 }
-                is JsonArray -> e.firstNotNullOfOrNull(::walk)
-                is JsonObject -> e.values.firstNotNullOfOrNull(::walk)
-            }
-            return walk(root)
-        }
-
-        private fun JsonElement.obj(key: String): JsonObject? = (this as? JsonObject)?.get(key) as? JsonObject
-        private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
     }
 }

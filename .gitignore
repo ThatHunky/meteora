@@ -8,6 +8,9 @@ captures/
 .externalNativeBuild/
 .cxx/
 
+# Rust core (Cargo.lock is committed)
+rust/meteora-core/target/
+
 # IDE
 .idea/
 *.iml
@@ -21,3 +24,6 @@ Thumbs.db
 *.jks
 *.keystore
 keystore.properties
+
+# Agent worktrees
+.claude/worktrees/

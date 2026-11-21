@@ -57,6 +57,11 @@ object AppModule {
     @Provides @Singleton
     fun ytmAuth(store: dev.thathunky.meteora.ytm.YtmAuthStore): YtmAuthProvider = store
 
+    /** QuickJS in the Rust core; the WebView only if that fails, and only built then (dagger.Lazy). */
     @Provides @Singleton
-    fun jsSolver(solver: dev.thathunky.meteora.stream.WebViewJsSolver): dev.thathunky.meteora.stream.JsSolver = solver
+    fun jsSolver(
+        native: dev.thathunky.meteora.stream.NativeJsSolver,
+        webView: dagger.Lazy<dev.thathunky.meteora.stream.WebViewJsSolver>,
+    ): dev.thathunky.meteora.stream.JsSolver =
+        dev.thathunky.meteora.stream.ChoosingJsSolver(native, { dev.thathunky.meteora.core.MeteoraCore.available }, { webView.get() })
 }
