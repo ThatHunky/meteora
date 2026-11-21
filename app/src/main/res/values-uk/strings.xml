@@ -123,6 +123,8 @@
     <string name="mode_song">Пісня</string>
     <string name="mode_video">Відео</string>
     <string name="action_fullscreen">На весь екран</string>
+    <string name="action_rewind">Назад на 10 секунд</string>
+    <string name="action_forward">Вперед на 10 секунд</string>
     <string name="action_exit_fullscreen">Вийти з повноекранного режиму</string>
     <string name="video_quality">Якість відео</string>
     <string name="video_quality_low">360p</string>

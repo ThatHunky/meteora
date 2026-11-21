@@ -124,6 +124,8 @@
     <string name="mode_song">Song</string>
     <string name="mode_video">Video</string>
     <string name="action_fullscreen">Full screen</string>
+    <string name="action_rewind">Back 10 seconds</string>
+    <string name="action_forward">Forward 10 seconds</string>
     <string name="action_exit_fullscreen">Exit full screen</string>
     <string name="video_quality">Video quality</string>
     <string name="video_quality_low">360p</string>
