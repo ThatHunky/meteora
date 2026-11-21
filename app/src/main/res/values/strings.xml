@@ -35,4 +35,13 @@
     <string name="settings_repair">Pair again</string>
     <string name="settings_forget">Forget this PC</string>
     <string name="settings_forget_note">Also remove Meteora under “Authorized companions” in YTMDesktop to revoke its access.</string>
+    <string name="playing_on">Playing on %1$s</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="queue">Queue</string>
+    <string name="automix">Up next from autoplay</string>
+    <string name="reorder">Reorder</string>
+    <string name="like">Like</string>
+    <string name="dislike">Dislike</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
 </resources>

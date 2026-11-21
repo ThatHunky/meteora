@@ -25,6 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import dev.thathunky.meteora.ui.player.PlayerHost
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -70,7 +75,10 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel()) {
 
     val inPairing = backStack.lastOrNull() == PairingRoute
     val currentTab = tabs.firstOrNull { it.route == backStack.firstOrNull() } ?: tabs.first()
+    var playerExpanded by rememberSaveable { mutableStateOf(false) }
+    var bottomBarHeight by remember { mutableStateOf(0.dp) }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         bottomBar = {
             if (!inPairing) {
@@ -92,6 +100,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel()) {
             }
         },
     ) { padding ->
+        bottomBarHeight = padding.calculateBottomPadding()
         NavDisplay(
             backStack = backStack,
             onBack = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
@@ -99,7 +108,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel()) {
             entryProvider = entryProvider {
                 entry<HomeRoute> {
                     Column(Modifier.fillMaxSize().padding(16.dp)) {
-                        DebugPlayerCard(connection, playback, vm::send)
+                        if (playback?.track == null) DebugPlayerCard(connection, playback, vm::send)
+                        else Placeholder("M5")
                     }
                 }
                 entry<SearchRoute> { Placeholder("M4") }
@@ -130,6 +140,15 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel()) {
                 }
             },
         )
+    }
+    if (!inPairing) {
+        PlayerHost(
+            expanded = playerExpanded,
+            onExpandedChange = { playerExpanded = it },
+            miniBottomPadding = bottomBarHeight,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
     }
 }
 

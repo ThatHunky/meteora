@@ -34,4 +34,13 @@
     <string name="settings_repair">Під’єднати знову</string>
     <string name="settings_forget">Забути цей ПК</string>
     <string name="settings_forget_note">Також видаліть Meteora в «Authorized companions» у YTMDesktop, щоб відкликати доступ.</string>
+    <string name="playing_on">Грає на %1$s</string>
+    <string name="reconnecting">Перепідключення…</string>
+    <string name="queue">Черга</string>
+    <string name="automix">Далі з автовідтворення</string>
+    <string name="reorder">Перемістити</string>
+    <string name="like">Подобається</string>
+    <string name="dislike">Не подобається</string>
+    <string name="shuffle">Перемішати</string>
+    <string name="repeat">Повтор</string>
 </resources>

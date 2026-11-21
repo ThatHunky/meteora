@@ -10,6 +10,12 @@ import dev.thathunky.meteora.data.PairedPcStore
 import dev.thathunky.meteora.data.PlayerRepository
 import dev.thathunky.meteora.domain.PlaybackState
 import javax.inject.Inject
+import androidx.compose.ui.graphics.Color
+import dev.thathunky.meteora.ui.theme.AlbumSeedExtractor
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -19,10 +25,20 @@ import kotlinx.coroutines.launch
 class ShellViewModel @Inject constructor(
     private val player: PlayerRepository,
     private val store: PairedPcStore,
+    seeds: AlbumSeedExtractor,
 ) : ViewModel() {
     val connection: StateFlow<ConnectionState> = player.connection
     val playback: StateFlow<PlaybackState?> = player.state
     val pairedPc: StateFlow<PairedPc?> = store.pc.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Theme seed from the current album art; keeps the last one while a track change settles. */
+    val albumSeed: StateFlow<Color?> = player.state
+        .map { it?.track?.artworkUrl }
+        .filterNotNull()
+        .distinctUntilChanged()
+        .mapLatest { seeds.seedFor(it) }
+        .filterNotNull()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Called from ON_START / ON_STOP of the activity. */
     fun onForeground() = player.acquire()

@@ -108,6 +108,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.material.kolor)
+    implementation(libs.reorderable)
+    implementation(libs.graphics.shapes)
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

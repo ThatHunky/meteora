@@ -23,6 +23,8 @@ coroutines = "1.10.2"
 junit = "4.13.2"
 mockwebserver = "5.5.1"
 okhttp = "5.5.1"
+reorderable = "3.1.0"
+graphicsShapes = "1.1.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom-alpha", version.ref = "composeBomAlpha" }
@@ -58,6 +60,8 @@ socketio-client = { module = "io.socket:socket.io-client", version.ref = "socket
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+graphics-shapes = { module = "androidx.graphics:graphics-shapes", version.ref = "graphicsShapes" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { module = "junit:junit", version.ref = "junit" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "mockwebserver" }
