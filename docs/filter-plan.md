@@ -44,5 +44,6 @@ Nothing about any language is built into the behaviour: no default exception for
 - **Artists:** each **Hidden** or **Always show**.
 - **Custom rules:** the user's own words or characters; a title or artist name containing one is hidden or always shown, as chosen per rule.
 - **Order when rules disagree:** an artist rule wins over a custom rule, then country, then language, then script; inside one level **Always show** wins over **Hide**. One pure function, with tests for each pair.
-- **Where it applies** is also a setting, one switch each: Home, radio and autoplay, artist page shelves, smart downloads, search results (off by default), albums and playlists opened on purpose (off by default).
+- **Where it applies** is also a setting, one switch each: Home, radio and autoplay, artist page shelves, smart downloads.
+- **Never filtered, with no switch** (the user, 2026-11-22: "if you specifically search for something it should still show"): search results and suggestions, the library, an album, playlist or artist page opened on purpose, and the song the user tapped. A radio started from a tapped song keeps that song and filters only what is added around it.
 - A **Test** field in Filters: type or paste a title and artist and see what the filter decides and which rule decided it.
