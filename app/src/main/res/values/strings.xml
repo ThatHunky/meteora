@@ -24,7 +24,7 @@
     <string name="pair_enable_auth_title">Turn on “Enable companion authorization”</string>
     <string name="pair_enable_auth_body">In YTMDesktop: Settings → Integrations. Meteora will continue automatically.</string>
     <string name="pair_code_title">Pairing code</string>
-    <string name="pair_code_body">Check that %1$s shows the same code, then click Allow.</string>
+    <string name="pair_code_body">Check that %1$s shows the same code in a YTMDesktop window (it may be behind other windows), then click Allow within 30 seconds.</string>
     <string name="pair_done">Connected to %1$s</string>
     <string name="pair_fail_unreachable">Couldn’t reach the PC. Is YTMDesktop running with the companion server on, and are you on the same network or tailnet?</string>
     <string name="pair_fail_denied">The request was denied or timed out on the PC.</string>
@@ -61,4 +61,5 @@
     <string name="share_unsupported">Meteora can’t play this link</string>
     <string name="share_no_pc">PC not connected. Open Meteora to pair or reconnect.</string>
     <string name="share_playing">Playing on %1$s</string>
+    <string name="pair_code_retry">The previous window on the PC timed out, so here is a new code. It appears in a YTMDesktop window (check the taskbar).</string>
 </resources>

@@ -49,6 +49,10 @@ Validation of the pairing request body:
 - `appName`: 2–48 characters. Meteora uses `Meteora`.
 - `appVersion`: must be valid semver (e.g. `0.1.0`, `0.1.0-alpha.3`). It is shown in the "Authorized companions" table.
 
+### ⚠ YTMDesktop 2.1.0 bug: authorization left on for 5 minutes crashes the app
+
+`memoryStoryListenerCallback` is registered unbound (`onStateChanged(this.memoryStoryListenerCallback)`), so its 5‑minute auto‑disable timer runs with the wrong `this`. If "Enable companion authorization" stays on for 5 minutes without a successful pairing, YTMDesktop throws `TypeError: this.getService is not a function`. The main window becomes "Error" and the companion server stops responding, so the app has to be restarted. Seen on V's PC at 19:52:04 on 2026‑11‑21. A successful pairing turns the toggle off and avoids the crash, so the pairing UI tells the user to enable it only when ready and to click Allow promptly.
+
 ### Pairing flow
 
 ```

@@ -37,7 +37,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -56,6 +58,13 @@ import dev.thathunky.meteora.companion.discovery.DiscoveredPc
 fun PairingScreen(onDone: () -> Unit, modifier: Modifier = Modifier, vm: PairingViewModel = hiltViewModel()) {
     val step by vm.step.collectAsStateWithLifecycle()
     val found by vm.discovered.collectAsStateWithLifecycle()
+
+    // Pairing needs a person at the PC within 30 s: don't let the phone sleep meanwhile.
+    val view = LocalView.current
+    DisposableEffect(step) {
+        view.keepScreenOn = step !is PairingStep.Choose && step !is PairingStep.Done && step !is PairingStep.Failed
+        onDispose { view.keepScreenOn = false }
+    }
 
     AnimatedContent(
         targetState = step,
@@ -91,7 +100,11 @@ fun PairingScreen(onDone: () -> Unit, modifier: Modifier = Modifier, vm: Pairing
                     )
                 }
                 Text(stringResource(R.string.pair_code_body, s.name), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (s.attempt > 0) {
+                    Text(stringResource(R.string.pair_code_retry), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
+                }
                 LoadingIndicator()
+                OutlinedButton(onClick = vm::cancel) { Text(stringResource(android.R.string.cancel)) }
             }
             is PairingStep.Failed -> Centered {
                 Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)

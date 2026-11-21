@@ -23,7 +23,7 @@
     <string name="pair_enable_auth_title">Увімкніть «Enable companion authorization»</string>
     <string name="pair_enable_auth_body">У YTMDesktop: Settings → Integrations. Meteora продовжить автоматично.</string>
     <string name="pair_code_title">Код під’єднання</string>
-    <string name="pair_code_body">Перевірте, що %1$s показує той самий код, і натисніть Allow.</string>
+    <string name="pair_code_body">Перевірте, що %1$s показує той самий код у вікні YTMDesktop (воно може бути позаду інших), і натисніть Allow протягом 30 секунд.</string>
     <string name="pair_done">Під’єднано до %1$s</string>
     <string name="pair_fail_unreachable">Не вдалося зв’язатися з ПК. Чи запущено YTMDesktop з увімкненим companion server, і чи ви в тій самій мережі або tailnet?</string>
     <string name="pair_fail_denied">Запит відхилено або час очікування на ПК вичерпано.</string>
@@ -60,4 +60,5 @@
     <string name="share_unsupported">Meteora не може відтворити це посилання</string>
     <string name="share_no_pc">ПК не під’єднано. Відкрийте Meteora, щоб під’єднатися.</string>
     <string name="share_playing">Грає на %1$s</string>
+    <string name="pair_code_retry">Попереднє вікно на ПК закрилося за таймаутом, тож ось новий код. Він з’являється у вікні YTMDesktop (перевірте панель завдань).</string>
 </resources>

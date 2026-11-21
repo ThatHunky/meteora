@@ -35,7 +35,8 @@ sealed interface PairingStep {
     data class Probing(val name: String) : PairingStep
     /** "Enable companion authorization" is off on the PC; we keep polling. */
     data class WaitingForAuthToggle(val name: String) : PairingStep
-    data class ShowCode(val name: String, val code: String) : PairingStep
+    /** [attempt] > 0 means the previous window on the PC timed out and this is a fresh code. */
+    data class ShowCode(val name: String, val code: String, val attempt: Int = 0) : PairingStep
     data class Failed(val name: String, val reason: Reason) : PairingStep
     data class Done(val name: String) : PairingStep
 
@@ -98,44 +99,64 @@ class PairingViewModel @Inject constructor(
                 _step.value = PairingStep.Failed(name, PairingStep.Reason.Unreachable)
                 return@launch
             }
-            // Request a code, polling while the PC's authorization toggle is off.
-            var code: String? = null
-            while (code == null) {
-                try {
-                    code = client.requestCode(endpoint, BuildConfig.VERSION_NAME)
-                } catch (e: CompanionException) {
-                    if (e.isAuthorizationDisabled) {
-                        _step.value = PairingStep.WaitingForAuthToggle(name)
-                        delay(3_000)
-                    } else if (e.isRateLimited) {
-                        delay(12_000)
-                    } else {
-                        _step.value = PairingStep.Failed(name, PairingStep.Reason.Other)
+            // The PC's Allow window closes after 30 s and reports a timeout exactly like a
+            // denial, so on failure we simply ask again with a fresh code a few times.
+            var token: String? = null
+            var attempt = 0
+            while (token == null) {
+                // requestcode is limited to 5/min: poll the toggle every 13 s.
+                var code: String? = null
+                while (code == null) {
+                    try {
+                        code = client.requestCode(endpoint, BuildConfig.VERSION_NAME)
+                    } catch (e: CompanionException) {
+                        when {
+                            e.isAuthorizationDisabled -> {
+                                _step.value = PairingStep.WaitingForAuthToggle(name)
+                                delay(13_000)
+                            }
+                            e.isRateLimited -> delay(15_000)
+                            else -> {
+                                _step.value = PairingStep.Failed(name, PairingStep.Reason.Other)
+                                return@launch
+                            }
+                        }
+                    } catch (e: Exception) {
+                        _step.value = PairingStep.Failed(name, PairingStep.Reason.Unreachable)
                         return@launch
                     }
                 }
-            }
-            _step.value = PairingStep.ShowCode(name, code)
-            val token = try {
-                client.requestToken(endpoint, code)
-            } catch (e: CompanionException) {
-                _step.value = PairingStep.Failed(
-                    name,
+                _step.value = PairingStep.ShowCode(name, code, attempt)
+                token = try {
+                    client.requestToken(endpoint, code)
+                } catch (e: CompanionException) {
                     when {
-                        e.isAuthorizationDenied -> PairingStep.Reason.Denied
-                        e.code == "AUTHORIZATION_TOO_MANY" -> PairingStep.Reason.TooMany
-                        else -> PairingStep.Reason.Other
-                    },
-                )
-                return@launch
-            } catch (e: Exception) {
-                _step.value = PairingStep.Failed(name, PairingStep.Reason.Other)
-                return@launch
+                        e.code == "AUTHORIZATION_TOO_MANY" -> {
+                            _step.value = PairingStep.Failed(name, PairingStep.Reason.TooMany)
+                            return@launch
+                        }
+                        e.isAuthorizationDenied && ++attempt < MAX_ATTEMPTS -> {
+                            delay(13_000) // stay inside the requestcode rate limit
+                            null
+                        }
+                        else -> {
+                            _step.value = PairingStep.Failed(name, PairingStep.Reason.Denied)
+                            return@launch
+                        }
+                    }
+                } catch (e: Exception) {
+                    _step.value = PairingStep.Failed(name, PairingStep.Reason.Other)
+                    return@launch
+                }
             }
             store.save(PairedPc(name = name, addresses = reachable + addresses, port = port, token = token, lastGood = endpoint.host))
             player.reconnect()
             _step.value = PairingStep.Done(name)
         }
+    }
+
+    private companion object {
+        const val MAX_ATTEMPTS = 5
     }
 
     /** Every address that answers `/metadata`, in preferred order (LAN, Tailscale, rest). */
