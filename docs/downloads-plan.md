@@ -1,104 +1,89 @@
 # Plan: downloads and smart downloads
 
-Written 2026‑11‑21. A plan only: nothing here is built yet. It follows the shape of [quality-switch-plan.md](quality-switch-plan.md) and is meant to be handed to an implementing agent one milestone at a time.
+Rewritten 2026‑11‑22 for an implementing agent; it replaces the plan of 2026‑11‑21. What changed: the user wants the files as ordinary music files, "they must go to internal storage, under Music/Meteora/Artist/Album etc", and 256 kbps is now available (it was not when the first plan was written).
 
-## Scope
+## What the user gets
 
-- A **download button** for songs, albums and playlists, for listening without a network.
-- **Smart downloads**: the app keeps a set of songs downloaded by itself and refreshes it.
-- A **download quality** setting, separate from the streaming quality.
-- Files live in the app's **internal storage**, never on shared or external storage.
-- The feature is **only available to YouTube Music Premium accounts**.
+- A **download button** on songs, albums and playlists.
+- Files in the phone's shared storage: `Music/Meteora/<Artist>/<Album>/<NN> <Title>.m4a`, visible to any music player and file manager, with title, artist, album, track number and cover inside the file.
+- Meteora plays a downloaded song from its file, with no network.
+- A **Downloads** tab in Library, a **download quality** setting, a Wi‑Fi‑only switch.
+- **Smart downloads**: a set of songs the app keeps downloaded by itself.
+- Downloading is **only for YouTube Music Premium accounts**, as in the official app. This keeps Meteora to what the account is entitled to; it does not make the way Meteora fetches audio permitted by YouTube's terms, and the app stays sideload‑only.
 
-One thing to be straight about: the official app lets Premium members download, so gating on Premium keeps Meteora to what the account is entitled to. It does not make Meteora's way of fetching audio permitted by YouTube's terms; that stays as the devlog says, and the app stays sideload‑only.
+## Decisions taken (the user can overrule them)
 
-## Decisions for you
+| Question | Decision |
+|---|---|
+| Premium ends | No new downloads. Files already in `Music/` are the user's files and are left alone. |
+| Premium re‑check | When a download is queued and at each smart refresh; a positive answer is remembered for 30 days. Signed out, check failed or marker missing all mean "not Premium" (fail closed). |
+| Smart downloads size | 100 songs by default, 0 to 500. |
+| New dependency | WorkManager (downloads and the nightly refresh). Media3's `DownloadManager` is not used: it writes into a cache, not into files. |
+| Format | AAC in `.m4a` always (itag 141 at High with Premium, else 140), not Opus: it plays everywhere and can carry tags. |
 
-These change the build, so they are worth settling before D1.
+## Order of work
 
-| # | Question | Proposed |
-|---|---|---|
-| 1 | What happens to downloads when the account stops being Premium? | Downloads stop playing offline at once, the files stay for 30 days in case Premium returns, then they are deleted. |
-| 2 | How often is Premium re‑checked? | When downloads are switched on, at every smart refresh, and at least every 30 days. Offline for more than 30 days: downloads pause until one check succeeds (the official app has the same 30‑day rule). |
-| 3 | Smart downloads default size | 100 songs, adjustable from 0 to 500. |
-| 4 | New dependency | WorkManager, for the nightly smart refresh. Nothing else new: Media3 already ships the download engine. |
+### D0. Premium signal (may stop the work)
 
-## D0: spike, find a reliable Premium signal
+Nothing in the code knows whether the account has Premium. With an anonymous request you cannot see it, and you have no phone, so:
 
-Nothing in the code knows whether the signed‑in account has Premium, and I have not verified a marker for it. Do this first, because the gate depends on it.
+- Add `YtmClient.isPremium()` reading the best candidate markers from responses the app already fetches signed in (the account menu's "Get Music Premium" / upgrade entry being absent; a subscriber flag in the page config that `ensureClientVersion()` downloads). Parse defensively, fail closed.
+- Add a debug broadcast like the existing ones in `MeteoraApp.kt` (`…PROBE_PREMIUM`) that logs which markers were found, with no personal fields, so the reviewer can confirm on the phone with the user's Premium account.
+- A JVM test over hand‑made fixtures of both shapes. Write what is known and unknown in `docs/api-notes.md`.
 
-- With the user's signed‑in session, capture the InnerTube `account/account_menu` response and the `browse` response for `FEmusic_home` (both as `WEB_REMIX`, through `YtmClient`). Save them, with personal fields removed, as fixtures under `app/src/test/resources/fixtures/ytm/`.
-- Find what differs for a Premium account: candidates are an "upgrade" / "Get Music Premium" entry in the account menu (present only without Premium) and a subscriber flag in the page config that `YtmClient.ensureClientVersion()` already downloads.
-- Ideally compare against a non‑Premium account. If only one account is available, record that the marker is confirmed for one side only.
-- Write the result into `docs/api-notes.md`.
-- **Fail closed:** signed out, check failed, or marker missing all mean "not Premium".
+The reviewer verifies on the phone. If the marker turns out wrong, the gate is fixed then; do not block the rest on it.
 
-Done when: `YtmClient.isPremium(): Boolean` exists with a parser test over the fixtures.
+### D1. One song to a tagged file
 
-## Storage
+- **Fetch:** `downloads/Downloader.kt`. Resolve through `StreamResolver` with a new `resolveForDownload(videoId, quality)` that only accepts AAC (extend the Rust `pick_audio` with a container preference, `cargo test` for it; signed in + High goes through `WebMusicStreams` for itag 141 as streaming does). Fetch with the media OkHttp client in ranges of at most 10 MiB (YouTube throttles larger and open‑ended ranges: `docs/api-notes.md`, "Video formats"; reuse the chunk maths in `playback/ChunkedDataSource`). Resolve just before fetching: URLs expire in about six hours and are tied to the IP. On a failed range, re‑resolve once and continue from the byte reached; a different itag on re‑resolve restarts the file.
+- **Tags, in Rust:** YouTube's `.m4a` is fragmented MP4 without tags. Add `rust/meteora-core/src/mp4tags.rs`: given the file's `moov` box bytes and the metadata (title, artist, album, album artist, track number, year if known, cover JPEG), return a new `moov` with `udta/meta/ilst` added (`©nam`, `©ART`, `©alb`, `aART`, `trkn`, `©day`, `covr`). In a fragmented file `moov` comes before `sidx` and the fragments, whose offsets are relative, so growing `moov` shifts nothing that is addressed absolutely; verify that claim against the box layout of a real file and say so in the notes (if `sidx` or `tfhd` there use absolute offsets, fix them up). Kotlin streams the rest of the file through unchanged. `cargo test` with a tiny synthetic fMP4 and, if `METEORA_M4A` points at a real file, a test on that. No I/O in Rust, as elsewhere.
+- **Write:** through `MediaStore.Audio.Media` with `RELATIVE_PATH = "Music/Meteora/<Artist>/<Album>/"`, `DISPLAY_NAME = "<NN> <Title>.m4a"`, `IS_PENDING = 1` until complete, then 0. No storage permission is needed for files the app creates (minSdk 31). Path parts are sanitised (no `/ \ : * ? " < > |`, no leading dot, trimmed, at most 80 characters, "Unknown artist" / "Singles" when empty). Pure function with JVM tests, including Cyrillic names and two songs that sanitise to the same name.
+- **Cover:** the track's artwork at 1080 px, fetched once per album and embedded.
+- **Index:** `downloads/DownloadIndex.kt`, a small SQLite table (videoId, content URI, itag, bytes, title, artist, album, track number, artwork URL, duration, state, manual or smart, collection ids). No Room; `SQLiteOpenHelper` is enough.
+- **Runner:** WorkManager, one unique work chain, at most two files at a time, a progress notification (foreground info, type `dataSync`; add `FOREGROUND_SERVICE_DATA_SYNC` to the manifest), constraint unmetered when the Wi‑Fi‑only switch is on.
+- **Gate:** `downloads/DownloadsGate.kt` from the decisions table; JVM tests.
 
-- Directory: `context.filesDir/downloads`. Internal, private to the app, not cleared by Android when space runs low (unlike `cacheDir`, where the streaming cache lives), removed on uninstall.
-- Engine: Media3's `DownloadManager` with its own `SimpleCache` over that directory and a `NoOpCacheEvictor`, so nothing is evicted behind the user's back. This is a second cache, separate from the 256 MB streaming cache in `LocalEngine`.
-- Index: Media3's `DefaultDownloadIndex` (SQLite through the `StandaloneDatabaseProvider` already in use). Each `DownloadRequest` carries, in its `data` bytes, a small JSON blob: title, artist, album, artwork URL, duration, the quality tier, the itag, the file size, whether it is a manual or a smart download, and which collection it came from.
-- Artwork: downloaded art is copied to `filesDir/downloads/art/<videoId>.jpg` so the lock screen and lists have it offline.
-- Settings shows the space used and the space free, with "Remove all downloads".
+### D2. Play from the file
 
-## Playing a downloaded song
+- In `LocalEngine`'s resolving lambda, ask the index first: a complete download becomes a `DataSpec` on its `content://` URI (a `ContentDataSource` beside the cached HTTP source, via `DefaultDataSource` or a small delegating source), with no call to `StreamResolver` and no HTTP cache key. Pin the track's format as usual.
+- If the file is gone (the user deleted it in a file manager), drop the index row and stream instead.
+- Offline, Play on a downloaded song, album or playlist builds the queue from the index (`ytm.watchQueue` needs the network).
+- Touch `LocalEngine` as little as possible and keep its rules (CLAUDE.md, "Things that are easy to break").
 
-Today every open of a track resolves a URL first (`ResolvingDataSource` in `LocalEngine.build()`), which needs the network. Offline playback needs a path that skips it.
+### D3. Button, collections, Library
 
-- In the resolving lambda, ask the download index first. If the video is fully downloaded, return a `DataSpec` whose key is the download's cache key and whose length is the stored file size, without calling `StreamResolver`.
-- Data source order becomes: downloads cache (read only) → streaming cache → network.
-- The format is fixed by the download, so the "pinning" rule in `LocalEngine` is satisfied by construction. Record the download's tier in `pinned` anyway so a partly downloaded track does not switch format between opens.
-- The queue itself (`ytm.watchQueue`) also needs the network. Offline, "play" on a downloaded song, album or playlist builds the queue from the index instead.
+- `ui/downloads/DownloadButton.kt`: not downloaded, queued, downloading with a percentage, downloaded, failed (tap retries), fed by a per‑id flow from the index. Places: the long‑press sheet (`ui/browse/ItemActions.kt`: a new `ItemAction.Download` / `RemoveDownload`), album and playlist page headers next to Play and Shuffle, and Now Playing next to like.
+- An album or playlist downloads its tracks and remembers the collection; removing it deletes the files no other downloaded collection needs. Reference counting is a pure function with tests. Track numbers come from the collection's order for albums; playlists do not renumber a file that already exists.
+- Library gets a **Downloads** tab: collections and songs, from the index. With no network, Home shows an offline note with a button to Downloads instead of an error.
+- Without Premium the buttons are not hidden: they open a short sheet saying downloads need YouTube Music Premium.
+- Removing a download deletes the file through MediaStore (the app owns it, so no prompt) and empty album and artist folders are left to the system.
 
-## Download quality
+### D4. Settings
 
-- New setting next to the streaming quality block in Settings: "Download quality" with the same three tiers (`StreamQuality`): High (about 130 kbps, about 57 MB per hour), Balanced (about 65 kbps, about 29 MB per hour), Data saver (about 50 kbps, about 22 MB per hour). Default: High.
-- Stored in `StreamQualityStore` as a third value (`quality_download`).
-- The tier is read once when a download is queued and saved in the request, so a download that resumes later uses the same tier. If the resumed lookup returns a different itag than the one recorded, the download restarts from zero rather than appending to another format's bytes.
-- Changing the setting affects new downloads only. A "Re‑download in the new quality" action can come later.
-- The 256 kbps tier of the official app is not available to Meteora (see the quality switch plan), so "High" here is about 130 kbps.
+Settings → Playback (or a new Downloads category in `ui/settings/SettingsCategories.kt`): download quality (Normal about 130 kbps, about 57 MB per hour; High 256 kbps, about 115 MB per hour, Premium), Wi‑Fi only (on by default), space used by downloads and free space, "Remove all downloads" with a confirmation.
 
-## The download button
+### D5. Smart downloads
 
-- **Where:** the long‑press action sheet for songs, albums and playlists; the header of album and playlist pages, next to Play and Shuffle; the full player, next to like and dislike.
-- **States:** not downloaded, queued, downloading (with a percentage), downloaded, failed (tap to retry). One composable, `DownloadButton`, fed by a `StateFlow` per video id from the download manager's listener.
-- **Collections:** downloading an album or playlist downloads its tracks and remembers the collection, so the Library can show it as one item and "remove" removes the tracks no other downloaded collection still needs.
-- **Library:** a third tab, "Downloads", listing downloaded collections and songs. With no network the app opens here and the Home tab shows an offline note instead of a load error.
-- **Network rule:** a "Download over Wi‑Fi only" switch, on by default, mapped to Media3 `Requirements.NETWORK_UNMETERED`.
-- **Service:** Media3 `DownloadService`, a foreground service of type `dataSync` (needs `FOREGROUND_SERVICE_DATA_SYNC` in the manifest) with a progress notification. At most two downloads at a time.
+A switch and a size slider. Keeps the most recent Liked songs and Home's "Listen again", interleaved without duplicates, up to the size. Refreshes nightly through WorkManager (charging, unmetered, storage not low) and from "Refresh now". A refresh checks Premium, queues what is missing as smart downloads, and removes smart downloads no longer wanted. Manual downloads are never touched; a song that is both is manual. It stops adding when free space falls under 500 MB, and stops early with a report if lookups start failing (the yt-dlp fallback is far too slow for this).
 
-## Smart downloads
+## Strings
 
-- A switch and a size slider in Settings (0 to 500 songs), only shown for Premium.
-- **What it keeps:** the most recent Liked songs and the songs on Home's "Listen again" shelf, interleaved, without duplicates, up to the size. Both lists come from calls `YtmClient` already makes (`likedSongs()`, `home()`). Mixes can be added as a source later.
-- **When it refreshes:** once a night through WorkManager, only when charging, on an unmetered network and with storage not low. Also from a "Refresh now" button.
-- **What a refresh does:** check Premium; build the wanted list; queue what is missing as smart downloads; remove smart downloads that are no longer wanted. Manual downloads are never touched, and a song that is both is treated as manual.
-- **Budget:** stop adding when the size limit is reached or free space falls under 500 MB.
+English and Ukrainian for everything shown, added near related strings. Notifications too.
 
-## Premium gate
+## UI and merge rules
 
-- One class, `DownloadsGate`, answers "may downloads be used right now?" from: signed in, last successful Premium check, and how long ago that was.
-- Without Premium the download buttons are not hidden: they open a short sheet saying downloads need YouTube Music Premium. Hidden buttons would read as a bug.
-- Offline playback of downloads asks the gate too, so a lapsed account does not keep its library (decision 1).
+Two reviewers are editing `ui/` on other branches right now. Put UI in new files under `ui/downloads/`, and add only single lines to existing screens (`PageScreens.kt`, `HomeLibrary.kt`, `PlayerHost.kt`, `MusicRows.kt`, `SettingsScreens.kt`). Use the look‑aware wrappers in `ui/components`.
 
-## Milestones
+## Tests
 
-| M | Scope | Done when |
-|---|---|---|
-| **D0** | Premium signal spike | `isPremium()` with fixtures and a test; notes in `api-notes.md` |
-| **D1** | Download cache, manager, service, `DownloadsGate`, download button for single songs | A song downloads on the phone, survives an app restart, and the button shows each state |
-| **D2** | Offline playback path | Airplane mode on: a downloaded song plays, seeks, and shows its artwork |
-| **D3** | Albums and playlists, Library "Downloads" tab, offline start | A downloaded album plays in order offline; removing it frees its space |
-| **D4** | Download quality, Wi‑Fi‑only switch, storage row in Settings | A new download at Data saver is about 40 % of the size of the same song at High |
-| **D5** | Smart downloads with WorkManager | After "Refresh now" the wanted songs are downloaded; lowering the slider removes the extra ones |
+JVM: path sanitising, gate rules, index round trip (Robolectric is not available: keep SQL behind an interface and test the logic above it), reference counting, the smart wanted‑list, chunk resume maths, the Premium parser. Rust: `pick_audio` with the AAC preference, `mp4tags`.
 
-Each milestone gets unit tests where logic can run on the JVM (gate rules, wanted‑list building, index metadata round trip, collection reference counting) and a check on a phone, recorded in the devlog.
+## Verify
+
+`.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain -q` from PowerShell and `cargo test --manifest-path rust\meteora-core\Cargo.toml`. No phone. The reviewer checks on the OnePlus: the Premium probe; a song downloads to `Music/Meteora/…` and shows title, artist, album and cover in another player; airplane mode playback and seek; an album in order; removal frees the files; Wi‑Fi only; smart refresh.
 
 ## Risks
 
-- **The Premium marker is unverified.** D0 may find none that is dependable. Then the choice is a weaker signal or no gate, and that is the user's call, not the implementer's.
-- **Stream URLs expire** after about six hours and are tied to the phone's IP. A long download queue must resolve each track just before fetching it, which the `meteora://` scheme already does.
-- **YouTube may change the visionOS client.** Downloads then fail like streaming does; the yt-dlp fallback is too slow (about 15 s per track) for a 500‑song refresh, so smart downloads should stop early and report rather than grind through it.
-- **Storage:** 500 songs at High is roughly 2 GB.
+- **The Premium marker is unverified** until the phone check.
+- **Tagging fragmented MP4** by hand is the delicate part. If the tagged file does not play or scan, the fallback is the untagged file with artist, album and title in the path, and that must be said in the report.
+- **Storage:** 500 songs at High is about 4 GB.
