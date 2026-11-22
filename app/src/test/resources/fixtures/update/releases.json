@@ -1,0 +1,39 @@
+[
+  {
+    "url": "https://api.github.com/repos/ThatHunky/meteora/releases/454074405",
+    "assets_url": "https://api.github.com/repos/ThatHunky/meteora/releases/454074405/assets",
+    "upload_url": "https://uploads.github.com/repos/ThatHunky/meteora/releases/454074405/assets{?name,label}",
+    "html_url": "https://github.com/ThatHunky/meteora/releases/tag/v0.1.0-alpha.1",
+    "id": 454074405,
+    "node_id": "RE_kwDOV3GeSc4bEKAl",
+    "tag_name": "v0.1.0-alpha.1",
+    "target_commitish": "main",
+    "name": "0.1.0 alpha 1",
+    "draft": false,
+    "immutable": false,
+    "prerelease": true,
+    "created_at": "2026-11-22T00:02:55Z",
+    "updated_at": "2026-11-22T00:04:28Z",
+    "published_at": "2026-11-22T00:04:28Z",
+    "assets": [
+      {
+        "url": "https://api.github.com/repos/ThatHunky/meteora/releases/assets/777284727",
+        "id": 777284727,
+        "node_id": "RA_kwDOV3GeSc4uVGx3",
+        "name": "meteora-0.1.0-alpha.1.apk",
+        "label": "",
+        "content_type": "application/vnd.android.package-archive",
+        "state": "uploaded",
+        "size": 124131768,
+        "digest": "sha256:0ccab464f150d7e49360625e47665351471111dd80c0833e0c71451bae939dbe",
+        "download_count": 1,
+        "created_at": "2026-11-22T00:04:21Z",
+        "updated_at": "2026-11-22T00:04:27Z",
+        "browser_download_url": "https://github.com/ThatHunky/meteora/releases/download/v0.1.0-alpha.1/meteora-0.1.0-alpha.1.apk"
+      }
+    ],
+    "tarball_url": "https://api.github.com/repos/ThatHunky/meteora/tarball/v0.1.0-alpha.1",
+    "zipball_url": "https://api.github.com/repos/ThatHunky/meteora/zipball/v0.1.0-alpha.1",
+    "body": "First alpha. Expect bugs.\n\n**What works**\n- Remote for YTMDesktop on a PC: play, pause, seek, volume, queue, likes\n- Playback on the phone: Home, search, albums, artists, playlists, radio, library\n- Sound quality per network, up to 256 kbps with Premium\n- Music videos with a quality picker and stats for nerds\n- Synced lyrics\n- Themes and five looks (Expressive, Terminal, Flat, Retro, Soft)\n- English and Ukrainian\n\n**Not yet**\n- Downloads\n- Hiding music by language, country or artist\n\n**Before you install**\n- arm64 phones, Android 12 or newer\n- This is a debug build signed with a debug key. A later, properly signed build will not install over it: you will have to uninstall this one first.\n- Playing on the phone is against YouTube's terms. Use it at your own risk.\n\nNot affiliated with YTMDesktop, YouTube or Google.\n"
+  }
+]

@@ -148,6 +148,7 @@ fun HomeScreen(
             @Suppress("NAME_SHADOWING") val shelves = dev.thathunky.meteora.ui.filter.rememberFilteredShelves(shelves)
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding)) {
                 item(key = "header") { header() }
+                item(key = "update") { dev.thathunky.meteora.ui.update.UpdateCard() }
                 item(key = "title") { PageTitle(stringResource(R.string.nav_home)) }
                 if (!signedIn) item(key = "signin") { SignInPrompt(onSignIn) }
                 if (shelves.isEmpty()) {

@@ -534,3 +534,23 @@ Build, and 256 unit tests passing (17 new: both tokens parsed and the toggles ig
 ### "Queue is totally buggy" (03:10)
 
 The user's screenshot, in the Terminal look: every queue row solid red with a delete icon, one row hanging half swiped. The rows sit in a swipe-to-dismiss box whose red background is always drawn behind them, and Terminal's rows have no fill of their own, so the red showed through all of them. The other looks hid it by accident, with their row fill. Rows are now opaque in every look and the red background is drawn only while a row is being swiped. On the OP7T in Terminal: normal rows at rest, red only under the row being swiped, and the swiped track left the queue.
+
+## The in-app updater (docs/updater-plan.md)
+
+Meteora is sideload-only and published as alpha pre-releases on GitHub, so it now updates itself from there. An Opus agent built it on its own branch while another worked on filters.
+
+- **Versions:** `versionName` carries the pre-release part (`0.1.0-alpha.2`, the tag is `v` + it) and `versionCode` goes up by one per published build (now 2). `update/Version.kt` orders semver by its rules (`alpha.2 < alpha.10 < beta.1 < 0.1.0`) and ignores tags that are not semver.
+- **Checking:** `GET api.github.com/repos/ThatHunky/meteora/releases?per_page=10`, anonymous, `Meteora/<versionName>` as User-Agent, through a TLS-only OkHttp client with no cookie jar and no HTTPS-to-HTTP redirects. The real answer was fetched once with curl (fixture in `src/test/resources/fixtures/update/`, user blocks cut): the asset carries `size`, `browser_download_url` and a `digest` of `sha256:<hex>`. The automatic check runs when Home's update card is shown, once a day, and fails silently; a 403 or 429 counts as checked. Settings → About has Check for updates, which also offers a skipped version again.
+- **Downloading:** only on the user's tap (the offer itself is kept in the preferences, so it survives the app being killed), to `cacheDir/updates/v<version>.apk`, resuming with a Range request (206 appends; 200 or 416 start over) and never past the promised size. The card shows the size (alpha 1 is 124 MB) before the tap.
+- **Verifying:** `checkApk`, a pure function: size, the sha256 digest, a readable package, our package name, a higher versionCode, and exactly the installed app's signing certificates. No signatures read on either side refuses.
+- **Installing:** a `PackageInstaller` session; Android always shows its dialog (skipping it would need `UPDATE_PACKAGES_WITHOUT_USER_ACTION`, left out on purpose); the status comes back to a non-exported receiver, which starts Android's dialog. A cancelled dialog offers the same file again; the failure statuses have their own messages, and a different key or a conflict points to the release page for a manual reinstall. Files at or below the installed version are deleted on start, which covers the process dying during a successful self-update.
+- **UI:** a card on Home (one line in `HomeLibrary.kt`) and a section in Settings → About (one line in `SettingsScreens.kt`): size, "Allow from this source" explained before Android asks, progress, Install, Skip, release notes as plain text. A progress notification on its own channel, posted only when the notification permission was already granted.
+- **Releasing:** `scripts/release.ps1` builds, tests and runs `gh release create`, refusing a dirty tree, a HEAD that is not the pushed `main`, an existing tag, or a versionCode not above the last tag's. CLAUDE.md has the procedure.
+
+### Checked
+
+Build, and the unit tests: Version (6), Releases with the real fixture, the picker, the request, the once-a-day rule and the stored offer (12), checkApk with each mismatch (8), and the notes cleanup (2). The release script parses, its semver order matches Version.kt, and it refuses a dirty tree and a branch other than main; nothing beyond those refusals was run, and nothing was published or pushed.
+
+### Not checked
+
+**Nothing was run on a phone.** Unchecked: the card and the About section in any look or in Ukrainian; the download, its resume after a kill, its notification; whether `getPackageArchiveInfo` returns signing certificates for the downloaded file (if it does not, every update is refused as "different key"); the installer session, "Allow from this source", the confirmation dialog, a cancelled dialog, and the app coming back after updating itself. The download is not a foreground service: if Android kills the app mid-download, the next try resumes from the partial file, but nothing restarts it by itself.

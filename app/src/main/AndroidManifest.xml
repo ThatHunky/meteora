@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Downloads run as WorkManager foreground work. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- The in-app updater: Android still asks the user before every install. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".MeteoraApp"
@@ -70,6 +72,11 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- The updater's install session reports here, through the installer's PendingIntent only. -->
+        <receiver
+            android:name=".update.UpdateStatusReceiver"
+            android:exported="false" />
 
         <!-- Per-app language on Android 12: AppCompat stores the choice itself. -->
         <service
