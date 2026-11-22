@@ -26,6 +26,8 @@ sealed interface MusicItem {
         override val thumbnail: String?,
         /** OLAK5uy_… when the API includes it (play buttons); else resolved from the album page. */
         val playlistId: String?,
+        /** The artists the subtitle links to, when it does (the content filter's Hide artist). */
+        val artists: List<ArtistRef> = emptyList(),
     ) : MusicItem
 
     data class Artist(
