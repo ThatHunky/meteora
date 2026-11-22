@@ -132,6 +132,11 @@ class DownloadRulesTest {
     @Test fun `year from an album subtitle`() {
         assertEquals("2013", DownloadRules.year("Album • Океан Ельзи • 2013"))
         assertNull(DownloadRules.year("EP • 12 songs"))
+        // The album's artist comes from the header, in either of its two shapes, never from track rows.
+        assertEquals("Radiohead", DownloadRules.albumArtist("Radiohead", "Single • 2021"))
+        assertEquals("Океан Ельзи", DownloadRules.albumArtist("Album • Океан Ельзи • 2013", null))
+        assertNull(DownloadRules.albumArtist("Album • 2013", null))
+        assertNull(DownloadRules.albumArtist("", null))
     }
 }
 

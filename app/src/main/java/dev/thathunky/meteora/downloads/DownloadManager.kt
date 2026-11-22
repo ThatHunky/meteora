@@ -147,7 +147,7 @@ class DownloadManager @Inject constructor(
         val now = System.currentTimeMillis()
         index.putCollection(DownloadCollection(id, page.title, isAlbum, page.thumbnail, browseId, tracks.map { it.videoId }, now))
         val year = if (isAlbum) DownloadRules.year(listOfNotNull(page.subtitle, page.secondSubtitle).joinToString(" ")) else null
-        val albumArtist = if (isAlbum) tracks.firstNotNullOfOrNull { it.artists.firstOrNull()?.name } else null
+        val albumArtist = if (isAlbum) DownloadRules.albumArtist(page.subtitle, page.secondSubtitle) else null
         val entries = tracks.mapIndexed { i, s ->
             val base = entryFor(s, single = false).copy(collections = setOf(id), trackNumber = i + 1)
             if (isAlbum) base.copy(album = page.title, albumArtist = albumArtist ?: base.albumArtist, year = year, artworkUrl = base.artworkUrl ?: page.thumbnail?.withArtSize(1080))
@@ -286,9 +286,10 @@ class DownloadManager @Inject constructor(
     }
 
     /** False on a network failure (the song goes back to the queue). */
-    private suspend fun one(e: DownloadEntry, covers: MutableMap<String, ByteArray>): Boolean {
-        index.update(e.videoId) { it.copy(state = DownloadState.Downloading) }
-        index.setProgress(e.videoId, 0f)
+    private suspend fun one(queued: DownloadEntry, covers: MutableMap<String, ByteArray>): Boolean {
+        index.update(queued.videoId) { it.copy(state = DownloadState.Downloading) }
+        index.setProgress(queued.videoId, 0f)
+        val e = withAlbum(queued)
         return try {
             val cover = e.artworkUrl?.let { url ->
                 val key = "${e.albumArtist ?: e.artist}/${e.album ?: url}"
@@ -321,6 +322,36 @@ class DownloadManager @Inject constructor(
             true
         } finally {
             index.setProgress(e.videoId, null)
+        }
+    }
+
+    /**
+     * A song picked from Home, search or a playlist often comes without its album, and the file
+     * would land in "Singles". The watch queue names the album; its page gives the track number,
+     * the year and the album's artist. Any failure leaves the entry as it was.
+     */
+    private suspend fun withAlbum(e: DownloadEntry): DownloadEntry {
+        if (e.album != null) return e
+        return try {
+            val ref = ytm.watchQueue(videoId = e.videoId).songs.firstOrNull { it.videoId == e.videoId }?.album ?: return e
+            val page = ref.browseId?.let { id -> runCatching { ytm.album(id) }.getOrElse { x -> if (x is CancellationException) throw x else null } }
+            val position = page?.tracks?.indexOfFirst { it.videoId == e.videoId }?.takeIf { it >= 0 }
+            val found = e.copy(
+                album = page?.title ?: ref.name,
+                albumArtist = page?.let { DownloadRules.albumArtist(it.subtitle, it.secondSubtitle) } ?: e.albumArtist,
+                trackNumber = e.trackNumber ?: position?.plus(1),
+                year = e.year ?: page?.let { DownloadRules.year(listOfNotNull(it.subtitle, it.secondSubtitle).joinToString(" ")) },
+                artworkUrl = e.artworkUrl ?: page?.thumbnail?.withArtSize(1080),
+            )
+            index.update(e.videoId) {
+                it.copy(album = found.album, albumArtist = found.albumArtist, trackNumber = found.trackNumber, year = found.year, artworkUrl = found.artworkUrl)
+            }
+            found
+        } catch (x: CancellationException) {
+            throw x
+        } catch (x: Exception) {
+            Log.w(TAG, "no album for ${e.videoId}: ${x.javaClass.simpleName}")
+            e
         }
     }
 

@@ -93,6 +93,19 @@ object DownloadRules {
         )
     }
 
+    /**
+     * The album's artist from its page header. YouTube sends either the artist alone on the first
+     * line with "Album • 2013" under it, or one line "Album • Artist • 2013". Not from the track
+     * rows: on an album page their second column is the play count ("6.4M plays"), not an artist.
+     */
+    fun albumArtist(subtitle: String?, secondSubtitle: String?): String? {
+        val first = subtitle?.trim().orEmpty()
+        if (first.isEmpty()) return null
+        if (secondSubtitle != null && '•' !in first) return first
+        val parts = first.split('•').map { it.trim() }.filter { it.isNotEmpty() && year(it) != it }
+        return parts.getOrNull(1)
+    }
+
     /** "2013" from an album page's subtitle such as "Album • Artist • 2013". */
     fun year(text: String?): String? = text?.let { Regex("\\b(19|20)\\d{2}\\b").findAll(it).lastOrNull()?.value }
 }
