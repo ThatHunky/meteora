@@ -234,7 +234,8 @@ private fun LyricsList(lyrics: Lyrics, index: State<Int>, follow: FollowState, o
     val userScroll = remember(follow) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                follow.scrolledByHand()
+                // A finger on the list; the fling after it counts through its drag.
+                if (source == NestedScrollSource.UserInput) follow.scrolledByHand()
                 return Offset.Zero
             }
         }

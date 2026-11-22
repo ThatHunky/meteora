@@ -178,6 +178,7 @@
     <string name="action_stop_download">Stop</string>
     <string name="download_remove_text">The file is deleted from the phone.</string>
     <string name="download_remove_collection_text">Its songs are deleted from the phone, except those you also downloaded on their own or with another album or playlist.</string>
+    <string name="download_kept_by_collection">Downloaded with an album or playlist. To delete this song, remove that download.</string>
     <string name="premium_title">Downloads need YouTube Music Premium</string>
     <string name="premium_text">Meteora downloads music only for accounts with YouTube Music Premium, as the official app does. Songs already downloaded stay on the phone.</string>
     <string name="premium_signed_out">Sign in with a YouTube Music Premium account to download music.</string>

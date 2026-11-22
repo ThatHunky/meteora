@@ -74,6 +74,8 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 
 @HiltViewModel
@@ -130,10 +132,19 @@ fun rememberDownloaded(item: MusicItem, vm: DownloadsViewModel = hiltViewModel()
 /**
  * The download button: not downloaded, queued, downloading with a percentage, downloaded, failed
  * (tap retries). Tapping a queued or downloading one asks before stopping it; a downloaded one,
- * before removing it. Every state is 48 dp, so the buttons beside it never move.
+ * before removing it. Every state is 48 dp, so the buttons beside it never move. Not [removable]
+ * (a track kept for its downloaded album or playlist): the tap says so instead of offering a
+ * removal that would keep the file.
  */
 @Composable
-fun DownloadButton(status: DownloadStatus, onDownload: () -> Unit, onRemove: () -> Unit, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun DownloadButton(
+    status: DownloadStatus,
+    onDownload: () -> Unit,
+    onRemove: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    removable: Boolean = true,
+) {
     var confirm by remember { mutableStateOf(false) }
     val textControls = LocalLook.current.textControls
     val ask = { confirm = true }
@@ -163,7 +174,13 @@ fun DownloadButton(status: DownloadStatus, onDownload: () -> Unit, onRemove: () 
     }
     // Only while there is something to stop or remove: a download removed elsewhere closes it.
     val stopping = status == DownloadStatus.Queued || status is DownloadStatus.Downloading
-    if (confirm && (stopping || status == DownloadStatus.Done)) {
+    if (confirm && !removable && (stopping || status == DownloadStatus.Done)) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            text = { Text(stringResource(R.string.download_kept_by_collection)) },
+            confirmButton = { TextButton({ confirm = false }) { Text(stringResource(R.string.action_got_it)) } },
+        )
+    } else if (confirm && (stopping || status == DownloadStatus.Done)) {
         RemoveDialog(
             title = stringResource(if (stopping) R.string.download_stop_title else R.string.action_remove_download),
             text = if (stopping) null else stringResource(R.string.download_remove_text),
@@ -190,8 +207,10 @@ private fun RemoveDialog(title: String, text: String?, confirm: String, onConfir
 fun TrackDownloadButton(track: Track, vm: DownloadsViewModel = hiltViewModel()) {
     val d = vm.downloads
     val status by remember(track.videoId) { d.index.status(track.videoId) }.collectAsStateWithLifecycle(DownloadStatus.None)
+    val entry by remember(track.videoId) { d.index.songs.map { it[track.videoId] }.distinctUntilChanged() }.collectAsStateWithLifecycle(null)
     DownloadButton(
         status,
+        removable = entry?.let(::removableFromList) ?: true,
         onDownload = { d.downloadSong(LocalSong(track.videoId, track.title, track.artist, track.album, track.albumId, track.artistChannelId, track.durationSec, track.artworkUrl)) },
         onRemove = { d.removeSong(track.videoId) },
         onRetry = { d.retry(track.videoId) },

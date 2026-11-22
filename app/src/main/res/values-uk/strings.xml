@@ -177,6 +177,7 @@
     <string name="action_stop_download">Зупинити</string>
     <string name="download_remove_text">Файл буде видалено з телефона.</string>
     <string name="download_remove_collection_text">Його пісні буде видалено з телефона, крім тих, які ви завантажили окремо або з іншим альбомом чи плейлистом.</string>
+    <string name="download_kept_by_collection">Завантажено разом з альбомом чи плейлистом. Щоб видалити цю пісню, видаліть те завантаження.</string>
     <string name="premium_title">Для завантажень потрібен YouTube Music Premium</string>
     <string name="premium_text">Meteora завантажує музику лише для облікових записів із YouTube Music Premium, як і офіційний застосунок. Уже завантажені пісні залишаються на телефоні.</string>
     <string name="premium_signed_out">Увійдіть в обліковий запис із YouTube Music Premium, щоб завантажувати музику.</string>
