@@ -496,3 +496,26 @@ Cherry-picked onto `main` like downloads (the agent's branch started from the ol
 
 - **Checked:** Settings shows Filters with "Nothing hidden"; the screen has the Test field, the four place switches, artists, words, countries with the MusicBrainz switch, and the Languages and Scripts sections. Long-press on a Radiohead song → Hide artist: the card left Home at once and Settings said "1 rule"; Remove in Filters brought it back and the row read "Nothing hidden" again.
 - **Not checked:** every language and script rule, the Test field (adb cannot type Cyrillic), country rules and the MusicBrainz requests, radio and autoplay filtering, artist pages, smart downloads with a rule set, Ukrainian, the other looks.
+
+## Hide artist tells YouTube too; Not interested (2026-11-22, docs/feedback-plan.md)
+
+The user pointed at the official app's **Not interested** and **Don't recommend artist** and asked that Hide artist and YouTube's option work together. The reviewer's probe on the phone confirmed both menu entries and their tokens on Home (`docs/api-notes.md` › Feedback); the rest was built in a worktree with no phone, while another reviewer worked in downloads and the engine. The branch was first fast-forwarded to `main`, which had the plan.
+
+### What was built
+
+- **Tokens:** `MusicItem`s gain `feedback: ItemFeedback?` (the two tokens), read from the item's own menu by icon in `twoRowItem` and `responsiveItem`; the library toggles that also use `feedbackEndpoint` are skipped. `ItemFeedback.toString()` says only which tokens are present, so an item or shelf printed anywhere does not carry them. They are not saved anywhere.
+- **The call:** `YtmClient.feedback(token)` POSTs `feedbackTokens: [token]` signed in as `WEB_REMIX`; true only on `isProcessed: true`, false (never a throw) signed out, on an HTTP error or a broken answer. Logcat `YtmFeedback` says `isProcessed=<bool>` and nothing else.
+- **Hide artist:** hides locally first, then, with **Also tell YouTube** on (Settings → Filters, under the artist rules, on by default) and a token on the item, sends "Don't recommend artist" with a 15 s limit. Three toasts: told, not told, or the old "Undo it in Settings → Filters" when nothing was sent. The switch's note says it changes recommendations for the whole account in every YouTube Music app and cannot be undone from Meteora.
+- **Not interested:** a long-press action shown only when the item has that token. The item leaves Home and artist shelves at once (an in-memory set of dismissed tokens, so it lasts until the next load), then the token is sent; the toast says whether YouTube took it. No local rule.
+
+### Deviations from the plan
+
+- The token goes only when Hide artist has exactly one artist to offer. With several, the user picks one in the dialog, but the token names YouTube's choice of artist; sending it could tell YouTube about the wrong one, and it cannot be taken back.
+- Dismissed items are kept in a `@Singleton` (`filter/Dismissals`) applied inside `rememberFilteredShelves`, not in the Home view model, so `HomeLibrary.kt` is untouched. Keyed by token, they still expire with the load they came from; a song that shows twice in one load goes from both shelves.
+- In `MeteoraShell.kt` the Hide artist branch was changed (one line) to pass the item's token; the rest are added lines.
+
+### Checked
+
+Build, and 256 unit tests passing (17 new: both tokens parsed and the toggles ignored, no token in `toString`, the request's path, headers and exact body, the answer's cases, signed out sending nothing; Hide artist with and without a token, with the switch off, and with a failing, refused or stuck call still hiding locally; the single-artist rule; old saved settings reading the switch as on; dismissals across shelves; Not interested offered only with its token).
+
+**Not checked, no phone:** that YouTube answers `isProcessed: true` to the call at all, that the artist then stops being recommended, the toasts, the switch and its note in any look or in Ukrainian, Not interested on Home, and which item kinds carry the tokens.
