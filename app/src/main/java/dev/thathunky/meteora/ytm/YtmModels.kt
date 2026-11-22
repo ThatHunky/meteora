@@ -4,6 +4,8 @@ package dev.thathunky.meteora.ytm
 sealed interface MusicItem {
     val title: String
     val thumbnail: String?
+    /** YouTube's feedback tokens from the item's own menu (Home and other browse shelves only). */
+    val feedback: ItemFeedback?
 
     data class Song(
         val videoId: String,
@@ -17,6 +19,7 @@ sealed interface MusicItem {
         val videoCounterpartId: String? = null,
         /** How this track's time lines up with [videoCounterpartId]'s; empty when YouTube gave none. */
         val segments: List<VideoSegment> = emptyList(),
+        override val feedback: ItemFeedback? = null,
     ) : MusicItem
 
     data class Album(
@@ -28,6 +31,7 @@ sealed interface MusicItem {
         val playlistId: String?,
         /** The artists the subtitle links to, when it does (the content filter's Hide artist). */
         val artists: List<ArtistRef> = emptyList(),
+        override val feedback: ItemFeedback? = null,
     ) : MusicItem
 
     data class Artist(
@@ -35,6 +39,7 @@ sealed interface MusicItem {
         override val title: String,
         val subtitle: String,
         override val thumbnail: String?,
+        override val feedback: ItemFeedback? = null,
     ) : MusicItem
 
     data class Playlist(
@@ -44,7 +49,25 @@ sealed interface MusicItem {
         val subtitle: String,
         override val thumbnail: String?,
         val playlistId: String,
+        override val feedback: ItemFeedback? = null,
     ) : MusicItem
+}
+
+/**
+ * The single-use tokens behind an item's "Not interested" and "Don't recommend artist" menu
+ * entries, bound to the response they came in. They act on the whole account, so they are kept
+ * in memory only: never logged, saved or shown, and [toString] says only which are present.
+ */
+data class ItemFeedback(val notInterested: String?, val dontRecommendArtist: String?) {
+    override fun toString() = "ItemFeedback(notInterested=${notInterested != null}, dontRecommendArtist=${dontRecommendArtist != null})"
+}
+
+/** [this] with [feedback] attached; unchanged when there is none. */
+fun MusicItem.withFeedback(feedback: ItemFeedback?): MusicItem = if (feedback == null) this else when (this) {
+    is MusicItem.Song -> copy(feedback = feedback)
+    is MusicItem.Album -> copy(feedback = feedback)
+    is MusicItem.Artist -> copy(feedback = feedback)
+    is MusicItem.Playlist -> copy(feedback = feedback)
 }
 
 data class ArtistRef(val name: String, val browseId: String?)

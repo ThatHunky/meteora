@@ -303,6 +303,13 @@
     <string name="filters_script_kana">Кана (японська)</string>
     <string name="filters_script_hangul">Хангиль (корейська)</string>
     <string name="filters_script_thai">Тайське</string>
+    <string name="filters_not_interested">Не цікавить</string>
+    <string name="filters_not_interested_toast">Прибрано. YouTube повідомлено, що вас це не цікавить.</string>
+    <string name="filters_not_interested_failed_toast">Прибрано поки що. Повідомити YouTube не вдалося, тож це може повернутися.</string>
+    <string name="filters_hidden_told_toast">%1$s приховано, і YouTube попрошено не рекомендувати цього виконавця. У Налаштуваннях → Фільтри можна скасувати лише приховування.</string>
+    <string name="filters_hidden_not_told_toast">%1$s приховано тут, але повідомити YouTube не вдалося. Скасувати можна в Налаштуваннях → Фільтри.</string>
+    <string name="filters_tell_youtube">Також повідомляти YouTube</string>
+    <string name="filters_tell_youtube_note">«Приховати виконавця» також надсилає YouTube «Не рекомендувати виконавця», коли елемент це пропонує (Головна та інші добірки, елемент з одним виконавцем). Це змінює рекомендації для всього облікового запису, у кожному застосунку YouTube Music, і скасувати це з Meteora не можна: якщо прибрати правило тут, виконавця знову буде видно лише в Meteora.</string>
     <string name="listen_clear_confirm">Розумні завантаження почнуть вчитися з нуля. Уже завантажені пісні залишаться.</string>
     <string name="action_clear">Очистити</string>
 </resources>

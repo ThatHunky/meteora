@@ -146,6 +146,7 @@ private fun ItemAction.label(): Pair<Int, ImageVector> = when (this) {
     ItemAction.Download -> R.string.action_download to Icons.Outlined.Download
     ItemAction.RemoveDownload -> R.string.action_remove_download to Icons.Outlined.Delete
     ItemAction.HideArtist -> R.string.filters_hide_artist to Icons.Outlined.Block
+    ItemAction.NotInterested -> R.string.filters_not_interested to dev.thathunky.meteora.ui.filter.NotInterestedIcon
 }
 
 @Composable

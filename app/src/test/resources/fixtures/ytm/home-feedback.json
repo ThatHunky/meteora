@@ -1,0 +1,71 @@
+{
+  "_note": "Hand-made, shaped after the menu entries the probe logged on Home (docs/api-notes.md › Feedback). Tokens are fake.",
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "tabs": [{
+        "tabRenderer": {
+          "content": {
+            "sectionListRenderer": {
+              "contents": [{
+                "musicCarouselShelfRenderer": {
+                  "header": { "musicCarouselShelfBasicHeaderRenderer": { "title": { "runs": [{ "text": "Quick picks" }] } } },
+                  "contents": [
+                    {
+                      "musicResponsiveListItemRenderer": {
+                        "flexColumns": [
+                          { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Song One", "navigationEndpoint": { "watchEndpoint": { "videoId": "aaaaaaaaaaa" } } }] } } },
+                          { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "Throwaway Band", "navigationEndpoint": { "browseEndpoint": { "browseId": "UCthrowaway", "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_ARTIST" } } } } }] } } }
+                        ],
+                        "playlistItemData": { "videoId": "aaaaaaaaaaa" },
+                        "menu": {
+                          "menuRenderer": {
+                            "items": [
+                              { "menuNavigationItemRenderer": { "text": { "runs": [{ "text": "Start radio" }] }, "icon": { "iconType": "MIX" }, "navigationEndpoint": { "watchEndpoint": { "videoId": "aaaaaaaaaaa", "playlistId": "RDAMVMaaaaaaaaaaa" } } } },
+                              { "toggleMenuServiceItemRenderer": { "defaultText": { "runs": [{ "text": "Save to library" }] }, "defaultIcon": { "iconType": "LIBRARY_ADD" }, "defaultServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_LIBRARY_ADD" } }, "toggledIcon": { "iconType": "LIBRARY_SAVED" }, "toggledServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_LIBRARY_REMOVE" } } } },
+                              { "menuServiceItemRenderer": { "text": { "runs": [{ "text": "Not interested" }] }, "icon": { "iconType": "NOT_INTERESTED" }, "serviceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_NOT_INTERESTED_1", "actions": [{ "clickTrackingParams": "x" }] } } } },
+                              { "menuServiceItemRenderer": { "text": { "runs": [{ "text": "Don't recommend artist" }] }, "icon": { "iconType": "REMOVE_CIRCLE" }, "serviceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_DONT_RECOMMEND_1", "actions": [{ "clickTrackingParams": "y" }] } } } }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "musicTwoRowItemRenderer": {
+                        "title": { "runs": [{ "text": "Album Two" }] },
+                        "subtitle": { "runs": [{ "text": "Album" }, { "text": " • " }, { "text": "Other Artist", "navigationEndpoint": { "browseEndpoint": { "browseId": "UCother", "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_ARTIST" } } } } }] },
+                        "navigationEndpoint": { "browseEndpoint": { "browseId": "MPREb_two", "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_ALBUM" } } } },
+                        "menu": {
+                          "menuRenderer": {
+                            "items": [
+                              { "toggleMenuServiceItemRenderer": { "defaultIcon": { "iconType": "KEEP" }, "defaultServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_KEEP" } }, "toggledIcon": { "iconType": "KEEP_OFF" }, "toggledServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_UNKEEP" } } } },
+                              { "toggleMenuServiceItemRenderer": { "defaultIcon": { "iconType": "BOOKMARK_BORDER" }, "defaultServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_BOOKMARK" } }, "toggledIcon": { "iconType": "BOOKMARK" }, "toggledServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_UNBOOKMARK" } } } },
+                              { "menuServiceItemRenderer": { "text": { "runs": [{ "text": "Not interested" }] }, "icon": { "iconType": "NOT_INTERESTED" }, "serviceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_NOT_INTERESTED_2" } } } }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "musicTwoRowItemRenderer": {
+                        "title": { "runs": [{ "text": "Playlist Three" }] },
+                        "subtitle": { "runs": [{ "text": "Playlist" }] },
+                        "navigationEndpoint": { "browseEndpoint": { "browseId": "VLPLthree", "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_PLAYLIST" } } } },
+                        "menu": {
+                          "menuRenderer": {
+                            "items": [
+                              { "toggleMenuServiceItemRenderer": { "defaultIcon": { "iconType": "LIBRARY_ADD" }, "defaultServiceEndpoint": { "feedbackEndpoint": { "feedbackToken": "FAKE_PLAYLIST_ADD" } } } }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }]
+            }
+          }
+        }
+      }]
+    }
+  }
+}

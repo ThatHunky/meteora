@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.filter.ContentFilter
+import dev.thathunky.meteora.filter.Dismissals
+import dev.thathunky.meteora.filter.withoutDismissed
 import dev.thathunky.meteora.filter.Place
 import dev.thathunky.meteora.ytm.ArtistPage
 import dev.thathunky.meteora.ytm.MusicItem
@@ -16,17 +18,19 @@ import javax.inject.Inject
 
 /** The content filter for the one-line hooks in browse screens. */
 @HiltViewModel
-class FilterHookViewModel @Inject constructor(val filter: ContentFilter) : ViewModel()
+class FilterHookViewModel @Inject constructor(val filter: ContentFilter, val dismissals: Dismissals) : ViewModel()
 
 /**
  * Home's shelves as the filter leaves them. Filtered again when a rule changes (Hide artist from
  * a long-press shows at once), not when an artist's country arrives: that applies from the next
- * load, so cards do not vanish under a finger.
+ * load, so cards do not vanish under a finger. Items removed with Not interested are left out
+ * whatever the rules and places say, until the next load.
  */
 @Composable
 fun rememberFilteredShelves(shelves: List<Shelf>, place: Place = Place.Home, vm: FilterHookViewModel = hiltViewModel()): List<Shelf> {
     val settings by vm.filter.settings.collectAsStateWithLifecycle()
-    return remember(shelves, settings) { vm.filter.shelves(shelves, place, settings) }
+    val dismissed by vm.dismissals.tokens.collectAsStateWithLifecycle()
+    return remember(shelves, settings, dismissed) { withoutDismissed(vm.filter.shelves(shelves, place, settings), dismissed) }
 }
 
 /**
@@ -37,8 +41,9 @@ fun rememberFilteredShelves(shelves: List<Shelf>, place: Place = Place.Home, vm:
 @Composable
 fun rememberFilteredArtistPage(page: ArtistPage, vm: FilterHookViewModel = hiltViewModel()): ArtistPage {
     val settings by vm.filter.settings.collectAsStateWithLifecycle()
-    return remember(page, settings) {
-        page.copy(shelves = vm.filter.shelves(page.shelves, Place.ArtistShelves, settings, ::isRelatedShelf))
+    val dismissed by vm.dismissals.tokens.collectAsStateWithLifecycle()
+    return remember(page, settings, dismissed) {
+        page.copy(shelves = withoutDismissed(vm.filter.shelves(page.shelves, Place.ArtistShelves, settings, ::isRelatedShelf), dismissed))
     }
 }
 

@@ -295,6 +295,16 @@ Downloads are for Premium accounts only, so Meteora has to tell. Nothing here ha
 - **Rule** (`PremiumMarkers.isPremium`, fail closed): `LOGGED_IN` and `IS_SUBSCRIBER` both `true` on the signed-in page, and the account menu read and offering no upgrade. A missing upsell alone never counts as Premium.
 - **Probe:** `adb shell am broadcast -a dev.thathunky.meteora.PROBE_PREMIUM -p dev.thathunky.meteora`, then `adb logcat -s PremiumCheck`. It logs the three markers and the menu's icon types and browse ids.
 - **Fixtures:** `fixtures/ytm/account-menu-free.json` (the real signed-out menu, tracking fields removed) and `account-menu-premium.json` (hand-made: the same without the upgrade entry, plus a made-up header).
+
+### Feedback: "Not interested" and "Don't recommend artist" (probed on the phone 2026‑11‑22, signed in, Premium account)
+
+Used by Hide artist and Not interested (`docs/feedback-plan.md`, `filter/YouTubeFeedback.kt`).
+- **Where the tokens are:** an item's own `menu.menuRenderer.items[]` in the signed-in `WEB_REMIX` Home browse. `LikeProbe.menus` (`adb shell am broadcast -a dev.thathunky.meteora.PROBE_LIKES -p dev.thathunky.meteora --es menus home`) logged `label x26: REMOVE_CIRCLE "Don't recommend artist" endpoint keys=[feedbackToken, actions]` and `label x38: NOT_INTERESTED "Not interested" endpoint keys=[feedbackToken, actions]`, both `menuServiceItemRenderer` with `serviceEndpoint.feedbackEndpoint`, and 332 `feedbackEndpoint`s with a token on Home in all. A watch queue (`next`) has neither entry. Which item kinds carry them (songs, albums, playlists, artist cards) was not logged.
+- **Telling them apart:** by `icon.iconType`, since the labels are translated under `hl=uk`. The library toggles (`toggleMenuServiceItemRenderer`, icons `KEEP`, `BOOKMARK_BORDER`, `LIBRARY_ADD`) also carry `feedbackEndpoint` tokens under `defaultServiceEndpoint` / `toggledServiceEndpoint`; the parser reads only `menuServiceItemRenderer` entries.
+- **`actions` on the endpoint:** present on both, not inspected (most likely the toast YouTube shows). No undo token is known, so telling YouTube is one-way from Meteora.
+- **The call** (from the open-source clients' notes; **not yet seen answering on the phone**): `POST music.youtube.com/youtubei/v1/feedback?prettyPrint=false` as `WEB_REMIX`, signed in (cookie + `SAPISIDHASH`), body `{"context": {...}, "feedbackTokens": ["<token>"]}`. Expected answer `{"feedbackResponses": [{"isProcessed": true}]}`; Meteora counts only `isProcessed: true` as told. A token is single-use and bound to the response it came from. The app logs only `hide artist: token=<bool> artists=<n> tellYouTube=<bool>` and `feedback isProcessed=<bool>` (or `feedback failed: <exception class> HTTP <status>`) under the tag `YtmFeedback`, never the token or the answer.
+- **Fixture:** `fixtures/ytm/home-feedback.json`, hand-made after the probe's output, with fake tokens.
+
 ## 3. MusicBrainz artist search (probed 2026‑11‑22, anonymous, from the PC; no phone)
 
 Used only for the content filter's country rules (`filter/MusicBrainz.kt`).

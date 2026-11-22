@@ -148,6 +148,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
     val longPress: (MusicItem) -> Unit = { sheetFor = it }
     // Here rather than in the sheet: its "which artist?" dialog outlives the sheet.
     val hideArtist = dev.thathunky.meteora.ui.filter.rememberHideArtist()
+    val notInterested = dev.thathunky.meteora.ui.filter.rememberNotInterested()
     val goBack: () -> Unit = {
         val s = stacks[tabIndex]
         if (s.size > 1) s.removeAt(s.lastIndex)
@@ -276,7 +277,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     ItemAction.RemoveDownload -> actions.removeDownload(item)
                     ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { push(AlbumRoute(it)) }
                     ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { push(ArtistRoute(it)) }
-                    ItemAction.HideArtist -> hideArtist(dev.thathunky.meteora.ui.filter.hideableArtists(item))
+                    ItemAction.HideArtist -> hideArtist(dev.thathunky.meteora.ui.filter.hideableArtists(item), item.feedback?.dontRecommendArtist)
+                    ItemAction.NotInterested -> notInterested(item)
                 }
             },
             onDismiss = { sheetFor = null },

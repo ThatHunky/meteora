@@ -37,6 +37,11 @@ data class FilterSettings(
     val placesOff: Set<Place> = emptySet(),
     /** Look up artists' countries on MusicBrainz. Only used while a country rule exists. */
     val musicBrainz: Boolean = true,
+    /**
+     * Hide artist also sends YouTube "Don't recommend artist" when the item carries that token.
+     * On by default; it acts on the whole account and Meteora cannot take it back.
+     */
+    val tellYouTube: Boolean = true,
 ) {
     /** True when no rule could hide or force anything: filtering can be skipped. */
     val hasRules: Boolean

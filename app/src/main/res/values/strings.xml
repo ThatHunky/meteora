@@ -300,6 +300,13 @@
     <string name="filters_script_kana">Kana (Japanese)</string>
     <string name="filters_script_hangul">Hangul (Korean)</string>
     <string name="filters_script_thai">Thai</string>
+    <string name="filters_not_interested">Not interested</string>
+    <string name="filters_not_interested_toast">Removed. YouTube was told you are not interested.</string>
+    <string name="filters_not_interested_failed_toast">Removed for now. YouTube could not be told, so it may come back.</string>
+    <string name="filters_hidden_told_toast">%1$s is hidden, and YouTube was told not to recommend them. Settings → Filters can undo only the hiding.</string>
+    <string name="filters_hidden_not_told_toast">%1$s is hidden here, but YouTube could not be told. Undo it in Settings → Filters.</string>
+    <string name="filters_tell_youtube">Also tell YouTube</string>
+    <string name="filters_tell_youtube_note">Hide artist also sends YouTube “Don\'t recommend artist” when the item offers it (Home and other shelves, an item with one artist). This changes recommendations for your whole account, in every YouTube Music app, and cannot be undone from Meteora: removing the rule here only shows the artist again in Meteora.</string>
     <string name="listen_clear_confirm">Smart downloads will start learning from scratch. Songs already downloaded stay.</string>
     <string name="action_clear">Clear</string>
 </resources>
