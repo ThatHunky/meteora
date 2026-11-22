@@ -81,6 +81,7 @@ class FiltersViewModel @Inject constructor(private val store: FilterStore, priva
     fun setCountry(code: String, v: Verdict?) = store.update { it.copy(countries = it.countries.with(code, v)) }
     fun setPlace(p: Place, on: Boolean) = store.update { it.copy(placesOff = if (on) it.placesOff - p else it.placesOff + p) }
     fun setMusicBrainz(on: Boolean) = store.update { it.copy(musicBrainz = on) }
+    fun setTellYouTube(on: Boolean) = store.update { it.copy(tellYouTube = on) }
 
     fun setArtist(rule: ArtistRule, v: Verdict?) = store.update { s ->
         val rest = s.artists.filterNot { it == rule }
@@ -214,6 +215,10 @@ private fun ArtistsSection(vm: FiltersViewModel, s: FilterSettings) {
     if (s.artists.isEmpty()) SettingsNote(stringResource(R.string.filters_artists_none))
     s.artists.forEach { r -> RuleRow(r.name, r.verdict) { vm.setArtist(r, it) } }
     AddRow(stringResource(R.string.filters_artist_name), vm::addArtist)
+    SettingsSwitchRow(
+        stringResource(R.string.filters_tell_youtube), s.tellYouTube, vm::setTellYouTube,
+        supporting = stringResource(R.string.filters_tell_youtube_note),
+    )
 }
 
 @Composable

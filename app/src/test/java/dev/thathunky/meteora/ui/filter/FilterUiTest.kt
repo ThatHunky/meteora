@@ -25,6 +25,13 @@ class FilterUiTest {
         assertEquals(listOf(ItemAction.HideArtist), filterActions(MusicItem.Album("MPREb_1", "X", "Album • Y", null, null, listOf(ArtistRef("Y", "UCy")))))
     }
 
+    @Test fun `Not interested is offered only when YouTube gave its token`() {
+        val song = MusicItem.Song("v", "T", listOf(ArtistRef("A", "UCa")), null, null, null, isVideo = false)
+        assertEquals(listOf(ItemAction.HideArtist), filterActions(song.copy(feedback = dev.thathunky.meteora.ytm.ItemFeedback(null, "D"))))
+        assertEquals(listOf(ItemAction.HideArtist, ItemAction.NotInterested), filterActions(song.copy(feedback = dev.thathunky.meteora.ytm.ItemFeedback("N", "D"))))
+        assertEquals(listOf(ItemAction.NotInterested), filterActions(MusicItem.Playlist("VLPL1", "Mix", "", null, "PL1", dev.thathunky.meteora.ytm.ItemFeedback("N", null))))
+    }
+
     @Test fun `Now Playing's artist line is offered whole with the channel, then in pieces`() {
         assertEquals(
             listOf(ArtistRef("Simon & Garfunkel", "UCsg"), ArtistRef("Simon", null), ArtistRef("Garfunkel", null)),
