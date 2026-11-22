@@ -469,3 +469,23 @@ Brought onto `main` by cherry-pick, not merge: the history had just been rewritt
 - **Wrong:** the album folder is "Singles" though the track is on an album: a Home card carries no album, so the file was named without one. A download should look the album up before naming the file.
 - **Not checked:** airplane mode (it would drop wireless adb), albums and playlists, removal, Wi‑Fi only, the Downloads tab, smart downloads and the listening log, another player's view of the cover.
 - **"Singles" fixed (02:20).** Before downloading, a song without an album now asks the watch queue for it and reads the album page for the track number and year. The first try put the file under an artist called "6.4M plays": on an album page the track rows' second column is the play count, and the album artist was being taken from there, for whole-album downloads too. It now comes from the page header. On the phone the same song landed at `Music/Meteora/Radiohead/If You Say the Word/01 If You Say the Word.m4a` with album artist, track 1 and year 2021 in its tags; removing a download deleted the file.
+
+## Content filter: hiding music by language, country or artist (02:00 →)
+
+The user asked whether music could be hidden by language or country of origin, and then that it be "fully customizable". Built from `docs/filter-plan.md` (its later sections override the first bullets) in a worktree, while downloads were being built on another branch, so existing files got only single-line additions.
+
+### What was built
+
+- **Rules, all off by default:** artists (Hide / Always show, by YouTube id or by name), the user's own words, countries (any ISO country), 20 languages (Show / Hide / Always show) and 10 scripts (Show / Hide). Precedence: artist, word, country, language, script; inside one level Always show beats Hide; a rule left at Show has no opinion. "Hide Cyrillic that is not clearly Ukrainian" is Cyrillic = Hide plus Ukrainian = Always show.
+- **Language guess:** from the letters of the title and the artists' names only (not subtitles, which carry YouTube's Cyrillic labels under `hl=uk`). Each language is a rule object: its script, its telling letters, and the letters that rule it out. The plan's letters overlap (Bulgarian writes ъ, Belarusian and Kazakh use ы э ё і), so the exclusions matter; text two rules of one script claim is left to the script rules.
+- **Where:** Home shelves, the "Fans might also like" row of artist pages, and the phone's radio and autoplay queues (the tapped song always stays, and a page the filter empties is followed by up to three more). Each has a switch, and so do smart downloads, which do not exist on this branch: they should call `ContentFilter.allows(song, Place.SmartDownloads)`. Search, the library, albums, playlists and anything opened or tapped are never filtered. A shelf the filter thins below three items is dropped. The PC builds its own radio, so radio on the PC is not filtered.
+- **Countries:** looked up on MusicBrainz only while a country rule exists and its switch is on; one request a second at most, anonymous, TLS only, cached on the phone for 90 days. A match needs a score of 95 and an equal name or alias; equal names with different countries are unknown, and an unknown artist is shown. An artist is shown until its answer arrives; the answer applies from the next load.
+- **Settings → Filters:** every list editable, a Test field that says what the filter does with a title and artist and which rule decided, and Hide artist in the long-press sheet (songs, albums with a linked artist, artists) and Now Playing's menu, with a toast saying where to undo it.
+
+### Checked
+
+Build, and 185 Kotlin unit tests passing (62 new: the language guess on real-looking Ukrainian, Russian, Belarusian, Bulgarian, Serbian, Kazakh, Latin and other titles; each precedence pair both ways; shelves and queues; the settings codec; album artists from the search fixture; MusicBrainz matching on three real answers, the request it sends, the 503, and the cache). MusicBrainz was asked from the PC with curl to learn the answer's shape (`docs/api-notes.md` › MusicBrainz). **Nothing was run on a phone:** the Filters screen in any look or in Ukrainian, Home and artist pages with rules set, radio and autoplay filtering, Hide artist and its toast and dialog, and lookups from the phone are all unchecked.
+
+### Known limits
+
+A Russian artist with an English title passes; Cyrillic with no telling letter is undecided; Finnish, Hungarian without ő ű, and metal umlauts ("Motörhead") read as German; Italian è reads as French; Portuguese with only á é í ó ú reads as Spanish; Japanese titles in kanji only read as Chinese. The Test field shows each of these.

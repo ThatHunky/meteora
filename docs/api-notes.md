@@ -295,3 +295,12 @@ Downloads are for Premium accounts only, so Meteora has to tell. Nothing here ha
 - **Rule** (`PremiumMarkers.isPremium`, fail closed): `LOGGED_IN` and `IS_SUBSCRIBER` both `true` on the signed-in page, and the account menu read and offering no upgrade. A missing upsell alone never counts as Premium.
 - **Probe:** `adb shell am broadcast -a dev.thathunky.meteora.PROBE_PREMIUM -p dev.thathunky.meteora`, then `adb logcat -s PremiumCheck`. It logs the three markers and the menu's icon types and browse ids.
 - **Fixtures:** `fixtures/ytm/account-menu-free.json` (the real signed-out menu, tracking fields removed) and `account-menu-premium.json` (hand-made: the same without the upgrade entry, plus a made-up header).
+## 3. MusicBrainz artist search (probed 2026‑11‑22, anonymous, from the PC; no phone)
+
+Used only for the content filter's country rules (`filter/MusicBrainz.kt`).
+
+- **Request:** `GET https://musicbrainz.org/ws/2/artist?query="<name>"&fmt=json&limit=5`, no key, a descriptive User-Agent (Meteora sends `Meteora/<version> (Android music player)`). A query with the `artist:` field matches the main name only (`artist:"Okean Elzy"` gave 0 results); the bare phrase also searches aliases and sort names.
+- **Answer:** `artists[]` with `score` (0–100), `name`, `sort-name`, `country` (ISO 3166‑1, may be missing), `area {type, name}`, `aliases[] {name, locale, type}`, `disambiguation`.
+- **Examples:** `"Okean Elzy"` → one artist, name `Океан Ельзи`, country `UA`, score 100 through its alias. `"Nirvana"` → the US band at 100, the UK one at 81, then 75 and below. `"Кино"` → `RU` at 100, the rest at 71 and below.
+- **Busy:** about half of the first requests got `503` with `{"error": "The MusicBrainz web server is currently busy. Please try again later."}` even a few seconds apart, with `X-RateLimit-*` headers on the successful ones. The app treats a non-200 as "not answered" and backs off; it never caches it.
+- **Fixtures:** `fixtures/musicbrainz/artist-okean-elzy.json`, `artist-nirvana.json`, `artist-kino.json`, trimmed to the fields above and five artists.
