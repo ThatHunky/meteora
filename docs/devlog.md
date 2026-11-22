@@ -658,3 +658,10 @@ The debug build, and 275 unit tests passing (10 new).
 **Not checked, no phone:** all of it on a screen. The widths are estimates from character counts, not measurements. The headers and Now Playing rows in all five looks and both languages, the compact and wrapped forms, two-line segments, the new chips, switches and volume bar, the sign-in loader, and TalkBack on the volume bar and the chips have not been seen.
 
 - **The sweep on the OP7T (03:45):** in Terminal the playlist header from the owner's screenshot now reads `[ play ] [ shuffle ] [ download ] [ share ]` on one line, all on one baseline, nothing cut. Now Playing in Terminal: the top row keeps the target chip with Lyrics as an icon and `[ queue ]` as text; `[ download ] [ dislike ] [ like ]` and the transport row are aligned. The same playlist page and opening Now Playing in Expressive look as before. Not checked: Ukrainian, 360 dp, font scale 1.3, Retro and Soft, the new chips, switches and volume bar, and the items the sweep only reported (Library's Play / Shuffle row, the download button's width while downloading, Material dialogs in downloads).
+
+## Alpha 2: the first build signed with the release key (2026-11-22, morning)
+
+The owner created the release key (kept outside the repository, read through the git-ignored `keystore.properties`). `scripts/release.ps1` now builds and publishes the minified release build and refuses to run without that file, since Gradle would fall back to the debug key and nobody could update to the result.
+
+- **Checked:** `apksigner verify --print-certs` shows the owner's certificate on the release APK and "Android Debug" on the debug one. On the OP7T the signed build would not install over the debug-signed one (as expected: a different key), so the app was uninstalled and installed fresh. It opened at the pairing screen as version 0.1.0-alpha.2 (code 2), "Use without a PC" went to the signed-out Home, and a searched song played 0.9 s after the tap.
+- **Not checked in the signed build:** signing in, the PC target, downloads, video, and the updater's real path, which needs alpha 3.

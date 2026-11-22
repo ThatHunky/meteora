@@ -104,9 +104,12 @@ if ($last) {
 }
 
 # ---- Build and test ----
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest --console=plain -q
+# The published build is the minified release build signed with the release key. Without
+# keystore.properties Gradle would sign it with the debug key, and nobody could update to it.
+if (-not (Test-Path 'keystore.properties')) { Stop-Release 'keystore.properties is missing: the build would be signed with the debug key.' }
+.\gradlew.bat :app:assembleRelease :app:testDebugUnitTest --console=plain -q
 if ($LASTEXITCODE -ne 0) { Stop-Release 'the build or the tests failed.' }
-$built = 'app/build/outputs/apk/debug/app-debug.apk'
+$built = 'app/build/outputs/apk/release/app-release.apk'
 if (-not (Test-Path $built)) { Stop-Release "no APK at $built." }
 New-Item -ItemType Directory -Force build/release | Out-Null
 $apk = "build/release/meteora-$($current.Name).apk"
