@@ -135,6 +135,7 @@ class LocalEngine @Inject constructor(
     @AppScope private val scope: CoroutineScope,
     private val autoplay: AutoplayStore,
     private val downloads: dev.thathunky.meteora.downloads.DownloadManager,
+    private val filter: dev.thathunky.meteora.filter.ContentFilter,
 ) {
     private val _state = MutableStateFlow<PlaybackState?>(null)
     val state: StateFlow<PlaybackState?> = _state.asStateFlow()
@@ -151,6 +152,8 @@ class LocalEngine @Inject constructor(
     /** What to append once an album or playlist runs out (autoplay). Used once, then its radio continues. */
     private var automix: AutomixRef? = null
     private var extending = false
+    /** The queue is a radio (or autoplay's): its further pages go through the content filter. */
+    @Volatile private var radioQueue = false
     private var unshuffled: List<String>? = null
     private val likes = HashMap<String, LikeStatus>()
     /** Tracks the user rated in this session; YouTube's answer no longer overrides these. */
@@ -602,6 +605,7 @@ class LocalEngine @Inject constructor(
             is PlayIntent.Collection -> ytm.watchQueue(intent.startVideoId, intent.playlistId)
             PlayIntent.LikedSongs -> ytm.watchQueue(playlistId = "LM")
         }.also { playlistId = (intent as? PlayIntent.Collection)?.playlistId ?: (intent as? PlayIntent.SongRadio)?.let { "RDAMVM${it.videoId}" } ?: "LM" }
+            .let { q -> radioQueue = dev.thathunky.meteora.filter.FilterApply.isRadio(intent); filter.startQueue(q, intent) }
             .let { q ->
                 // Shuffle without a chosen track (from a list's menu): start on a random one, as YTM does.
                 val randomStart = shuffle && intent is PlayIntent.Collection && intent.startVideoId == null && q.songs.isNotEmpty()
@@ -756,7 +760,7 @@ class LocalEngine @Inject constructor(
         scope.launch {
             val more: WatchQueue? = runCatching {
                 if (token != null) ytm.watchQueueContinuation(token) else ytm.watchQueue(playlistId = mix!!.playlistId, params = mix.params)
-            }.getOrNull()
+            }.getOrNull()?.let { if (token == null || radioQueue) filter.radioPage(it) { c -> ytm.watchQueueContinuation(c) } else it }
             withContext(Dispatchers.Main) {
                 extending = false
                 if (more == null) return@withContext
@@ -766,6 +770,7 @@ class LocalEngine @Inject constructor(
                 // A long playlist pages through continuations first; its automix may come on a later page.
                 automix = if (token == null) null else more.automix ?: automix
                 if (token == null) Log.i(TAG, "autoplay: ${mix?.playlistId}, ${more.songs.size} tracks")
+                if (token == null) radioQueue = true
                 mergeLikes(more.likes)
                 val have = (0 until p.mediaItemCount).map { p.getMediaItemAt(it).mediaId }.toSet()
                 val fresh = more.songs.filter { it.videoId !in have }.map { it.toLocal() }

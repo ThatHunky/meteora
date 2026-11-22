@@ -238,7 +238,7 @@ object YtmParser {
     private fun browseItem(browse: JsonElement, title: String, subtitle: String, thumb: String?, ctx: JsonObject): MusicItem? {
         val id = browse.str("browseId") ?: return null
         return when (browse.pageTypeOfEndpoint()) {
-            PT_ALBUM, PT_AUDIOBOOK -> MusicItem.Album(id, title, subtitle, thumb, ctx.findAll("watchPlaylistEndpoint").firstOrNull()?.str("playlistId"))
+            PT_ALBUM, PT_AUDIOBOOK -> MusicItem.Album(id, title, subtitle, thumb, ctx.findAll("watchPlaylistEndpoint").firstOrNull()?.str("playlistId"), linkedArtists(ctx))
             PT_ARTIST, PT_LIBRARY_ARTIST, PT_USER_CHANNEL -> MusicItem.Artist(id, title, subtitle, thumb)
             PT_PLAYLIST, PT_PODCAST -> MusicItem.Playlist(id, title, subtitle, thumb, id.removePrefix("VL"))
             else -> if (id.startsWith("VL")) MusicItem.Playlist(id, title, subtitle, thumb, id.removePrefix("VL")) else null
@@ -255,6 +255,14 @@ object YtmParser {
         return runs.map { it.str("text").orEmpty().trim() }
             .firstOrNull { it.isNotEmpty() && it != "•" && it !in TYPE_LABELS && !DURATION.matches(it) }
             ?.let { listOf(ArtistRef(it, null)) }.orEmpty()
+    }
+
+    /** Artists a card's or row's subtitle links to; none when it links none (no guessing from plain text). */
+    private fun linkedArtists(ctx: JsonObject): List<ArtistRef> {
+        val runs = ctx["subtitle"]["runs"].array() +
+            ctx["flexColumns"].array().drop(1).flatMap { it["musicResponsiveListItemFlexColumnRenderer"]["text"]["runs"].array() }
+        return runs.filter { it.pageType() == PT_ARTIST || it.pageType() == PT_USER_CHANNEL }
+            .map { ArtistRef(it.str("text").orEmpty(), it["navigationEndpoint"]["browseEndpoint"].str("browseId")) }
     }
 
     private fun cleanSubtitle(s: String) = s.split(" • ").filterNot { it in TYPE_LABELS }.joinToString(" • ")

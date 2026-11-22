@@ -214,6 +214,7 @@ fun ArtistScreen(
     LaunchedEffect(browseId, vm) { vm.load(browseId) }
     val page by vm.page.collectAsStateWithLifecycle()
     Loaded(page, onRetry = { vm.load(browseId, force = true) }, bottomPadding = bottomPadding) { p ->
+        @Suppress("NAME_SHADOWING") val p = dev.thathunky.meteora.ui.filter.rememberFilteredArtistPage(p)
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.name, null, null, round = true)

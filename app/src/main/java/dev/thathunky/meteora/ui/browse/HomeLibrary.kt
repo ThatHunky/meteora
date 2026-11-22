@@ -145,6 +145,7 @@ fun HomeScreen(
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
         if (home is Load.Failed && dev.thathunky.meteora.ui.downloads.OfflineHomeNote()) return@PullToRefreshBox
         Loaded(home, onRetry = { vm.retry() }, bottomPadding = bottomPadding) { shelves ->
+            @Suppress("NAME_SHADOWING") val shelves = dev.thathunky.meteora.ui.filter.rememberFilteredShelves(shelves)
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding)) {
                 item(key = "header") { header() }
                 item(key = "title") { PageTitle(stringResource(R.string.nav_home)) }
