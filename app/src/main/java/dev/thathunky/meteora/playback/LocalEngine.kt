@@ -456,6 +456,14 @@ class LocalEngine @Inject constructor(
             publish()
         }
 
+        /** The listening log for smart downloads: where the track that was left got to, and whether the user moved on. */
+        override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
+            val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION
+            // A seek within the track, or the queue rearranged around it, is not leaving it.
+            if (!auto && (reason != Player.DISCONTINUITY_REASON_SEEK || old.mediaItem?.mediaId == new.mediaItem?.mediaId)) return
+            old.mediaItem?.let { downloads.listens.left(it.toLocalSong(), old.positionMs, byUser = !auto) }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying && tappedAt != 0L) {
                 Log.i(TAG, "playing ${SystemClock.elapsedRealtime() - tappedAt} ms after the tap")

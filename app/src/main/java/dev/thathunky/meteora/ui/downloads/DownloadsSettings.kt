@@ -1,6 +1,11 @@
 package dev.thathunky.meteora.ui.downloads
 
+import android.text.format.DateUtils
 import android.text.format.Formatter
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Slider
+import dev.thathunky.meteora.downloads.DownloadSettings
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
@@ -87,6 +92,43 @@ fun DownloadsSettingsSection(vm: DownloadsViewModel = hiltViewModel()) {
     }
 }
 
-/** Filled in by smart downloads (D5). */
+/** Smart downloads: the switch, the size, "Refresh now", what the last refresh did, and the listening history. */
 @Composable
-private fun SmartDownloadsSettings(vm: DownloadsViewModel) = Unit
+private fun SmartDownloadsSettings(vm: DownloadsViewModel) {
+    val s = vm.downloads.settings
+    val on by s.smartEnabled.collectAsStateWithLifecycle()
+    val size by s.smartSize.collectAsStateWithLifecycle()
+    val last by s.lastRefresh.collectAsStateWithLifecycle()
+    var dragging by remember(size) { mutableStateOf(size.toFloat()) }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.smart_title)) },
+        supportingContent = { Text(stringResource(R.string.smart_text, dragging.roundToInt())) },
+        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = vm.smart::setEnabled),
+    )
+    if (!on) return
+    Slider(
+        value = dragging,
+        onValueChange = { dragging = it },
+        onValueChangeFinished = { s.setSmartSize(dragging.roundToInt()) },
+        valueRange = 0f..DownloadSettings.SMART_MAX.toFloat(),
+        steps = DownloadSettings.SMART_MAX / 10 - 1,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(lastRefreshText(last), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    MButton(stringResource(R.string.smart_refresh), vm.smart::refreshNow, kind = ButtonKind.Tonal)
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.listen_clear)) },
+        supportingContent = { Text(stringResource(R.string.listen_clear_text)) },
+        modifier = Modifier.clickable { vm.downloads.listens.clear() },
+    )
+}
+
+@Composable
+private fun lastRefreshText(raw: String?): String {
+    val parts = raw?.split('|')?.mapNotNull { it.toLongOrNull() }
+    if (parts == null || parts.size != 4) return stringResource(R.string.smart_never)
+    if (parts[0] < 0) return stringResource(R.string.smart_failed)
+    val at = DateUtils.getRelativeTimeSpanString(parts[3], System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+    return stringResource(R.string.smart_last, parts[0].toInt(), parts[1].toInt(), parts[2].toInt(), at)
+}

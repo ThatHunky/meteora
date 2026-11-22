@@ -108,6 +108,46 @@ internal fun Cursor.str(col: String): String? = getString(getColumnIndexOrThrow(
 internal fun Cursor.int(col: String): Int = getInt(getColumnIndexOrThrow(col))
 internal fun Cursor.long(col: String): Long = getLong(getColumnIndexOrThrow(col))
 
+/** The listening log's rows. */
+interface ListenStore {
+    fun listens(): List<Listen>
+    fun putListen(l: Listen)
+    fun clearListens()
+}
+
+class MemoryListenStore : ListenStore {
+    private val rows = LinkedHashMap<String, Listen>()
+    @Synchronized override fun listens() = rows.values.toList()
+    @Synchronized override fun putListen(l: Listen) { rows[l.videoId] = l }
+    @Synchronized override fun clearListens() = rows.clear()
+}
+
+class SqliteListenStore(private val db: SqliteDownloadStore) : ListenStore {
+    override fun listens(): List<Listen> = db.readableDatabase.query("listens", null, null, null, null, null, null).use { c ->
+        buildList {
+            while (c.moveToNext()) add(
+                Listen(
+                    videoId = c.str("video_id")!!, plays = c.int("plays"), skips = c.int("skips"), lastPlayedMs = c.long("last_played"),
+                    title = c.str("title")!!, artist = c.str("artist")!!, album = c.str("album"), albumId = c.str("album_id"),
+                    artworkUrl = c.str("artwork"), durationSec = c.getDouble(c.getColumnIndexOrThrow("duration")),
+                ),
+            )
+        }
+    }
+
+    override fun putListen(l: Listen) {
+        db.writableDatabase.insertWithOnConflict("listens", null, ContentValues().apply {
+            put("video_id", l.videoId); put("plays", l.plays); put("skips", l.skips); put("last_played", l.lastPlayedMs)
+            put("title", l.title); put("artist", l.artist); put("album", l.album); put("album_id", l.albumId)
+            put("artwork", l.artworkUrl); put("duration", l.durationSec)
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    override fun clearListens() {
+        db.writableDatabase.delete("listens", null, null)
+    }
+}
+
 /** The listening log's table (D5), in the same database. */
 internal object ListenTables {
     fun create(db: SQLiteDatabase) {

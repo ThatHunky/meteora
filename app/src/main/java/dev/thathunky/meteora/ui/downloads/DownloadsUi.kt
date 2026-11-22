@@ -62,7 +62,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flowOf
 
 @HiltViewModel
-class DownloadsViewModel @Inject constructor(val downloads: DownloadManager, val actions: MusicActions) : ViewModel()
+class DownloadsViewModel @Inject constructor(
+    val downloads: DownloadManager,
+    val actions: MusicActions,
+    val smart: dev.thathunky.meteora.downloads.SmartDownloads,
+) : ViewModel()
 
 /** Asks the shell to open the Downloads page (from Home's offline note). */
 object DownloadsNav {

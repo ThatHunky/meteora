@@ -65,7 +65,10 @@ class DownloadManager @Inject constructor(
     val settings: DownloadSettings,
     @AppScope private val scope: CoroutineScope,
 ) {
-    val index = DownloadIndex(SqliteDownloadStore(context))
+    private val db = SqliteDownloadStore(context)
+    val index = DownloadIndex(db)
+    /** Smart downloads' listening log, in the same database. Written by LocalEngine (phone target only). */
+    val listens = ListenLog(SqliteListenStore(db), scope)
     private val http = okHttp
     private val downloader = Downloader(context, okHttp, resolver)
     private val gateLock = Mutex()
@@ -85,17 +88,17 @@ class DownloadManager @Inject constructor(
 
     // ---- the gate ----
 
-    /** True when downloading is allowed now; otherwise tells the UI and returns false. */
-    suspend fun allowed(forceCheck: Boolean = false): Boolean = gateLock.withLock {
+    /** True when downloading is allowed now; otherwise tells the UI (when [notify]) and returns false. */
+    suspend fun allowed(forceCheck: Boolean = false, notify: Boolean = true): Boolean = gateLock.withLock {
         val signedIn = runCatching { auth.headers() }.getOrNull() != null
         val now = System.currentTimeMillis()
         when (DownloadsGate.decide(signedIn, settings.premiumAtMs, now, forceCheck)) {
             DownloadsGate.Decision.Allowed -> true
-            DownloadsGate.Decision.SignedOut -> false.also { _blocked.tryEmit(Blocked.SignedOut) }
+            DownloadsGate.Decision.SignedOut -> false.also { if (notify) _blocked.tryEmit(Blocked.SignedOut) }
             DownloadsGate.Decision.Check -> {
                 val ok = premium.isPremium()
                 settings.premiumAtMs = DownloadsGate.remember(ok, now)
-                if (!ok) _blocked.tryEmit(Blocked.NotPremium)
+                if (!ok && notify) _blocked.tryEmit(Blocked.NotPremium)
                 ok
             }
         }
@@ -253,6 +256,7 @@ class DownloadManager @Inject constructor(
         index.ensureLoaded()
         val covers = ConcurrentHashMap<String, ByteArray>()
         var done = 0
+        var failedInARow = 0
         while (true) {
             val batch = index.queued().take(PARALLEL)
             if (batch.isEmpty()) return true
@@ -267,6 +271,12 @@ class DownloadManager @Inject constructor(
             }
             done += batch.size
             if (ok.any { !it }) return false
+            // Smart downloads stop early when lookups keep failing: the slow fallback is not used for them.
+            failedInARow = if (batch.all { index.get(it.videoId)?.state == DownloadState.Failed }) failedInARow + batch.size else 0
+            if (failedInARow >= MAX_FAILED_IN_A_ROW && index.queued().all { it.smart && !it.manual }) {
+                Log.w(TAG, "stopping: $failedInARow downloads in a row failed")
+                return true
+            }
         }
     }
 
@@ -357,6 +367,7 @@ class DownloadManager @Inject constructor(
         private const val CHANNEL = "downloads"
         private const val NOTIFICATION_ID = 0xD0
         private const val PARALLEL = 2
+        private const val MAX_FAILED_IN_A_ROW = 6
         const val MIN_FREE_BYTES = 500L * 1024 * 1024
         private const val MAX_COVER_BYTES = 4 * 1024 * 1024
     }
