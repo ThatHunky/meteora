@@ -69,6 +69,7 @@ class SmartDownloads @Inject constructor(
     private val downloads: DownloadManager,
     private val ytm: YtmClient,
     @AppScope private val scope: CoroutineScope,
+    private val filter: dev.thathunky.meteora.filter.ContentFilter,
 ) {
     private val settings get() = downloads.settings
 
@@ -123,7 +124,12 @@ class SmartDownloads @Inject constructor(
         val entries = index.songs.value.values
         val manual = entries.filter { it.manual }.map { it.videoId }.toSet()
         val size = settings.smartSize.value
-        val wanted = SmartRules.wanted(SmartRules.Inputs(size, listens, likes, listenAgain, mix, manual, now))
+        // The content filter applies to every source when its Smart downloads switch is on.
+        val place = dev.thathunky.meteora.filter.Place.SmartDownloads
+        fun List<SmartSong>.shown() = filter { filter.allows(it.title, it.artist, place) }
+        val wanted = SmartRules.wanted(
+            SmartRules.Inputs(size, listens.filterValues { filter.allows(it.title, it.artist, place) }, likes.shown(), listenAgain.shown(), mix.shown(), manual, now),
+        )
         // Smart songs that became manual leave the set (they stay downloaded as manual) and their slot is refilled.
         val current = entries.filter { it.smart && !it.manual }.sortedBy { it.addedAtMs }.map { it.videoId }
         var plan = SmartRules.plan(current, wanted, size, listens, now)

@@ -489,3 +489,10 @@ Build, and 187 Kotlin unit tests passing (64 new: the language guess on real-loo
 ### Known limits
 
 A Russian artist with an English title passes; Cyrillic with no telling letter is undecided; Finnish, Hungarian without ő ű, and metal umlauts ("Motörhead") read as German; Italian è reads as French; Portuguese with only á é í ó ú reads as Spanish; Japanese titles in kanji only read as Chinese. The Test field shows each of these.
+
+### The filter on the OP7T (02:30)
+
+Cherry-picked onto `main` like downloads (the agent's branch started from the old history). Conflicts were all "both added a line here": the engine's constructor, the item actions, the strings. Then the piece the agent could not do on its branch: smart downloads pass every source (listening log, likes, "Listen again", the mix) through `ContentFilter.allows(…, Place.SmartDownloads)`.
+
+- **Checked:** Settings shows Filters with "Nothing hidden"; the screen has the Test field, the four place switches, artists, words, countries with the MusicBrainz switch, and the Languages and Scripts sections. Long-press on a Radiohead song → Hide artist: the card left Home at once and Settings said "1 rule"; Remove in Filters brought it back and the row read "Nothing hidden" again.
+- **Not checked:** every language and script rule, the Test field (adb cannot type Cyrillic), country rules and the MusicBrainz requests, radio and autoplay filtering, artist pages, smart downloads with a rule set, Ukrainian, the other looks.
