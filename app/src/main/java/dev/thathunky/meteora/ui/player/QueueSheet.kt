@@ -116,7 +116,8 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                             }
                         },
                         backgroundContent = {
-                            Box(
+                            // Only while the row is being swiped: at rest nothing red may sit behind it.
+                            if (dismiss.dismissDirection == SwipeToDismissBoxValue.EndToStart) Box(
                                 Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 24.dp),
                                 contentAlignment = Alignment.CenterEnd,
                             ) { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.onErrorContainer) }
@@ -161,6 +162,9 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                             marked = current,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                // Opaque in every look. Terminal's rows have no fill of their own, so the
+                                // red swipe background showed through every row of the queue.
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                                 .clickable { vm.playAt(entry.value.videoId, position) }
                                 .semantics {
                                     if (current) stateDescription = nowPlaying

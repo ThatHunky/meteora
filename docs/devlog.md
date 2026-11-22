@@ -530,3 +530,7 @@ Build, and 256 unit tests passing (17 new: both tokens parsed and the toggles ig
 
 - **On the OP7T (03:05):** the long-press sheet of a Home song now ends with Hide artist and Not interested, and Settings → Filters has "Also tell YouTube" with its note. Nothing was sent: which artist to tell YouTube about is the user's choice, and it cannot be taken back, so whether YouTube answers `isProcessed: true` is for the user's first real use (logcat tag `YtmFeedback` shows it).
 - **Release build.** The minified `release` build type was built for the first time: 25.5 MB against the debug build's 124 MB, and it runs on the phone (sign-in kept, playback and the Rust core work). It reads its signing key from a git-ignored `keystore.properties`; the key itself is the owner's to create.
+
+### "Queue is totally buggy" (03:10)
+
+The user's screenshot, in the Terminal look: every queue row solid red with a delete icon, one row hanging half swiped. The rows sit in a swipe-to-dismiss box whose red background is always drawn behind them, and Terminal's rows have no fill of their own, so the red showed through all of them. The other looks hid it by accident, with their row fill. Rows are now opaque in every look and the red background is drawn only while a row is being swiped. On the OP7T in Terminal: normal rows at rest, red only under the row being swiped, and the swiped track left the queue.
