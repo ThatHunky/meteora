@@ -157,6 +157,12 @@ class SmartRulesTest {
         val p2 = SmartRules.plan(current, w2, 2, listens, now)
         assertEquals(listOf("a"), p2.remove)
         assertEquals(listOf("n"), p2.add.map { it.videoId })
+        // A refresh whose likes or Home lookup failed replaces nothing, but still fills free room.
+        val p3 = SmartRules.plan(current, w2, 2, listens, now, replace = false)
+        assertTrue(p3.remove.isEmpty() && p3.add.isEmpty())
+        val p4 = SmartRules.plan(current, w2, 3, listens, now, replace = false)
+        assertEquals(listOf("n"), p4.add.map { it.videoId })
+        assertTrue(p4.remove.isEmpty())
     }
 
     @Test fun `at most 20 percent replaced in one refresh`() {

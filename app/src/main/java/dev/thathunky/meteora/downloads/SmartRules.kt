@@ -187,7 +187,12 @@ object SmartRules {
      * room (the set is smaller than the size) is filled without counting as replacement. A set
      * larger than the size (the size was lowered) loses its lowest scores first, whatever the rules.
      */
-    fun plan(current: List<String>, wanted: Wanted, size: Int, listens: Map<String, Listen>, nowMs: Long): Plan {
+    /**
+     * [replace]: false when part of the input could not be fetched (likes or Home failed). The
+     * wanted list is then built from less than it should be, so nothing is swapped out on its
+     * word; free room is still filled and a lowered size still applies.
+     */
+    fun plan(current: List<String>, wanted: Wanted, size: Int, listens: Map<String, Listen>, nowMs: Long, replace: Boolean = true): Plan {
         val scoreOf = { id: String -> wanted.scores[id] ?: 0.0 }
         val wantedIds = wanted.songs.map { it.videoId }.toSet()
         val protectedIds = listens.values.filter { nowMs - it.lastPlayedMs < PROTECT_DAYS * DAY_MS }.map { it.videoId }.toSet()
@@ -203,7 +208,7 @@ object SmartRules {
         val add = ArrayList<SmartSong>()
         while (keep.size + add.size < size && newcomers.isNotEmpty()) add += newcomers.removeFirst()
         // 20 % of the set, but at least one song, so a small set is not frozen.
-        var budget = if (size > 0) maxOf(1, (size * MAX_REPLACED).toInt()) else 0
+        var budget = if (size > 0 && replace) maxOf(1, (size * MAX_REPLACED).toInt()) else 0
         val victims = keep.filter { it !in wantedIds && it !in protectedIds }.sortedBy { scoreOf(it) }.toMutableList()
         // Strongest newcomers first, each against the weakest song that may go.
         for (n in newcomers.sortedByDescending { scoreOf(it.videoId) }) {
