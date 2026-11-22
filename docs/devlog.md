@@ -458,3 +458,13 @@ Built by one agent in its own worktree, in the plan's order, one commit per step
 ### Checked
 
 `cargo test`: 46 passing (new: 3 for the AAC preference, 6 for `mp4tags`, one of them on the real file when `METEORA_M4A` is set). Gradle build, and 163 Kotlin unit tests passing (new: Premium parser, paths, gate, ranges, reference counting and renumbering, index round trip, listen counting, scores, shares, manual downloads outside the limit, fresh-share artist rule, stability). **Not checked at all:** the Premium markers on a Premium account, any download on the phone, MediaStore writing, the notification, Wi‑Fi only, playback from a file, airplane mode, the UI, the nightly refresh, the "Listen again" and mix shelf titles signed in.
+
+### Downloads on the OP7T (02:10)
+
+Brought onto `main` by cherry-pick, not merge: the history had just been rewritten to the no-reply address for the public repo, and the agent's branch started from the old one. Two conflicts, both with the UI review's changes (Library's toggle row gained a third choice, Downloads; the shell's per-tab back stacks gained the Downloads route).
+
+- **Premium probe** with the user's account: `loggedIn=true subscriber=true upgradeOffered=false → premium=true`. So the markers hold for a Premium account; a non-Premium one is still unseen.
+- **One song** from Home's long-press sheet: `itag 141, 8394021 bytes, tagged`, at `Music/Meteora/Radiohead/Singles/If You Say the Word.m4a`. Android's media scanner reads title, artist and album from it, so the tags written in Rust work on a real 256 kbps file and the JNI byte-array call runs on a device.
+- **Playing it** started the AAC decoder (streams at High are Opus), 462 ms after the tap: it is read from the file. The engine still warms a network lookup for it first, which is wasted.
+- **Wrong:** the album folder is "Singles" though the track is on an album: a Home card carries no album, so the file was named without one. A download should look the album up before naming the file.
+- **Not checked:** airplane mode (it would drop wireless adb), albums and playlists, removal, Wi‑Fi only, the Downloads tab, smart downloads and the listening log, another player's view of the cover.
