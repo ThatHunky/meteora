@@ -167,11 +167,11 @@ fun PlaybackSettingsScreen(vm: ShellViewModel, onBack: () -> Unit, bottomPadding
         )
         VideoQualitySection()
         dev.thathunky.meteora.ui.downloads.DownloadsSettingsSection()
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.autoplay_title)) },
-            supportingContent = { Text(stringResource(R.string.autoplay_note)) },
-            trailingContent = { Switch(checked = autoplay, onCheckedChange = null) },
-            modifier = Modifier.toggleable(value = autoplay, role = Role.Switch, onValueChange = vm::setAutoplay),
+        // The page's own switch row: a ListItem added its own 16 dp inset on top of the page's,
+        // and its Material switch ignored the look.
+        dev.thathunky.meteora.ui.settings.SettingsSwitchRow(
+            stringResource(R.string.autoplay_title), autoplay, vm::setAutoplay,
+            supporting = stringResource(R.string.autoplay_note),
         )
         dev.thathunky.meteora.ui.settings.LrcLibSetting()
     }

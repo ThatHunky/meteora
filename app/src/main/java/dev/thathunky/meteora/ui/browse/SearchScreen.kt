@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.ui.components.MChip
 import dev.thathunky.meteora.ui.components.SectionHeader
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -95,13 +96,14 @@ fun SearchScreen(
         )
         LazyRow(contentPadding = PaddingValues(horizontal = look.screenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(YtmClient.SearchFilter.entries.toList()) { f ->
-                FilterChip(
+                // The look's chip: Material's tonal, checked chip read as Expressive in Terminal and Retro.
+                MChip(
+                    stringResource(f.label()),
                     selected = f == filter,
                     onClick = {
                         dismissKeyboard()
                         vm.setFilter(f)
                     },
-                    label = { Text(stringResource(f.label())) },
                 )
             }
         }

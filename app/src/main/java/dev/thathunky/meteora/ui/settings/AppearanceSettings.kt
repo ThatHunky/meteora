@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,8 +75,9 @@ import dev.thathunky.meteora.ui.theme.effectiveLook
 import dev.thathunky.meteora.ui.theme.titleFontFor
 import dev.thathunky.meteora.ui.components.hardShadow
 import dev.thathunky.meteora.ui.components.Choice
+import dev.thathunky.meteora.ui.components.MChip
+import dev.thathunky.meteora.ui.components.MSwitch
 import dev.thathunky.meteora.ui.components.SegmentedChoice
-import androidx.compose.material3.FilterChip
 import dev.thathunky.meteora.ui.theme.ThemeMode
 import dev.thathunky.meteora.ui.theme.ThemeStore
 import dev.thathunky.meteora.ui.theme.isDark
@@ -190,7 +192,7 @@ fun SettingsSwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
             Text(title, style = MaterialTheme.typography.bodyLarge, color = c)
             if (supporting != null) SettingsNote(supporting)
         }
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        MSwitch(checked = checked, enabled = enabled)
     }
 }
 
@@ -259,16 +261,11 @@ private fun StyleRow(selected: LookId?, onSelect: (LookId?) -> Unit) {
     val options: List<LookId?> = listOf(null) + LookId.entries
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { id ->
-            FilterChip(
+            MChip(
+                stringResource(lookName(id)),
                 selected = selected == id,
                 onClick = { onSelect(id) },
-                label = {
-                    Text(
-                        stringResource(lookName(id)),
-                        fontFamily = id?.let { titleFontFor(Looks.of(it).typeface) },
-                        maxLines = 1,
-                    )
-                },
+                fontFamily = id?.let { titleFontFor(Looks.of(it).typeface) },
             )
         }
     }
@@ -333,11 +330,19 @@ private fun ThemeCard(t: AppTheme, look: Look, selected: Boolean, mode: ThemeMod
                 )
             }
         }
+        // Shrinks before it is cut: in 104 dp "Catppuccin Mocha" and "Catppuccin Latte" could both
+        // end as "Catppuccin…", in Terminal's mono most of all. One line, so every card stays the
+        // same height and the row does not jump while it scrolls.
         Text(
             name,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(
+                minFontSize = 8.sp,
+                maxFontSize = MaterialTheme.typography.labelLarge.fontSize,
+                stepSize = 0.5.sp,
+            ),
             modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp),
         )
         if (author != null) {
