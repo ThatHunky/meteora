@@ -215,6 +215,7 @@ fun PcSettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, onBack: () -> Un
 fun AboutSettingsScreen(onBack: () -> Unit, bottomPadding: Dp) =
     SettingsPage(R.string.settings_about, onBack, bottomPadding) {
         StatusBlock(stringResource(R.string.app_name),stringResource(R.string.settings_version, BuildConfig.VERSION_NAME))
+        dev.thathunky.meteora.ui.update.UpdateSettingsSection()
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
