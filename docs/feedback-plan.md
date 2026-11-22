@@ -13,7 +13,11 @@ Written 2026‑11‑22 for an implementing agent. The user pointed out that the 
 
 So the tokens come with Home items (and probably other browse shelves), not with queue items or Now Playing.
 
-## Step 1: confirm before building
+## Step 1 result (done by the reviewer on the phone, 02:50)
+
+`label x26: REMOVE_CIRCLE "Don't recommend artist" endpoint keys=[feedbackToken, actions]` and `label x38: NOT_INTERESTED "Not interested" endpoint keys=[feedbackToken, actions]`. So the assumption holds; both endpoints also carry `actions` (not inspected: most likely the toast YouTube shows, possibly with an undo token; look at their shape in a hand-made fixture only if the reviewer supplies one, otherwise ignore them). Skip the rest of step 1 below and start building; still write the "Feedback" section in `docs/api-notes.md`.
+
+## Step 1: confirm before building (already done, kept for the record)
 
 Extend the probe to log, for the two entries, the entry's `text.runs` text (it is YouTube's own label, not personal data) and whether the endpoint carries anything besides `feedbackToken` (for example `actions` to run on success), and which item kinds have them (song, album, playlist, artist cards). The reviewer runs it on the phone and pastes the output back; write the result in `docs/api-notes.md` under "Feedback". If REMOVE_CIRCLE is not "Don't recommend artist", stop and report.
 

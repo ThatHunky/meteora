@@ -22,6 +22,7 @@ object LikeProbe {
     suspend fun menus(ytm: YtmClient, queueOf: String?) {
         val root = runCatching { if (queueOf != null) ytm.nextRaw(queueOf, null) else ytm.browse("FEmusic_home") }
             .getOrElse { Log.i(TAG, "menus failed: $it"); return }
+        val labels = HashMap<String, Int>()
         val kinds = HashMap<String, Int>()
         for (menu in root.findAll("menuRenderer")) {
             for (entry in (menu["items"] as? JsonArray).orEmpty()) {
@@ -32,10 +33,17 @@ object LikeProbe {
                     .mapNotNull { o[it] as? JsonObject }
                     .flatMap { e -> e.keys.filter { it.endsWith("Endpoint") } }
                 kinds.merge("${renderer.removeSuffix("Renderer")} icon=$icon → $endpoints", 1, Int::plus)
+                // YouTube's own label for the two feedback entries, and what else the endpoint carries.
+                if (icon == "NOT_INTERESTED" || icon == "REMOVE_CIRCLE") {
+                    val label = ((o["text"] as? JsonObject)?.get("runs") as? JsonArray)?.joinToString("") { (it as? JsonObject)?.str("text").orEmpty() }
+                    val fe = (o["serviceEndpoint"] as? JsonObject)?.get("feedbackEndpoint") as? JsonObject
+                    labels.merge("$icon \"$label\" endpoint keys=${fe?.keys}", 1, Int::plus)
+                }
             }
         }
         Log.i(TAG, "menus in ${if (queueOf != null) "a queue" else "Home"}: ${kinds.size} kinds")
         kinds.entries.sortedByDescending { it.value }.forEach { Log.i(TAG, "x${it.value}: ${it.key}") }
+        labels.forEach { (k, n) -> Log.i(TAG, "label x$n: $k") }
         val tokens = root.findAll("feedbackEndpoint").count { it.str("feedbackToken") != null }
         Log.i(TAG, "feedbackEndpoint with a token: $tokens")
     }
