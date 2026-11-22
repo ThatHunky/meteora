@@ -5,6 +5,14 @@ import android.content.Intent
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
+import android.os.Bundle
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import dagger.hilt.android.AndroidEntryPoint
 import dev.thathunky.meteora.MainActivity
 import dev.thathunky.meteora.data.PlaybackRouter
@@ -45,7 +53,18 @@ class MeteoraSessionService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val initial = if (router.isPhone) router.local.player else remote
-        session = MediaSession.Builder(this, initial).setSessionActivity(open).build()
+        session = MediaSession.Builder(this, initial)
+            .setSessionActivity(open)
+            .setCallback(Buttons())
+            .setMediaButtonPreferences(SessionButtons.buttons(this, SessionButtons.shown(router.state.value)))
+            .build()
+
+        // Like, dislike, shuffle and repeat follow the state of whichever target is playing.
+        scope.launch {
+            router.state.map(SessionButtons::shown).distinctUntilChanged().collect { shown ->
+                session?.setMediaButtonPreferences(SessionButtons.buttons(this@MeteoraSessionService, shown))
+            }
+        }
 
         scope.launch {
             router.target.collect { t ->
@@ -76,6 +95,29 @@ class MeteoraSessionService : MediaSessionService() {
                     }
                 }
             }
+        }
+    }
+
+    /** Lets every controller use the four extra buttons, and turns a press into the usual [Command]. */
+    private inner class Buttons : MediaSession.Callback {
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
+            MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(
+                    MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().addSessionCommands(SessionButtons.commands).build(),
+                )
+                .setMediaButtonPreferences(SessionButtons.buttons(this@MeteoraSessionService, SessionButtons.shown(router.state.value)))
+                .build()
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            val command = SessionButtons.commandFor(customCommand.customAction, router.state.value)
+                ?: return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
+            router.send(command)
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
     }
 

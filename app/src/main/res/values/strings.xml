@@ -407,4 +407,12 @@
         <item quantity="one">%d song stays for its album or playlist.</item>
         <item quantity="other">%d songs stay for their album or playlist.</item>
     </plurals>
+    <!-- Media notification buttons -->
+    <string name="session_undo_like">Undo like</string>
+    <string name="session_undo_dislike">Undo dislike</string>
+    <string name="session_shuffle_on">Shuffle is on</string>
+    <string name="session_shuffle_off">Shuffle is off</string>
+    <string name="session_repeat_all">Repeat all</string>
+    <string name="session_repeat_one">Repeat one</string>
+    <string name="session_repeat_off">Repeat is off</string>
 </resources>

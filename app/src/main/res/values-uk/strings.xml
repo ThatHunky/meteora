@@ -416,4 +416,12 @@
         <item quantity="many">%d пісень залишаться для свого альбому чи плейлиста.</item>
         <item quantity="other">%d пісні залишаться для свого альбому чи плейлиста.</item>
     </plurals>
+    <!-- Media notification buttons -->
+    <string name="session_undo_like">Скасувати вподобання</string>
+    <string name="session_undo_dislike">Скасувати «не подобається»</string>
+    <string name="session_shuffle_on">Перемішування ввімкнено</string>
+    <string name="session_shuffle_off">Перемішування вимкнено</string>
+    <string name="session_repeat_all">Повторювати все</string>
+    <string name="session_repeat_one">Повторювати одну</string>
+    <string name="session_repeat_off">Повтор вимкнено</string>
 </resources>

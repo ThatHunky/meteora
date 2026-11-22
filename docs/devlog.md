@@ -673,3 +673,11 @@ The owner's screenshots of Home on his phone: three of four Quick picks rows and
 - **What was there:** a bare `AsyncImage`. No placeholder, no failed state, and Coil does not retry: one dropped request leaves a cover blank until the screen is rebuilt. Nothing was logged, so a failure could not be told from slowness.
 - **Now, in `ArtworkFrame` (every cover in the app):** a pulsing fill in the cover's own shape while it loads; a note icon on the fill if it failed; up to three retries, 1.5, 3 and 6 s apart; a 200 ms fade-in. Failures go to logcat under `Artwork` with the host and the error's kind, never the URL. The pulse runs only while a cover is loading.
 - **On the OP7T:** after clearing the app's data, Home's covers were all there within the first 0.7 s on this Wi-Fi and `Artwork` logged nothing, so neither the pulse nor a failure was seen here. The cause of the blanks on the owner's phone is not found; if they return, the icon will show which covers failed and the log will say why.
+
+### Like and dislike in the notification (10:05)
+
+The owner: "controls like likes and dislikes in the notification player (same as official app but better)". The session had no custom buttons at all.
+
+- **Built:** `playback/SessionButtons`: four session commands (dislike, like, shuffle, repeat) offered to every controller, sent on as the usual `Command`s, so they work for the phone and for the PC target. The icons follow the state (filled thumb when rated, shuffle on or off, repeat off / all / one) and are rebuilt only when one of those changes.
+- **First try was wrong:** with dislike and like in Media3's "secondary" slots beside previous and next, Android's notification showed shuffle and repeat and left the two out. The notification has room for two buttons besides previous, play and next, and takes the first two of the list, so dislike and like are now first. Shuffle and repeat are still offered to surfaces with more room (a watch, a car).
+- **On the OP7T:** the notification shows previous, next, dislike, like, and the session lists Dislike, Like, "Shuffle is off", "Repeat is off". A tap on like changed nothing visible: this phone is signed out since the reinstall, and a rating needs an account. So a like actually landing, the filled icon, and the PC target are unchecked.
