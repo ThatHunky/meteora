@@ -143,6 +143,31 @@ fn head_cut_inside_the_media_is_fine() {
 }
 
 #[test]
+fn hostile_64_bit_size_is_an_error_not_a_wrap() {
+    // ftyp, then a box whose 64-bit size would wrap `at + size` past u64::MAX back to a small number.
+    let mut f = bx(b"ftyp", b"dash\0\0\0\0iso6mp41");
+    f.extend_from_slice(&1u32.to_be_bytes());
+    f.extend_from_slice(b"moov");
+    f.extend_from_slice(&(u64::MAX - 3).to_be_bytes());
+    f.extend_from_slice(&[0; 64]);
+    assert!(tag_head(&f, tail(&f), &tags(), None).is_err());
+    let p = tag_head_packed(&f, tail(&f), "{}", None);
+    assert_eq!(p[0], 1);
+}
+
+#[test]
+fn deep_nesting_is_an_error_not_a_stack_overflow() {
+    // 30 000 trak boxes inside each other under a fragmented moov: recursion must stop early.
+    let mut inner = full(b"stco", 0, &0u32.to_be_bytes());
+    for _ in 0..30_000 {
+        inner = bx(b"trak", &inner);
+    }
+    let moov = bx(b"moov", &[full(b"mvhd", 0, &[7; 100]), bx(b"mvex", &full(b"trex", 0, &[0; 20])), inner].concat());
+    let f = [bx(b"ftyp", b"dash\0\0\0\0iso6mp41"), moov].concat();
+    assert!(tag_head(&f, tail(&f), &tags(), None).unwrap_err().contains("nested"));
+}
+
+#[test]
 fn packed_form() {
     let f = file(true, 0x02_0000, 0, true);
     let p = tag_head_packed(&f, tail(&f), r#"{"title":"T","track":1}"#, None);

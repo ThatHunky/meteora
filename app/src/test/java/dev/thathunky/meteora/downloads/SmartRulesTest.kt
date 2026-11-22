@@ -28,6 +28,35 @@ class ListenRulesTest {
         assertEquals(1, two.skips)
         assertNull(ListenRules.apply(two, song, ListenOutcome.Nothing, 3000))
     }
+
+    @Test fun `a skip does not count as having played it`() {
+        val day = 24 * 60 * 60 * 1000L
+        val now = 1000 * day
+        val old = Listen("a", 10, 0, now - 60 * day, "T", "A")
+        val skipped = ListenRules.apply(old, old, ListenOutcome.Skip, now)!!
+        assertEquals(now - 60 * day, skipped.lastPlayedMs)
+        // The score goes down, not up (it went from 2.5 to 8.5 when a skip reset the decay).
+        assertTrue(SmartRules.habit(skipped, now) < SmartRules.habit(old, now))
+        // Not protected from removal by a skip.
+        val plan = SmartRules.plan(listOf("a"), SmartRules.Wanted(listOf(SmartSong("b", "T", "B", null, null, 1.0)), mapOf("a" to 0.1, "b" to 5.0)), 1, mapOf("a" to skipped), now)
+        assertEquals(listOf("a"), plan.remove)
+    }
+
+    @Test fun `which jumps leave a track and which can be a skip`() {
+        // Next, or a tap on a later queue entry.
+        assertEquals(true, ListenRules.leftByUser(ListenRules.Jump.Seek, sameItem = false, forward = true, skippedForError = false))
+        // Previous, or a tap on an earlier entry: left, but not a skip.
+        assertEquals(false, ListenRules.leftByUser(ListenRules.Jump.Seek, sameItem = false, forward = false, skippedForError = false))
+        // The player moving past a track that failed to play.
+        assertEquals(false, ListenRules.leftByUser(ListenRules.Jump.Seek, sameItem = false, forward = true, skippedForError = true))
+        // A seek inside the track.
+        assertNull(ListenRules.leftByUser(ListenRules.Jump.Seek, sameItem = true, forward = false, skippedForError = false))
+        // The end, repeat-one included.
+        assertEquals(false, ListenRules.leftByUser(ListenRules.Jump.Auto, sameItem = true, forward = false, skippedForError = false))
+        // A new queue replacing it.
+        assertEquals(false, ListenRules.leftByUser(ListenRules.Jump.Remove, sameItem = false, forward = false, skippedForError = false))
+        assertNull(ListenRules.leftByUser(ListenRules.Jump.Other, sameItem = false, forward = true, skippedForError = false))
+    }
 }
 
 class SmartRulesTest {
@@ -128,6 +157,12 @@ class SmartRulesTest {
         val p2 = SmartRules.plan(current, w2, 2, listens, now)
         assertEquals(listOf("a"), p2.remove)
         assertEquals(listOf("n"), p2.add.map { it.videoId })
+        // A refresh whose likes or Home lookup failed replaces nothing, but still fills free room.
+        val p3 = SmartRules.plan(current, w2, 2, listens, now, replace = false)
+        assertTrue(p3.remove.isEmpty() && p3.add.isEmpty())
+        val p4 = SmartRules.plan(current, w2, 3, listens, now, replace = false)
+        assertEquals(listOf("n"), p4.add.map { it.videoId })
+        assertTrue(p4.remove.isEmpty())
     }
 
     @Test fun `at most 20 percent replaced in one refresh`() {

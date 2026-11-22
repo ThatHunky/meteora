@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 /**
  * What is downloaded, queued or failed, kept in [store] and mirrored in memory for the UI and the
@@ -49,11 +50,22 @@ class DownloadIndex(private val store: DownloadStore) {
         _songs.value = _songs.value + (e.videoId to e)
     }
 
-    fun delete(videoId: String) = synchronized(this) {
+    fun delete(videoId: String) {
+        remove(videoId)
+    }
+
+    /**
+     * Deletes the entry and returns it as it was at that moment, so the caller deletes the file
+     * it has now: a download that finished after the caller's snapshot has a file the snapshot
+     * does not know of.
+     */
+    fun remove(videoId: String): DownloadEntry? = synchronized(this) {
         ensureLoaded()
+        val was = _songs.value[videoId]
         store.deleteSong(videoId)
         _songs.value = _songs.value - videoId
-        _progress.value = _progress.value - videoId
+        _progress.update { it - videoId }
+        was
     }
 
     fun putCollection(c: DownloadCollection) = synchronized(this) {
@@ -68,13 +80,16 @@ class DownloadIndex(private val store: DownloadStore) {
         _collections.value = _collections.value - id
     }
 
-    /** Changes one entry if it is still there. */
-    fun update(videoId: String, change: (DownloadEntry) -> DownloadEntry) = synchronized(this) {
-        get(videoId)?.let { put(change(it)) }
+    /** Changes one entry if it is still there; false when it is not (it was removed). */
+    fun update(videoId: String, change: (DownloadEntry) -> DownloadEntry): Boolean = synchronized(this) {
+        val e = get(videoId) ?: return@synchronized false
+        put(change(e))
+        true
     }
 
+    /** Two downloads run at once: the map is changed atomically, so neither loses the other's change. */
     fun setProgress(videoId: String, fraction: Float?) {
-        _progress.value = if (fraction == null) _progress.value - videoId else _progress.value + (videoId to fraction)
+        _progress.update { if (fraction == null) it - videoId else it + (videoId to fraction) }
     }
 
     fun queued(): List<DownloadEntry> {

@@ -38,13 +38,32 @@ object ListenRules {
         }
     }
 
+    /** How the player moved away from a position (Media3's discontinuity reasons, reduced to what matters here). */
+    enum class Jump { Auto, Seek, Remove, Other }
+
+    /**
+     * Whether a jump leaves the track, and if so whether the user moved on to a later one (only
+     * that can be a skip). Null: the track was not left (a seek inside it, a rearranged queue).
+     * Reaching the end, repeat-one included, is never a skip; nor is a new queue replacing the
+     * track, going back with Previous or to an earlier queue entry, or the player itself moving
+     * past a track that failed to play ([skippedForError]).
+     */
+    fun leftByUser(jump: Jump, sameItem: Boolean, forward: Boolean, skippedForError: Boolean): Boolean? = when (jump) {
+        Jump.Auto -> false
+        Jump.Other -> null
+        Jump.Remove -> if (sameItem) null else false
+        Jump.Seek -> if (sameItem) null else forward && !skippedForError
+    }
+
     fun apply(old: Listen?, song: Listen, outcome: ListenOutcome, nowMs: Long): Listen? {
         if (outcome == ListenOutcome.Nothing) return null
         val base = old?.copy(title = song.title, artist = song.artist, album = song.album ?: old.album, albumId = song.albumId ?: old.albumId, artworkUrl = song.artworkUrl ?: old.artworkUrl, durationSec = if (song.durationSec > 0) song.durationSec else old.durationSec)
             ?: song.copy(plays = 0, skips = 0, lastPlayedMs = 0)
         return when (outcome) {
             ListenOutcome.Play -> base.copy(plays = base.plays + 1, lastPlayedMs = nowMs)
-            else -> base.copy(skips = base.skips + 1, lastPlayedMs = nowMs)
+            // A skip is not a play: it must not refresh the decay of old plays (which would raise
+            // the score) nor put the song under the 14-day protection.
+            else -> base.copy(skips = base.skips + 1)
         }
     }
 }
@@ -168,7 +187,12 @@ object SmartRules {
      * room (the set is smaller than the size) is filled without counting as replacement. A set
      * larger than the size (the size was lowered) loses its lowest scores first, whatever the rules.
      */
-    fun plan(current: List<String>, wanted: Wanted, size: Int, listens: Map<String, Listen>, nowMs: Long): Plan {
+    /**
+     * [replace]: false when part of the input could not be fetched (likes or Home failed). The
+     * wanted list is then built from less than it should be, so nothing is swapped out on its
+     * word; free room is still filled and a lowered size still applies.
+     */
+    fun plan(current: List<String>, wanted: Wanted, size: Int, listens: Map<String, Listen>, nowMs: Long, replace: Boolean = true): Plan {
         val scoreOf = { id: String -> wanted.scores[id] ?: 0.0 }
         val wantedIds = wanted.songs.map { it.videoId }.toSet()
         val protectedIds = listens.values.filter { nowMs - it.lastPlayedMs < PROTECT_DAYS * DAY_MS }.map { it.videoId }.toSet()
@@ -184,7 +208,7 @@ object SmartRules {
         val add = ArrayList<SmartSong>()
         while (keep.size + add.size < size && newcomers.isNotEmpty()) add += newcomers.removeFirst()
         // 20 % of the set, but at least one song, so a small set is not frozen.
-        var budget = if (size > 0) maxOf(1, (size * MAX_REPLACED).toInt()) else 0
+        var budget = if (size > 0 && replace) maxOf(1, (size * MAX_REPLACED).toInt()) else 0
         val victims = keep.filter { it !in wantedIds && it !in protectedIds }.sortedBy { scoreOf(it) }.toMutableList()
         // Strongest newcomers first, each against the weakest song that may go.
         for (n in newcomers.sortedByDescending { scoreOf(it.videoId) }) {

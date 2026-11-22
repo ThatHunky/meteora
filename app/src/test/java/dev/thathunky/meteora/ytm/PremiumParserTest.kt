@@ -40,6 +40,26 @@ class PremiumParserTest {
         assertFalse(PremiumMarkers(null, null, null).isPremium)
     }
 
+    @Test fun `verdict tells a no from a check that could not tell`() {
+        assertEquals(true, PremiumMarkers(true, true, false).verdict)
+        assertEquals(false, PremiumMarkers(true, false, null).verdict)
+        assertEquals(false, PremiumMarkers(true, true, true).verdict)
+        assertEquals(false, PremiumMarkers(false, null, null).verdict)
+        assertNull(PremiumMarkers(null, null, null).verdict)
+        assertNull(PremiumMarkers(true, true, null).verdict)
+    }
+
+    @Test fun `menu shape never logs the account's channel id`() {
+        val menu = Json.parseToJsonElement(
+            """{"multiPageMenuRenderer":{"sections":[{"compactLinkRenderer":{"navigationEndpoint":{"browseEndpoint":{"browseId":"UCabcdefghijklmnopqrstuv"}}}},
+               {"compactLinkRenderer":{"navigationEndpoint":{"browseEndpoint":{"browseId":"SPaccount_overview"}}}}]}}""",
+        )
+        val shape = PremiumParser.menuShape(menu)
+        assertFalse(shape.contains("UCabcdefghijklmnopqrstuv"))
+        assertTrue(shape.contains("SPaccount_overview"))
+        assertTrue(shape.contains("other"))
+    }
+
     @Test fun `menu shape names no person`() {
         val shape = PremiumParser.menuShape(fixture("account-menu-premium.json"))
         assertFalse(shape.contains("Test Person"))

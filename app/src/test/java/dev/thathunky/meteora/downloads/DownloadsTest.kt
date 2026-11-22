@@ -62,8 +62,14 @@ class DownloadsGateTest {
     }
 
     @Test fun `a negative answer is not remembered`() {
-        assertNull(DownloadsGate.remember(false, 5))
-        assertEquals(5L, DownloadsGate.remember(true, 5))
+        assertNull(DownloadsGate.remember(false, 3, 5))
+        assertEquals(5L, DownloadsGate.remember(true, 3, 5))
+    }
+
+    @Test fun `a check that could not tell keeps the remembered answer`() {
+        // A nightly refresh offline must not erase last week's yes.
+        assertEquals(3L, DownloadsGate.remember(null, 3, 5))
+        assertNull(DownloadsGate.remember(null, null, 5))
     }
 }
 
@@ -77,9 +83,26 @@ class DownloadRangesTest {
     }
 
     @Test fun `resume after re-resolving`() {
-        assertEquals(5000L, DownloadRanges.resumeAt(141, 141, 5000))
+        assertEquals(5000L, DownloadRanges.resumeAt(141, 9000, 141, 9000, 5000))
         // Another format: the bytes so far belong to a different file.
-        assertEquals(0L, DownloadRanges.resumeAt(141, 140, 5000))
+        assertEquals(0L, DownloadRanges.resumeAt(141, 9000, 140, 9000, 5000))
+        // The same itag, another file (a loudness-compressed or dubbed variant): start over.
+        assertEquals(0L, DownloadRanges.resumeAt(140, 9000, 140, 9100, 5000))
+    }
+
+    @Test fun `a part is only continued by the same file`() {
+        assertEquals("abc.140.9000.part", DownloadRanges.partName("abc", 140, 9000))
+        assertTrue(DownloadRanges.partName("abc", 140, 9000) != DownloadRanges.partName("abc", 140, 9100))
+    }
+
+    @Test fun `progress once per percent`() {
+        assertEquals(0, DownloadRanges.percent(0, 1000))
+        assertEquals(0, DownloadRanges.percent(9, 1000))
+        assertEquals(1, DownloadRanges.percent(10, 1000))
+        assertEquals(100, DownloadRanges.percent(1000, 1000))
+        assertEquals(0, DownloadRanges.percent(10, 0))
+        // No overflow on a large file.
+        assertEquals(50, DownloadRanges.percent(Long.MAX_VALUE / 200, Long.MAX_VALUE / 100))
     }
 }
 
@@ -159,6 +182,27 @@ class DownloadIndexTest {
         assertEquals(listOf("a", "b"), again.collections.value.getValue("OLAK").videoIds)
         again.delete("c")
         assertNull(DownloadIndex(store).get("c"))
+    }
+
+    @Test fun `remove returns the entry as it is now, and an update after it does nothing`() {
+        val index = DownloadIndex(MemoryDownloadStore())
+        index.put(e("x", DownloadState.Downloading, 0))
+        // The download finished after a caller took its snapshot (uri still null there).
+        assertTrue(index.update("x") { it.copy(state = DownloadState.Done, uri = "content://x") })
+        assertEquals("content://x", index.remove("x")?.uri)
+        // The other order: removed first, so the finished download learns its file must go.
+        assertFalse(index.update("x") { it.copy(state = DownloadState.Done) })
+        assertNull(index.get("x"))
+    }
+
+    @Test fun `two downloads reporting progress at once lose nothing`() {
+        val index = DownloadIndex(MemoryDownloadStore())
+        val threads = (0 until 8).map { t ->
+            Thread { repeat(2000) { i -> index.setProgress("$t-$i", 0.5f) } }
+        }
+        threads.forEach(Thread::start)
+        threads.forEach(Thread::join)
+        assertEquals(8 * 2000, index.progress.value.size)
     }
 
     @Test fun `work cut off by a restart is queued again`() {

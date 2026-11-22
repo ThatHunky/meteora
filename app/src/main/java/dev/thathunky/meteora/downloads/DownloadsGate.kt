@@ -18,6 +18,14 @@ object DownloadsGate {
         else -> Decision.Check
     }
 
-    /** What to remember after a check: its time when Premium, else nothing (the next request checks again). */
-    fun remember(premium: Boolean, nowMs: Long): Long? = if (premium) nowMs else null
+    /**
+     * What to remember after a check with [verdict]: its time when Premium; nothing when it said
+     * no; [previous] unchanged when it could not tell (a network error is not a "no", and must
+     * not undo a yes from last week).
+     */
+    fun remember(verdict: Boolean?, previous: Long?, nowMs: Long): Long? = when (verdict) {
+        true -> nowMs
+        false -> null
+        null -> previous
+    }
 }

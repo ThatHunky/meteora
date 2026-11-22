@@ -119,7 +119,7 @@ class SmartDownloads @Inject constructor(
         }
         val listenAgain = home.firstOrNull { SmartHome.isListenAgain(it.title) }?.items.orEmpty().filterIsInstance<MusicItem.Song>().map { it.smart() }
         val mixId = home.flatMap { it.items }.filterIsInstance<MusicItem.Playlist>().firstOrNull { SmartHome.isMix(it.title) }?.playlistId
-        val mix = mixId?.let { id -> lookup { ytm.watchQueue(playlistId = id).songs.map { it.smart() } } }.orEmpty()
+        val mix = mixId?.let { id -> lookup { ytm.watchQueue(playlistId = id).songs.map { it.smart() } } ?: emptyList<SmartSong>().also { failures++ } }.orEmpty()
         val listens = downloads.listens.all()
         val entries = index.songs.value.values
         val manual = entries.filter { it.manual }.map { it.videoId }.toSet()
@@ -132,7 +132,9 @@ class SmartDownloads @Inject constructor(
         )
         // Smart songs that became manual leave the set (they stay downloaded as manual) and their slot is refilled.
         val current = entries.filter { it.smart && !it.manual }.sortedBy { it.addedAtMs }.map { it.videoId }
-        var plan = SmartRules.plan(current, wanted, size, listens, now)
+        // With likes, Home or the mix missing, the wanted list is short of songs that belong in it:
+        // nothing is replaced on its word (a failed likes lookup would otherwise evict up to 20 %).
+        var plan = SmartRules.plan(current, wanted, size, listens, now, replace = failures == 0)
         // Stops adding when free space would fall under 500 MB.
         val perSong = if (settings.quality.value == dev.thathunky.meteora.stream.StreamQuality.High) 8L shl 20 else 4L shl 20
         val room = ((downloads.freeBytes() - DownloadManager.MIN_FREE_BYTES) / perSong).coerceAtLeast(0)

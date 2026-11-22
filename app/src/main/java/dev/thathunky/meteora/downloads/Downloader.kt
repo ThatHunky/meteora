@@ -16,6 +16,7 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
@@ -35,8 +36,19 @@ object DownloadRanges {
         return "bytes=$position-${position + len - 1}"
     }
 
-    /** Where to go on after re-resolving: the same format continues from [position], another one starts over. */
-    fun resumeAt(oldItag: Int, newItag: Int, position: Long): Long = if (oldItag == newItag) position else 0
+    /**
+     * Where to go on after re-resolving: the same file continues from [position], another one
+     * starts over. The same itag is not enough: a loudness-compressed or dubbed variant shares
+     * the itag of the plain track but is another file, which its size tells apart.
+     */
+    fun resumeAt(oldItag: Int, oldTotal: Long, newItag: Int, newTotal: Long, position: Long): Long =
+        if (oldItag == newItag && oldTotal == newTotal) position else 0
+
+    /** The temporary file's name: a part is only ever continued by a request for the same file. */
+    fun partName(videoId: String, itag: Int, total: Long) = "$videoId.$itag.$total.part"
+
+    /** Whole percent reached, for progress that is reported once per percent, not per buffer. */
+    fun percent(at: Long, total: Long): Int = if (total <= 0) 0 else (at * 100 / total).toInt()
 }
 
 /** One file written to shared storage. */
@@ -56,21 +68,40 @@ class Downloader(
     private val http = http.newBuilder().readTimeout(20, java.util.concurrent.TimeUnit.SECONDS).build()
     private val tmpDir get() = File(context.filesDir, "downloads-tmp").apply { mkdirs() }
 
-    suspend fun download(e: DownloadEntry, quality: StreamQuality, cover: ByteArray?, onProgress: (Float) -> Unit): Written = withContext(Dispatchers.IO) {
+    /**
+     * Downloads [e]. [commit] is called with the finished file at once, before anything can
+     * cancel the call: once the file exists in shared storage it must reach the index, or a
+     * cancellation at that moment would leave it there unknown and queue the song again.
+     */
+    suspend fun download(
+        e: DownloadEntry,
+        quality: StreamQuality,
+        cover: ByteArray?,
+        onProgress: (Float) -> Unit,
+        commit: (Written) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val job = coroutineContext[Job]
         // Resolved just before fetching: URLs expire after about six hours and are tied to this IP.
         var stream = resolver.resolveForDownload(e.videoId, quality)
         var itag = itagOf(stream)
         var total = stream.contentLength ?: throw StreamException("no file size for ${e.videoId}")
-        var part = partFile(e.videoId, itag)
+        var part = partFile(e.videoId, itag, total)
         // A part left by another format would mix two files' bytes.
-        tmpDir.listFiles()?.filter { it.name.startsWith("${e.videoId}.") && it != part }?.forEach { it.delete() }
+        partsOf(e.videoId).filter { it != part }.forEach { it.delete() }
         var position = part.length().coerceAtMost(total)
         var reResolved = false
+        var shown = -1
+        val progress = { at: Long ->
+            val p = DownloadRanges.percent(at, total)
+            if (p != shown) {
+                shown = p
+                onProgress(at.toFloat() / total)
+            }
+        }
         while (position < total) {
             ensureActive()
             try {
-                position = fetch(stream, part, position, total)
-                onProgress(position.toFloat() / total)
+                position = fetch(stream, part, position, total, job, progress)
             } catch (x: CancellationException) {
                 throw x
             } catch (x: IOException) {
@@ -79,26 +110,49 @@ class Downloader(
                 Log.w(TAG, "range failed for ${e.videoId} at $position of $total: ${x.javaClass.simpleName}; resolving again")
                 stream = resolver.resolveForDownload(e.videoId, quality)
                 val newItag = itagOf(stream)
-                position = DownloadRanges.resumeAt(itag, newItag, position)
-                if (newItag != itag) {
+                val newTotal = stream.contentLength ?: throw StreamException("no file size for ${e.videoId}")
+                position = DownloadRanges.resumeAt(itag, total, newItag, newTotal, position)
+                if (newItag != itag || newTotal != total) {
                     part.delete()
                     itag = newItag
-                    part = partFile(e.videoId, itag)
-                    total = stream.contentLength ?: throw StreamException("no file size for ${e.videoId}")
+                    total = newTotal
+                    part = partFile(e.videoId, itag, total)
                 }
             }
         }
+        ensureActive()
+        // No suspension from here to commit: the file and its index row appear together.
         val written = write(e, part, total, itag, cover)
+        commit(written)
         part.delete()
-        written
     }
 
     private fun itagOf(s: AudioStream): Int = s.cacheKey.substringAfter('/', "").toIntOrNull() ?: 0
 
-    private fun partFile(videoId: String, itag: Int) = File(tmpDir, "$videoId.$itag.part")
+    private fun partFile(videoId: String, itag: Int, total: Long) = File(tmpDir, DownloadRanges.partName(videoId, itag, total))
 
-    /** One range appended at [position]; returns the new position. */
-    private fun fetch(stream: AudioStream, part: File, position: Long, total: Long): Long {
+    private fun partsOf(videoId: String): List<File> =
+        tmpDir.listFiles()?.filter { it.name.startsWith("$videoId.") && it.name.endsWith(".part") }.orEmpty()
+
+    /** Records the MediaStore row a write is filling, so a write cut off by process death can be cleaned up. */
+    private fun pendingMarker(videoId: String) = File(tmpDir, "$videoId.pending")
+
+    /** Deletes the row a cut-off write left pending (hidden, holding its space for a week). */
+    private fun dropStalePending(videoId: String) {
+        val marker = pendingMarker(videoId)
+        if (!marker.exists()) return
+        runCatching { context.contentResolver.delete(Uri.parse(marker.readText()), null, null) }
+        marker.delete()
+    }
+
+    /** A song no longer wanted: its temporary parts and any row a cut-off write left pending go. */
+    fun discard(videoId: String) {
+        partsOf(videoId).forEach { it.delete() }
+        dropStalePending(videoId)
+    }
+
+    /** One range appended at [position]; returns the new position. Stops between buffers when [job] is cancelled. */
+    private fun fetch(stream: AudioStream, part: File, position: Long, total: Long, job: Job?, progress: (Long) -> Unit): Long {
         val req = Request.Builder().url(stream.url)
             .apply { stream.headers.forEach { (k, v) -> header(k, v) } }
             .header("Range", DownloadRanges.range(position, total))
@@ -112,10 +166,13 @@ class Downloader(
                 val buf = ByteArray(64 * 1024)
                 res.body.byteStream().use { input ->
                     while (true) {
+                        // The bytes so far stay in the part, and the next run continues from them.
+                        if (job?.isActive == false) throw CancellationException("download cancelled")
                         val n = input.read(buf)
                         if (n < 0) break
                         out.write(buf, 0, n)
                         at += n
+                        progress(at)
                     }
                 }
                 if (at == position) throw IOException("empty range")
@@ -135,9 +192,13 @@ class Downloader(
             put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4")
             put(MediaStore.Audio.Media.IS_PENDING, 1)
         }
+        // A write cut off last time (the process died) left a hidden pending row: it goes first.
+        dropStalePending(e.videoId)
         val uri = resolverCr.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values)
             ?: throw IOException("MediaStore refused the file")
+        val marker = pendingMarker(e.videoId)
         try {
+            marker.writeText(uri.toString())
             resolverCr.openOutputStream(uri, "w")?.use { out ->
                 out.write(head)
                 part.inputStream().use { input ->
@@ -150,10 +211,15 @@ class Downloader(
                     input.copyTo(out, 64 * 1024)
                 }
             } ?: throw IOException("cannot open the new file")
-            resolverCr.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+            // Still pending, the file stays hidden and MediaStore deletes it after a week.
+            if (resolverCr.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null) < 1) {
+                throw IOException("MediaStore did not publish the file")
+            }
         } catch (x: Exception) {
             runCatching { resolverCr.delete(uri, null, null) }
             throw x
+        } finally {
+            marker.delete()
         }
         Log.i(TAG, "downloaded ${e.videoId}: itag $itag, $total bytes, ${if (resumeAt > 0) "tagged" else "untagged"}")
         return Written(uri, itag, head.size + (total - resumeAt), resumeAt > 0)

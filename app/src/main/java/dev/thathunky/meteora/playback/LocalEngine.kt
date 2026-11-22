@@ -163,6 +163,10 @@ class LocalEngine @Inject constructor(
     private val pinned = ConcurrentHashMap<String, StreamQuality>()
     /** videoId → its downloaded file's URI, or "" to stream; fixed at the first open like [pinned]. Loader thread. */
     private val pinnedFile = ConcurrentHashMap<String, String>()
+    /** Media id the player itself moved past after it failed to play: that is no skip for the listening log. Main thread. */
+    private var skippedBroken: String? = null
+    /** Media id of the last track, counted when the queue played to its end. Main thread. */
+    private var endedCounted: String? = null
     /** Video id of a song that [play] started by itself while its queue is still loading. Main thread. */
     private var startedAlone: String? = null
     /** When the last play request came in, for the start-up time in the log. 0 once reported. */
@@ -456,17 +460,25 @@ class LocalEngine @Inject constructor(
                 failedInARow = 0
                 networkAttempts = 0
             }
+            // The last track of the queue played to its end: no transition follows to count it.
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_ENDED) player.currentMediaItem?.let { endedCounted = it.mediaId; downloads.listens.left(it.toLocalSong(), player.currentPosition, byUser = false) }
             publish()
         }
 
         /** The listening log for smart downloads: where the track that was left got to, and whether the user moved on. */
         override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
-            val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION
-            // A seek within the track, or the queue rearranged around it, is not leaving it. A new
-            // queue replacing the track (REMOVE) can count a play but never a skip.
-            val moved = reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_REMOVE
-            if (!auto && (!moved || old.mediaItem?.mediaId == new.mediaItem?.mediaId)) return
-            old.mediaItem?.let { downloads.listens.left(it.toLocalSong(), old.positionMs, byUser = reason == Player.DISCONTINUITY_REASON_SEEK) }
+            val jump = when (reason) {
+                Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> dev.thathunky.meteora.downloads.ListenRules.Jump.Auto
+                Player.DISCONTINUITY_REASON_SEEK -> dev.thathunky.meteora.downloads.ListenRules.Jump.Seek
+                Player.DISCONTINUITY_REASON_REMOVE -> dev.thathunky.meteora.downloads.ListenRules.Jump.Remove
+                else -> dev.thathunky.meteora.downloads.ListenRules.Jump.Other
+            }
+            val item = old.mediaItem ?: return
+            val skippedForError = item.mediaId == skippedBroken.also { skippedBroken = null }
+            // Counted already when the queue ended; leaving it now (play again, a new queue) is not another play.
+            if (item.mediaId == endedCounted.also { endedCounted = null }) return
+            val byUser = dev.thathunky.meteora.downloads.ListenRules.leftByUser(jump, item.mediaId == new.mediaItem?.mediaId, new.mediaItemIndex > old.mediaItemIndex, skippedForError) ?: return
+            downloads.listens.left(item.toLocalSong(), old.positionMs, byUser)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -507,6 +519,7 @@ class LocalEngine @Inject constructor(
                 else -> {
                     _errors.tryEmit(error)
                     if (p.hasNextMediaItem() && ++failedInARow < MAX_FAILED_IN_A_ROW) {
+                        skippedBroken = id
                         p.seekToNextMediaItem()
                         p.prepare()
                     } else {
@@ -558,7 +571,7 @@ class LocalEngine @Inject constructor(
             is PlayIntent.Collection -> if (shuffle) null else intent.startVideoId
             PlayIntent.LikedSongs -> null
         }
-        startId?.let(resolver::warm)
+        startId?.let(::warmUnlessDownloaded)
         if (first != null && first.videoId == startId) {
             scope.launch(Dispatchers.Main) {
                 radioContinuation = null
@@ -640,6 +653,11 @@ class LocalEngine @Inject constructor(
         }
     }
 
+    /** Resolves the stream ahead, except for a downloaded song: it plays from its file, with no /player call. */
+    private fun warmUnlessDownloaded(videoId: String) {
+        if (downloads.index.songs.value[videoId]?.state != dev.thathunky.meteora.downloads.DownloadState.Done) resolver.warm(videoId)
+    }
+
     /** One-off stream setup, done when the phone becomes the target instead of on the first tap. */
     fun prewarm() = resolver.prewarm()
 
@@ -653,7 +671,7 @@ class LocalEngine @Inject constructor(
         likes: Map<String, LikeStatus> = emptyMap(),
     ) {
         loadJob?.cancel()
-        songs.getOrNull(startIndex)?.let { resolver.warm(it.videoId) }
+        songs.getOrNull(startIndex)?.let { warmUnlessDownloaded(it.videoId) }
         scope.launch(Dispatchers.Main) {
             mergeLikes(likes)
             playlistId = source
@@ -689,7 +707,7 @@ class LocalEngine @Inject constructor(
             Log.i(TAG, "queue of ${loaded.songs.size} in ${SystemClock.elapsedRealtime() - t0} ms")
             if (loaded.songs.isEmpty()) return@launch
             // Warm the first track's stream while ExoPlayer is being set up (a no-op if play() already did).
-            resolver.warm(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId)
+            warmUnlessDownloaded(loaded.songs[loaded.start.coerceIn(0, loaded.songs.lastIndex)].videoId)
             withContext(Dispatchers.Main) {
                 radioContinuation = loaded.continuation
                 automix = loaded.automix
