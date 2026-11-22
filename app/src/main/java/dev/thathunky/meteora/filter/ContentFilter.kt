@@ -194,6 +194,15 @@ class ContentFilter @Inject constructor(private val store: FilterStore, private 
         return FilterRules.decide(settings, item.subject(), countryOf).allowed
     }
 
+    /**
+     * For lists that carry only a title and an artist line, such as smart downloads' `SmartSong`:
+     * `allows(song.title, song.artist, Place.SmartDownloads)`. The line is read whole and in pieces.
+     */
+    fun allows(title: String, artist: String, place: Place, settings: FilterSettings = store.settings.value): Boolean {
+        if (!settings.hasRules || !settings.appliesTo(place)) return true
+        return FilterRules.decide(settings, Subject(title, subtitleParts(artist).map { ArtistRef(it, null) }), countryOf).allowed
+    }
+
     /** Home and artist page shelves. [which]: the shelves that may be filtered. */
     fun shelves(
         shelves: List<Shelf>,
