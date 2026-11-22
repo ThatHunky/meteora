@@ -31,4 +31,19 @@ class LrcParserTest {
         assertTrue(LrcParser.parse("just text\nmore").isEmpty())
         assertTrue(LrcParser.parse("").isEmpty())
     }
+
+    @Test fun `spaces between time tags still read as tags`() {
+        val l = LrcParser.parse("[00:10.00] [00:30.00] chorus")
+        assertEquals(listOf(LyricLine(10_000, "chorus"), LyricLine(30_000, "chorus")), l)
+    }
+
+    @Test fun `the offset tag moves every line, positive is sooner`() {
+        // Never before zero.
+        assertEquals(listOf(LyricLine(0, "b"), LyricLine(9_500, "a")), LrcParser.parse("[offset:+500]\n[00:10.00]a\n[00:00.20]b"))
+        assertEquals(listOf(LyricLine(10_250, "a")), LrcParser.parse("[00:10.00]a\n[offset:-250]"))
+    }
+
+    @Test fun `a byte order mark does not hide the first line`() {
+        assertEquals(listOf(LyricLine(1_000, "first")), LrcParser.parse("\uFEFF[00:01.00]first"))
+    }
 }

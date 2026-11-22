@@ -103,4 +103,17 @@ class LyricsRepositoryTest {
         repo.lyrics(track("t0")) // oldest: dropped
         assertEquals(LyricsRepository.CACHE_SIZE + 2, calls)
     }
+
+    @Test fun `a stopgap answer is shown but not kept, and lrclib is not asked for it`() = runTest {
+        val stopgap = plain.copy(stopgap = true)
+        var calls = 0
+        var asked = 0
+        val repo = LyricsRepository({ calls++; if (calls == 1) stopgap else timed }, { asked++; lrcTimed }, { true })
+        assertEquals(stopgap, repo.lyrics(track()))
+        assertEquals(0, asked)
+        // Next time YouTube is asked again and its timed answer wins.
+        assertEquals(timed, repo.lyrics(track()))
+        assertEquals(2, calls)
+        assertEquals(0, asked)
+    }
 }
