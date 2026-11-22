@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -126,22 +129,43 @@ fun rowSlotHeight(): androidx.compose.ui.unit.Dp {
 
 data class Choice<T>(val value: T, val label: String, val icon: ImageVector? = null)
 
-/** A choice's label on one line: shrinks a little before it ellipsizes ("Як у системі" in a third of the width). */
+/**
+ * A label that shrinks a little on one line before anything is cut ("Як у системі" in a third
+ * of the width) and, if even [minFontSize] does not fit, takes two lines once [twoLines] is set:
+ * [onOverflow] asks for that. The floor is in sp, so at font scale 1.3 it is 1.3 times larger,
+ * which is why shrinking alone cut "* вподобані пісні" in Terminal on a 360 dp phone.
+ */
 @Composable
-private fun ChoiceLabel(text: String, style: androidx.compose.ui.text.TextStyle, color: Color = Color.Unspecified) {
+internal fun ShrinkLabel(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color = Color.Unspecified,
+    modifier: Modifier = Modifier,
+    minFontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
+    twoLines: Boolean = false,
+    onOverflow: () -> Unit = {},
+) {
     Text(
         text,
+        modifier = modifier,
         style = style,
         color = color,
-        maxLines = 1,
+        maxLines = if (twoLines) 2 else 1,
         overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Center,
         autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(
-            minFontSize = 10.sp,
+            minFontSize = minFontSize,
             maxFontSize = style.fontSize,
             stepSize = 0.5.sp,
         ),
+        onTextLayout = { if (!twoLines && it.hasVisualOverflow) onOverflow() },
     )
 }
+
+/** The height every segment takes once one label needs two lines, so the row stays even. */
+@Composable
+private fun twoLineHeight(style: androidx.compose.ui.text.TextStyle): androidx.compose.ui.unit.Dp =
+    with(androidx.compose.ui.platform.LocalDensity.current) { style.lineHeight.toDp() * 2 } + 16.dp
 
 /** A row of mutually exclusive options (mode, quality, target), drawn the look's way. */
 @Composable
@@ -154,6 +178,12 @@ fun <T> SegmentedChoice(
 ) {
     val look = LocalLook.current
     val scheme = MaterialTheme.colorScheme
+    val labelStyle = MaterialTheme.typography.labelLarge
+    // One label too long even shrunk: every label may take two lines and every segment grows
+    // to that height, so the selected (inverted, filled) one is not shorter than its neighbours.
+    var twoLines by androidx.compose.runtime.remember(options.map { it.label }) { androidx.compose.runtime.mutableStateOf(false) }
+    val tall = if (twoLines) twoLineHeight(labelStyle) else 0.dp
+    val askTwoLines = { twoLines = true }
     when (look.id) {
         LookId.Expressive, LookId.Flat, LookId.Soft -> {
             val gap = when (look.id) {
@@ -174,13 +204,13 @@ fun <T> SegmentedChoice(
                     }
                     val checked = selected == o.value
                     val onChecked: (Boolean) -> Unit = { if (it) onSelect(o.value) }
-                    val mod = Modifier.weight(1f).then(if (look.id == LookId.Soft) Modifier.heightIn(min = 52.dp) else Modifier)
+                    val mod = Modifier.weight(1f).heightIn(min = maxOf(tall, if (look.id == LookId.Soft) 52.dp else 0.dp))
                     val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
                         if (o.icon != null) {
                             Icon(o.icon, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                         }
-                        ChoiceLabel(o.label, MaterialTheme.typography.labelLarge)
+                        ShrinkLabel(o.label, labelStyle, twoLines = twoLines, onOverflow = askTwoLines)
                     }
                     if (options.size > 2) {
                         // The default 16 dp a side leaves too little for a label once there are three or more.
@@ -199,16 +229,18 @@ fun <T> SegmentedChoice(
                 Box(
                     Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp)
+                        .defaultMinSize(minHeight = maxOf(48.dp, tall))
                         .selectable(selected = on, enabled = enabled, role = Role.RadioButton) { onSelect(o.value) }
                         .then(if (on) Modifier.background(scheme.onSurface) else Modifier)
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    ChoiceLabel(
+                    ShrinkLabel(
                         (if (on) "* " else "") + lookLabel(o.label),
-                        MaterialTheme.typography.labelLarge,
+                        labelStyle,
                         if (on) scheme.surface else scheme.onSurface,
+                        twoLines = twoLines,
+                        onOverflow = askTwoLines,
                     )
                 }
             }
@@ -222,14 +254,14 @@ fun <T> SegmentedChoice(
                 Box(
                     Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp)
+                        .defaultMinSize(minHeight = maxOf(48.dp, tall))
                         // The chosen one is pushed in: no shadow, shifted into it.
                         .retroBox(RoundedCornerShape(look.cornerSmall), if (on) scheme.primary else scheme.surface, pressed = on)
                         .selectable(selected = on, enabled = enabled, role = Role.RadioButton) { onSelect(o.value) }
                         .padding(horizontal = 6.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    ChoiceLabel(lookLabel(o.label), MaterialTheme.typography.labelLarge, if (on) scheme.onPrimary else scheme.onSurface)
+                    ShrinkLabel(lookLabel(o.label), labelStyle, if (on) scheme.onPrimary else scheme.onSurface, twoLines = twoLines, onOverflow = askTwoLines)
                 }
             }
         }
