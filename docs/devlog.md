@@ -681,3 +681,11 @@ The owner: "controls like likes and dislikes in the notification player (same as
 - **Built:** `playback/SessionButtons`: four session commands (dislike, like, shuffle, repeat) offered to every controller, sent on as the usual `Command`s, so they work for the phone and for the PC target. The icons follow the state (filled thumb when rated, shuffle on or off, repeat off / all / one) and are rebuilt only when one of those changes.
 - **First try was wrong:** with dislike and like in Media3's "secondary" slots beside previous and next, Android's notification showed shuffle and repeat and left the two out. The notification has room for two buttons besides previous, play and next, and takes the first two of the list, so dislike and like are now first. Shuffle and repeat are still offered to surfaces with more room (a watch, a car).
 - **On the OP7T:** the notification shows previous, next, dislike, like, and the session lists Dislike, Like, "Shuffle is off", "Repeat is off". A tap on like changed nothing visible: this phone is signed out since the reinstall, and a rating needs an account. So a like actually landing, the filled icon, and the PC target are unchecked.
+
+### Alpha 3, and the updater's first real run (11:15)
+
+The owner: "release alpha 3 so I can test the updater". `0.1.0-alpha.3`, `versionCode` 3, published with `scripts/release.ps1`: 26,962,549 bytes, signed with the release key, with the notification buttons and the cover states.
+
+- **On the OP7T (release-signed alpha 2 build):** Settings → About → Check for updates found "Version 0.1.0 alpha 3 is available, Download: 27 MB". Download and install fetched it and passed the checks (size, checksum, package, version code, signing certificate): "ready to install". Install opened Android's dialog saying the phone does not allow installs from this source yet, with a Settings button.
+- **Stopped there:** allowing a source is a security setting and is the owner's to switch. So the install itself, the app coming back as alpha 3, and the cleanup of the downloaded file are unchecked.
+- **Seen on the way:** "Download and install" stops at "ready to install" with an Install button and needs a second tap. Not looked into: it may be that the first attempt went to the same dialog. Home showed no update card, as expected: the daily check had run an hour before the release.
