@@ -615,3 +615,5 @@ The owner's screenshot of Library → Downloads showed the header "Songs · 133"
 - Liked songs is the first page that `likedSongs()` returns (one browse, no continuation), so the sorts cover only what is loaded.
 - Which artist and album groups are open is forgotten when you leave the screen. Group, sort and filter are remembered.
 - Collections are not part of bulk selection.
+
+- **Grouping on the OP7T (03:25):** merged with conflicts only where two branches appended (strings, this log). Liked songs → Sort: Artist gave letter headers with the sticky one on top, "The Cardigans" filed under C next to Childish Gambino, and the index on the right running A–Y then Б–Х and #. Downloads shows "1 song · 8.6 MB", the Group and Sort menus, a letter header and one ⋮ per row instead of a delete icon. This phone has one download, so the 133-song case the owner reported, the folding artist and album groups, selection and bulk removal, search, and the other four looks are unchecked here.
