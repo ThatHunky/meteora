@@ -554,3 +554,5 @@ Build, and the unit tests: Version (6), Releases with the real fixture, the pick
 ### Not checked
 
 **Nothing was run on a phone.** Unchecked: the card and the About section in any look or in Ukrainian; the download, its resume after a kill, its notification; whether `getPackageArchiveInfo` returns signing certificates for the downloaded file (if it does not, every update is refused as "different key"); the installer session, "Allow from this source", the confirmation dialog, a cancelled dialog, and the app coming back after updating itself. The download is not a foreground service: if Android kills the app mid-download, the next try resumes from the partial file, but nothing restarts it by itself.
+
+- **Updater on the OP7T (03:20):** Settings → About shows "Version 0.1.0-alpha.2", and Check for updates answered "You have the latest version" with "Last checked 0 minutes ago" (the only published release is alpha 1). The real path, an offer, the download, verification of the signing certificate and the install, cannot be tried until a newer release than the installed build exists: that is alpha 3 after alpha 2 is installed by hand.
