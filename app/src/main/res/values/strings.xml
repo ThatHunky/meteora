@@ -171,6 +171,13 @@
     <string name="download_progress">Downloading, %1$d%%</string>
     <string name="download_done">Downloaded</string>
     <string name="download_failed">Download failed. Tap to try again</string>
+    <string name="download_short_queued">Waiting</string>
+    <string name="download_short_done">Saved</string>
+    <string name="download_short_failed">Retry</string>
+    <string name="download_stop_title">Stop this download?</string>
+    <string name="action_stop_download">Stop</string>
+    <string name="download_remove_text">The file is deleted from the phone.</string>
+    <string name="download_remove_collection_text">Its songs are deleted from the phone, except those you also downloaded on their own or with another album or playlist.</string>
     <string name="premium_title">Downloads need YouTube Music Premium</string>
     <string name="premium_text">Meteora downloads music only for accounts with YouTube Music Premium, as the official app does. Songs already downloaded stay on the phone.</string>
     <string name="premium_signed_out">Sign in with a YouTube Music Premium account to download music.</string>
@@ -178,6 +185,11 @@
     <string name="action_cancel">Cancel</string>
     <string name="library_downloads">Downloads</string>
     <string name="downloads_empty">Nothing downloaded yet</string>
+    <string name="downloads_empty_hint">Tap the download button on a song, album or playlist to keep it on this phone.</string>
+    <plurals name="downloads_song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <string name="downloads_songs">Songs</string>
     <string name="downloads_collections">Albums and playlists</string>
     <string name="offline_title">You are offline</string>
@@ -200,4 +212,6 @@
     <string name="smart_failed">Stopped early: YouTube lookups kept failing</string>
     <string name="listen_clear">Clear listening history</string>
     <string name="listen_clear_text">Smart downloads learn from what you play on this phone. The history never leaves it.</string>
+    <string name="listen_clear_confirm">Smart downloads will start learning from scratch. Songs already downloaded stay.</string>
+    <string name="action_clear">Clear</string>
 </resources>
