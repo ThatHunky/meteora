@@ -534,3 +534,34 @@ Build, and 256 unit tests passing (17 new: both tokens parsed and the toggles ig
 ### "Queue is totally buggy" (03:10)
 
 The user's screenshot, in the Terminal look: every queue row solid red with a delete icon, one row hanging half swiped. The rows sit in a swipe-to-dismiss box whose red background is always drawn behind them, and Terminal's rows have no fill of their own, so the red showed through all of them. The other looks hid it by accident, with their row fill. Rows are now opaque in every look and the red background is drawn only while a row is being swiped. On the OP7T in Terminal: normal rows at rest, red only under the row being swiped, and the swiped track left the queue.
+
+## The looks sweep: rows that only fit in Expressive (2026-11-22)
+
+The owner sent two Terminal screenshots from the OP7T: a playlist header with `[ play ]`, `[ shuffl…`, a `[ download ]` sitting higher than its neighbours, and `[ share ]`; and the red queue, already fixed above. He asked for every instance of that class to be found. One agent, in a worktree with no phone, read every composable under `ui/` and estimated each row in all five looks, in English and Ukrainian, at 360 and 411 dp and at font scale 1.3. It took JetBrains Mono as 0.6 em a character (7.8 dp at Terminal's 13 sp label size), with 4 more characters for a bracketed label.
+
+### What was wrong
+
+- **The playlist header.** Row's weights split the spare width without looking at what each label needs. At 411 dp the four Terminal labels do fit (about 384 of 387 dp), but Shuffle was handed 72 dp of the 98 it needs. The Row had no vertical alignment, and the download button is 48 dp among 56 dp buttons, hence the 4 dp step. In Ukrainian the same row needs about 516 dp. The artist header (Shuffle, Radio, Share) has the same problem.
+- **Now Playing, in Terminal.** Lyrics and Queue as text left the target chip about 44 dp at 360 dp. Download, Dislike and Like in Ukrainian need about 410 dp of 371. `[ previous ]` made the transport row 327 dp of 320 at 360 dp. In the icon looks the transport row (48 + 64 + 112 + 64 + 48 dp) is wider than the 312 dp Expressive leaves at 360 dp, so the repeat button was crushed.
+- **Labels that were cut.** Terminal's button ellipsis ate the closing bracket, and Retro's button labels had `maxLines = 1` with no overflow. Segmented choices and tab labels shrank to a floor in sp, which font scale 1.3 makes 1.3 times larger, so they were cut anyway: `* вподобані пісні`, `4:налаштування`. Theme names were cut to the same "Catppuccin…".
+- **Material where the look has its own form.** These were Material in every look: Search's filter chips and the Style row (a tonal fill and a check), the settings switches (pills), and the PC volume slider under Terminal's block seek bar. The autoplay row was a ListItem 16 dp further in than the rest of its page.
+- **Smaller ones.** In Terminal the icon form showed no disabled state (the lyrics "follow" button); neither did Retro's boxed icon buttons. The sign-in WebView jumped at every page load because its loader came and went. The automix rows had a fixed 40 dp of art, and the PC-offline banner a fixed 16 dp margin.
+
+### What was built
+
+- **`fitActions`** (`ui/components/ActionFit.kt`, pure, 10 JVM tests). Everything stays in full form if it fits. Otherwise priority levels go to their compact (icon) form, least important first, a whole level at a time, so Previous and Next change together. After that the row wraps and the primary keeps its text; a row that must stay on one line compacts the primary too, and as a last resort shrinks everything a little. When Row's own weight rule leaves every weighted item its natural width, it is used unchanged, so a row that fitted before lays out as before.
+- **`ActionRow`** measures each action in both forms (`LocalControlForm`), places the chosen one and centres every action vertically in its line. It is used by the album, playlist and artist headers, and by Now Playing's top row (the chip is a filler of at least 120 dp), like row and transport row. `MButton` has a compact form (a 56 dp icon button); `MIconButton` and `MIconToggle` draw their icon in Terminal when compact. No overflow menu: the download button owns its confirm dialog, so it cannot become a menu item, and icons followed by wrapping covered every case estimated.
+- **`ShrinkLabel`.** It shrinks on one line, and if even the floor overflows it takes two lines. Segmented choices then give every segment the two-line height. The status line and Retro's tab boxes wrap; the icon tabs only shrink.
+- **`MChip`, `MSwitch`, `MSlider`.** MChip is a 1 dp box, inverted when selected, in Terminal, and an outlined box with a hard shadow in Retro. MSwitch is `[x]` / `[ ]` in Terminal and a square track in Retro. MSlider draws the look's own seek-bar track in Terminal, Flat and Retro; the volume slider now has a TalkBack label, "Volume" / "Гучність". The other looks keep Material's components.
+
+### Left alone, reported to the owner
+
+- `HomeLibrary.kt`, Library half: Liked's Play / Shuffle row has the same weight pattern as the playlist header. Its owner can wrap it in `ActionRow`.
+- `ui/downloads`: `CollectionDownloadButton` and `TrackDownloadButton` take no modifier or kind, so the download button cannot be boxed like its tonal neighbours or given their 56 dp. In Terminal, while downloading, its width follows the percentage (`[ 5% ]` … `[ 100% ]`), so an `ActionRow` around it lays out again as it counts and may switch forms partway. In its compact form it is a plain download icon, so the percentage is not shown. The downloads dialogs use Material `TextButton` while the Filters dialogs use `MButton`, and the smart-downloads size is a Material slider.
+- Full-screen video keeps Material's round tonal play button: it sits on the picture, not on a surface of the look, as its comment says.
+
+### Checked
+
+The debug build, and 275 unit tests passing (10 new).
+
+**Not checked, no phone:** all of it on a screen. The widths are estimates from character counts, not measurements. The headers and Now Playing rows in all five looks and both languages, the compact and wrapped forms, two-line segments, the new chips, switches and volume bar, the sign-in loader, and TalkBack on the volume bar and the chips have not been seen.
