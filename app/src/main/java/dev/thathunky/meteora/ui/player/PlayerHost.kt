@@ -140,6 +140,8 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import dev.thathunky.meteora.ui.components.MLoading
+import dev.thathunky.meteora.ui.components.ActionRow
+import dev.thathunky.meteora.ui.components.RowAction
 import dev.thathunky.meteora.ui.components.ArtKind
 import dev.thathunky.meteora.ui.components.ArtworkFrame
 import dev.thathunky.meteora.ui.components.IconKind
@@ -323,6 +325,54 @@ private class TrackLinks(
     val radio: (String) -> Unit,
 )
 
+/** "Playing on …" with the PC / phone menu, centred in the width the top row leaves it. */
+@Composable
+private fun TargetChip(connection: ConnectionState, vm: PlayerViewModel) {
+    Box(Modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+        val pcName = (connection as? ConnectionState.Connected)?.pcName
+        val knownPc by vm.pcName.collectAsStateWithLifecycle()
+        val target by vm.target.collectAsStateWithLifecycle()
+        var targetMenu by remember { mutableStateOf(false) }
+        Box {
+            AssistChip(
+                onClick = { targetMenu = true },
+                leadingIcon = {
+                    Icon(
+                        if (connection == ConnectionState.Local) Icons.Outlined.PhoneAndroid else Icons.Outlined.Computer,
+                        null,
+                        Modifier.size(18.dp),
+                    )
+                },
+                label = {
+                    Text(
+                        when {
+                            connection == ConnectionState.Local -> stringResource(R.string.playing_on_phone)
+                            pcName != null -> stringResource(R.string.playing_on, pcName)
+                            else -> stringResource(R.string.reconnecting)
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+            DropdownMenu(expanded = targetMenu, onDismissRequest = { targetMenu = false }) {
+                dev.thathunky.meteora.data.PlaybackTarget.entries.forEach { t ->
+                    val phone = t == dev.thathunky.meteora.data.PlaybackTarget.Phone
+                    DropdownMenuItem(
+                        text = { Text(if (phone) stringResource(R.string.target_phone) else knownPc ?: stringResource(R.string.target_pc)) },
+                        leadingIcon = { Icon(if (phone) Icons.Outlined.PhoneAndroid else Icons.Outlined.Computer, null) },
+                        trailingIcon = { if (t == target) Icon(Icons.Outlined.Check, null) },
+                        onClick = {
+                            targetMenu = false
+                            vm.setTarget(t)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun FullPlayer(
     s: PlaybackState,
@@ -397,71 +447,29 @@ private fun FullPlayer(
                 .padding(horizontal = look.screenPadding + 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                MIconButton(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse), onClick = onCollapse)
-                // The chip gets what the buttons leave and ellipsizes, so a long PC name (or the
-                // Ukrainian label) cannot push the queue and More buttons off the row.
-                Box(Modifier.weight(1f).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
-                val pcName = (connection as? ConnectionState.Connected)?.pcName
-                val knownPc by vm.pcName.collectAsStateWithLifecycle()
-                val target by vm.target.collectAsStateWithLifecycle()
-                var targetMenu by remember { mutableStateOf(false) }
-                Box {
-                    AssistChip(
-                        onClick = { targetMenu = true },
-                        leadingIcon = {
-                            Icon(
-                                if (connection == ConnectionState.Local) androidx.compose.material.icons.Icons.Outlined.PhoneAndroid
-                                else androidx.compose.material.icons.Icons.Outlined.Computer,
-                                null,
-                                Modifier.size(18.dp),
-                            )
-                        },
-                        label = {
-                            Text(
-                                when {
-                                    connection == ConnectionState.Local -> stringResource(R.string.playing_on_phone)
-                                    pcName != null -> stringResource(R.string.playing_on, pcName)
-                                    else -> stringResource(R.string.reconnecting)
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                    )
-                    androidx.compose.material3.DropdownMenu(expanded = targetMenu, onDismissRequest = { targetMenu = false }) {
-                        dev.thathunky.meteora.data.PlaybackTarget.entries.forEach { t ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (t == dev.thathunky.meteora.data.PlaybackTarget.Phone) stringResource(R.string.target_phone)
-                                        else knownPc ?: stringResource(R.string.target_pc),
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        if (t == dev.thathunky.meteora.data.PlaybackTarget.Phone) androidx.compose.material.icons.Icons.Outlined.PhoneAndroid
-                                        else androidx.compose.material.icons.Icons.Outlined.Computer,
-                                        null,
-                                    )
-                                },
-                                trailingIcon = { if (t == target) Icon(androidx.compose.material.icons.Icons.Outlined.Check, null) },
-                                onClick = {
-                                    targetMenu = false
-                                    vm.setTarget(t)
-                                },
-                            )
-                        }
-                    }
-                }
-                }
-                LyricsButton(onClick = { showLyrics = true })
-                MIconButton(
-                    Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue),
-                    onClick = { showQueue = true }, text = stringResource(R.string.queue),
-                )
-                TrackMenu(track, links)
-            }
+            // The chip gets what the buttons leave and ellipsizes, so a long PC name (or the
+            // Ukrainian label) cannot push the queue and More buttons off the row. In Terminal,
+            // "[ lyrics ]" and "[ queue ]" left the chip about 44 dp on a 360 dp phone: they turn
+            // into icons when the chip would get less than 120 dp.
+            ActionRow(
+                listOf(
+                    RowAction(compactable = false) {
+                        MIconButton(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.action_collapse), onClick = onCollapse)
+                    },
+                    RowAction(weight = 1f, minWidth = 120.dp) { TargetChip(connection, vm) },
+                    RowAction(priority = 2) { LyricsButton(onClick = { showLyrics = true }) },
+                    RowAction(priority = 1) {
+                        MIconButton(
+                            Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.queue),
+                            onClick = { showQueue = true }, text = stringResource(R.string.queue),
+                        )
+                    },
+                    RowAction(compactable = false) { TrackMenu(track, links) },
+                ),
+                Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                arrangement = Arrangement.Start,
+                wrap = false,
+            )
 
             Spacer(Modifier.height(16.dp))
             SongVideoSwitch()
@@ -522,68 +530,94 @@ private fun FullPlayer(
             }
 
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                dev.thathunky.meteora.ui.downloads.TrackDownloadButton(track)
-                MIconToggle(
-                    checked = track.like == LikeStatus.Dislike,
-                    onCheckedChange = { vm.toggleDislike() },
-                    icon = Icons.Outlined.ThumbDown,
-                    checkedIcon = Icons.Filled.ThumbDown,
-                    contentDescription = stringResource(R.string.dislike),
-                    text = stringResource(R.string.dislike),
-                )
-                MIconToggle(
-                    checked = track.like == LikeStatus.Like,
-                    onCheckedChange = {
-                        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                        vm.toggleLike()
+            // "[ завантажити ] [ не подобається ] [ подобається ]" is about 410 dp in Terminal:
+            // Download, then Dislike, turn into icons when the words do not fit.
+            ActionRow(
+                listOf(
+                    RowAction(priority = 2) { dev.thathunky.meteora.ui.downloads.TrackDownloadButton(track) },
+                    RowAction(priority = 1) {
+                        MIconToggle(
+                            checked = track.like == LikeStatus.Dislike,
+                            onCheckedChange = { vm.toggleDislike() },
+                            icon = Icons.Outlined.ThumbDown,
+                            checkedIcon = Icons.Filled.ThumbDown,
+                            contentDescription = stringResource(R.string.dislike),
+                            text = stringResource(R.string.dislike),
+                        )
                     },
-                    icon = Icons.Outlined.ThumbUp,
-                    checkedIcon = Icons.Filled.ThumbUp,
-                    contentDescription = stringResource(R.string.like),
-                    text = stringResource(R.string.like),
-                )
-            }
+                    RowAction(priority = 0) {
+                        MIconToggle(
+                            checked = track.like == LikeStatus.Like,
+                            onCheckedChange = {
+                                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                vm.toggleLike()
+                            },
+                            icon = Icons.Outlined.ThumbUp,
+                            checkedIcon = Icons.Filled.ThumbUp,
+                            contentDescription = stringResource(R.string.like),
+                            text = stringResource(R.string.like),
+                        )
+                    },
+                ),
+                Modifier.fillMaxWidth(),
+                arrangement = Arrangement.End,
+                wrap = false,
+            )
 
             SeekBar(s, vm)
 
             // 8, not 12: the seek bar's 48 dp touch area already leaves room under its times.
             Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Shuffle and repeat keep their icons in Terminal too: their words would not fit the row.
-                MIconToggle(s.shuffle, { vm.toggleShuffle() }, Icons.Outlined.Shuffle, stringResource(R.string.shuffle))
-                // Text controls size to their words; the icon forms keep today's sizes.
-                val side = if (look.textControls) Modifier.height(56.dp) else Modifier.size(64.dp)
-                MIconButton(
-                    Icons.Filled.SkipPrevious, stringResource(R.string.action_previous), onClick = vm::previous,
-                    kind = IconKind.Tonal, text = stringResource(R.string.action_previous), iconSize = 32.dp, modifier = side,
-                )
-                MIconButton(
-                    if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
-                    onClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        vm.playPause()
+            // Shuffle and repeat keep their icons in Terminal too: their words would not fit the row.
+            // Previous and Next are words where they fit ("[ previous ]" alone is 106 dp) and
+            // icons, both together, where they do not. On one line whatever happens.
+            val side = if (look.textControls) Modifier.height(56.dp) else Modifier.size(64.dp)
+            ActionRow(
+                listOf(
+                    RowAction(priority = 2, compactable = false) {
+                        MIconToggle(s.shuffle, { vm.toggleShuffle() }, Icons.Outlined.Shuffle, stringResource(R.string.shuffle))
                     },
-                    kind = IconKind.Filled,
-                    text = if (s.isPlaying) "‖" else "▶",
-                    iconSize = 40.dp,
-                    modifier = if (look.textControls) Modifier.height(56.dp) else Modifier.size(width = 112.dp, height = 80.dp),
-                )
-                MIconButton(
-                    Icons.Filled.SkipNext, stringResource(R.string.action_next), onClick = vm::next,
-                    kind = IconKind.Tonal, text = stringResource(R.string.action_next), iconSize = 32.dp, modifier = side,
-                )
-                MIconToggle(
-                    s.repeat == RepeatMode.All || s.repeat == RepeatMode.One, { vm.cycleRepeat() },
-                    if (s.repeat == RepeatMode.One) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
-                    stringResource(R.string.repeat),
-                )
-            }
+                    RowAction(priority = 1) {
+                        MIconButton(
+                            Icons.Filled.SkipPrevious, stringResource(R.string.action_previous), onClick = vm::previous,
+                            kind = IconKind.Tonal, text = stringResource(R.string.action_previous), iconSize = 32.dp,
+                            // The icon form of a text control is square, as in the other looks.
+                            modifier = if (look.textControls) side.widthIn(min = 56.dp) else side,
+                        )
+                    },
+                    RowAction(priority = 0, compactable = false) {
+                        MIconButton(
+                            if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            stringResource(if (s.isPlaying) R.string.action_pause else R.string.action_play),
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                vm.playPause()
+                            },
+                            kind = IconKind.Filled,
+                            text = if (s.isPlaying) "‖" else "▶",
+                            iconSize = 40.dp,
+                            modifier = if (look.textControls) Modifier.height(56.dp) else Modifier.size(width = 112.dp, height = 80.dp),
+                        )
+                    },
+                    RowAction(priority = 1) {
+                        MIconButton(
+                            Icons.Filled.SkipNext, stringResource(R.string.action_next), onClick = vm::next,
+                            kind = IconKind.Tonal, text = stringResource(R.string.action_next), iconSize = 32.dp,
+                            modifier = if (look.textControls) side.widthIn(min = 56.dp) else side,
+                        )
+                    },
+                    RowAction(priority = 2, compactable = false) {
+                        MIconToggle(
+                            s.repeat == RepeatMode.All || s.repeat == RepeatMode.One, { vm.cycleRepeat() },
+                            if (s.repeat == RepeatMode.One) Icons.Outlined.RepeatOne else Icons.Outlined.Repeat,
+                            stringResource(R.string.repeat),
+                        )
+                    },
+                ),
+                Modifier.fillMaxWidth(),
+                arrangement = Arrangement.SpaceBetween,
+                wrap = false,
+            )
 
             Spacer(Modifier.height(12.dp))
             // On the phone the hardware keys and system slider already set the volume.
