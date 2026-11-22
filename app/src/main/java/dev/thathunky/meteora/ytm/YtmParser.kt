@@ -167,7 +167,9 @@ object YtmParser {
 
     // ---- item renderers ----
 
-    fun responsiveItem(r: JsonObject): MusicItem? {
+    fun responsiveItem(r: JsonObject): MusicItem? = responsiveItemBare(r)?.withFeedback(itemFeedback(r))
+
+    private fun responsiveItemBare(r: JsonObject): MusicItem? {
         val cols = r["flexColumns"].array().map { it["musicResponsiveListItemFlexColumnRenderer"]["text"] }
         val title = cols.getOrNull(0).runsText().ifBlank { return null }
         val subtitleRuns = cols.drop(1).flatMap { it["runs"].array() }
@@ -199,7 +201,9 @@ object YtmParser {
         return browse?.let { browseItem(it, title, cleanSubtitle(subtitle), thumb, r) }
     }
 
-    fun twoRowItem(r: JsonObject): MusicItem? {
+    fun twoRowItem(r: JsonObject): MusicItem? = twoRowItemBare(r)?.withFeedback(itemFeedback(r))
+
+    private fun twoRowItemBare(r: JsonObject): MusicItem? {
         val title = r["title"].runsText().ifBlank { return null }
         val subtitle = r["subtitle"].runsText()
         val thumb = bestThumbnail(r)
@@ -219,6 +223,30 @@ object YtmParser {
         }
         return null
     }
+
+    /**
+     * The "Not interested" and "Don't recommend artist" tokens from the item's own menu, told
+     * apart by icon (labels are translated). Only `menuServiceItemRenderer` entries: the library
+     * toggles (KEEP, BOOKMARK_BORDER) are `toggleMenuServiceItemRenderer`s with feedback
+     * endpoints of their own. Null when the menu has neither.
+     */
+    fun itemFeedback(r: JsonObject): ItemFeedback? {
+        var notInterested: String? = null
+        var dontRecommend: String? = null
+        for (entry in r["menu"]["menuRenderer"]["items"].array()) {
+            val o = entry["menuServiceItemRenderer"] ?: continue
+            val token = o["serviceEndpoint"]["feedbackEndpoint"].str("feedbackToken")?.ifBlank { null } ?: continue
+            when (o["icon"].str("iconType")) {
+                "NOT_INTERESTED" -> notInterested = notInterested ?: token
+                "REMOVE_CIRCLE" -> dontRecommend = dontRecommend ?: token
+            }
+        }
+        return if (notInterested == null && dontRecommend == null) null else ItemFeedback(notInterested, dontRecommend)
+    }
+
+    /** A `feedback` answer: true only when YouTube says the (first) token was processed. */
+    fun feedbackProcessed(root: JsonElement): Boolean =
+        root["feedbackResponses"].array().firstOrNull()?.str("isProcessed") == "true"
 
     private fun cardItem(r: JsonObject): MusicItem? {
         val title = r["title"].runsText().ifBlank { return null }

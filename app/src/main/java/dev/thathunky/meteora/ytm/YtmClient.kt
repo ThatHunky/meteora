@@ -17,7 +17,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 class YtmException(val status: Int, message: String) : Exception(message) {
@@ -98,6 +100,26 @@ class YtmClient(
             else -> "like/removelike"
         }
         post(endpoint, buildJsonObject { putJsonObject("target") { put("videoId", videoId) } })
+    }
+
+    /**
+     * Sends one of an item's [ItemFeedback] tokens ("Not interested", "Don't recommend artist"):
+     * it changes the whole account's recommendations. True only when YouTube answers that it
+     * processed it. False, never a throw, when signed out (nothing is sent), on an HTTP error or
+     * any failure. The token and the answer's body are never logged: only the outcome.
+     */
+    suspend fun feedback(token: String): Boolean {
+        if (auth.headers() == null) return false
+        val ok = try {
+            YtmParser.feedbackProcessed(post("feedback", buildJsonObject { putJsonArray("feedbackTokens") { add(token) } }))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            runCatching { android.util.Log.i(FEEDBACK_TAG, "feedback failed: ${e.javaClass.simpleName}") }
+            return false
+        }
+        runCatching { android.util.Log.i(FEEDBACK_TAG, "feedback isProcessed=$ok") }
+        return ok
     }
 
     suspend fun browse(browseId: String): JsonElement = post("browse", buildJsonObject { put("browseId", browseId) })
@@ -190,6 +212,8 @@ class YtmClient(
 
     companion object {
         const val ORIGIN = "https://music.youtube.com"
+        /** Logcat tag for the feedback call's outcome (never its token). */
+        const val FEEDBACK_TAG = "YtmFeedback"
         private const val BASE = "$ORIGIN/youtubei/v1"
         const val FALLBACK_CLIENT_VERSION = "1.20261117.06.00"
         const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
