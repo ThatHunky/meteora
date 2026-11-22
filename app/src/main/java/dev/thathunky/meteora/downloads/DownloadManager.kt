@@ -89,13 +89,15 @@ class DownloadManager @Inject constructor(
 
     /** True when downloading is allowed now; otherwise tells the UI (when [notify]) and returns false. */
     suspend fun allowed(forceCheck: Boolean = false, notify: Boolean = true): Boolean = gateLock.withLock {
-        val signedIn = runCatching { auth.headers() }.getOrNull() != null
+        val headers = runCatching { auth.headers() }
+        val signedIn = headers.getOrNull() != null
         val now = System.currentTimeMillis()
         when (DownloadsGate.decide(signedIn, settings.premiumAtMs, now, forceCheck)) {
             DownloadsGate.Decision.Allowed -> true
             DownloadsGate.Decision.SignedOut -> false.also {
                 // The memory is not tied to an account: the next one to sign in must be checked.
-                settings.premiumAtMs = null
+                // Only when the store said "no session", not when reading it failed this once.
+                if (headers.isSuccess) settings.premiumAtMs = null
                 if (notify) _blocked.tryEmit(Blocked.SignedOut)
             }
             DownloadsGate.Decision.Check -> {
