@@ -327,7 +327,7 @@ fun SelectionBar(
     val look = LocalLook.current
     MSurface(modifier.fillMaxWidth().padding(horizontal = look.screenPadding / 2, vertical = 4.dp), tone = Tone.Primary) {
         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            MIconButton(Icons.Outlined.Close, stringResource(R.string.lib_cancel_selection), onClose, text = "esc")
+            MIconButton(Icons.Outlined.Close, stringResource(R.string.lib_cancel_selection), onClose, text = "x")
             Text(
                 count,
                 style = MaterialTheme.typography.titleMedium,
