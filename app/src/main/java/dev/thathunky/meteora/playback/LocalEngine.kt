@@ -160,6 +160,8 @@ class LocalEngine @Inject constructor(
     private val pinned = ConcurrentHashMap<String, StreamQuality>()
     /** videoId → its downloaded file's URI, or "" to stream; fixed at the first open like [pinned]. Loader thread. */
     private val pinnedFile = ConcurrentHashMap<String, String>()
+    /** Media id the player itself moved past after it failed to play: that is no skip for the listening log. Main thread. */
+    private var skippedBroken: String? = null
     /** Video id of a song that [play] started by itself while its queue is still loading. Main thread. */
     private var startedAlone: String? = null
     /** When the last play request came in, for the start-up time in the log. 0 once reported. */
@@ -453,17 +455,23 @@ class LocalEngine @Inject constructor(
                 failedInARow = 0
                 networkAttempts = 0
             }
+            // The last track of the queue played to its end: no transition follows to count it.
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_ENDED) player.currentMediaItem?.let { downloads.listens.left(it.toLocalSong(), player.currentPosition, byUser = false) }
             publish()
         }
 
         /** The listening log for smart downloads: where the track that was left got to, and whether the user moved on. */
         override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
-            val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION
-            // A seek within the track, or the queue rearranged around it, is not leaving it. A new
-            // queue replacing the track (REMOVE) can count a play but never a skip.
-            val moved = reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_REMOVE
-            if (!auto && (!moved || old.mediaItem?.mediaId == new.mediaItem?.mediaId)) return
-            old.mediaItem?.let { downloads.listens.left(it.toLocalSong(), old.positionMs, byUser = reason == Player.DISCONTINUITY_REASON_SEEK) }
+            val jump = when (reason) {
+                Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> dev.thathunky.meteora.downloads.ListenRules.Jump.Auto
+                Player.DISCONTINUITY_REASON_SEEK -> dev.thathunky.meteora.downloads.ListenRules.Jump.Seek
+                Player.DISCONTINUITY_REASON_REMOVE -> dev.thathunky.meteora.downloads.ListenRules.Jump.Remove
+                else -> dev.thathunky.meteora.downloads.ListenRules.Jump.Other
+            }
+            val item = old.mediaItem ?: return
+            val skippedForError = item.mediaId == skippedBroken.also { skippedBroken = null }
+            val byUser = dev.thathunky.meteora.downloads.ListenRules.leftByUser(jump, item.mediaId == new.mediaItem?.mediaId, new.mediaItemIndex > old.mediaItemIndex, skippedForError) ?: return
+            downloads.listens.left(item.toLocalSong(), old.positionMs, byUser)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -504,6 +512,7 @@ class LocalEngine @Inject constructor(
                 else -> {
                     _errors.tryEmit(error)
                     if (p.hasNextMediaItem() && ++failedInARow < MAX_FAILED_IN_A_ROW) {
+                        skippedBroken = id
                         p.seekToNextMediaItem()
                         p.prepare()
                     } else {
