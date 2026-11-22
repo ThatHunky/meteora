@@ -45,6 +45,15 @@ class CountryCache(private val now: () -> Long = System::currentTimeMillis) {
         entries[key] = CountryEntry(country, now())
     }
 
+    /** By the artist's id, else by its name. */
+    fun find(artist: ArtistRef): CountryEntry? = lookup(key(artist)) ?: lookup(nameKey(artist.name))
+
+    /** One answer, kept under the artist's key and its name. */
+    fun putFor(artist: ArtistRef, country: String?) {
+        put(key(artist), country)
+        put(nameKey(artist.name), country)
+    }
+
     fun encode(): String = json.encodeToString(serializer, entries.filterValues { now() - it.at < TTL_MS })
 
     fun load(text: String) {
@@ -56,7 +65,10 @@ class CountryCache(private val now: () -> Long = System::currentTimeMillis) {
         private val json = Json { ignoreUnknownKeys = true }
         private val serializer = MapSerializer(String.serializer(), CountryEntry.serializer())
 
-        fun key(artist: ArtistRef): String = artist.browseId ?: ("name:" + artist.name.trim().lowercase(Locale.ROOT))
+        fun key(artist: ArtistRef): String = artist.browseId ?: nameKey(artist.name)
+
+        /** The lookup is by name, so its answer is also kept under the name (the Test field has no ids). */
+        fun nameKey(name: String): String = "name:" + name.trim().lowercase(Locale.ROOT)
     }
 }
 
@@ -100,9 +112,15 @@ class ArtistCountries @Inject constructor(
     fun countryOf(artist: ArtistRef): String? {
         if (!store.settings.value.wantsCountries || artist.name.isBlank()) return null
         val key = CountryCache.key(artist)
-        cache.lookup(key)?.let { return it.country }
+        cache.find(artist)?.let { return it.country }
         if (pending.size < MAX_PENDING && pending.add(key)) queue.trySend(artist)
         return null
+    }
+
+    /** From the cache only, never queued: for the Test field, so typing sends nothing anywhere. */
+    fun cached(artist: ArtistRef): String? {
+        if (!store.settings.value.wantsCountries || artist.name.isBlank()) return null
+        return cache.find(artist)?.country
     }
 
     private suspend fun work() {
@@ -110,11 +128,11 @@ class ArtistCountries @Inject constructor(
         for (artist in queue) {
             val key = CountryCache.key(artist)
             try {
-                if (!store.settings.value.wantsCountries || cache.lookup(key) != null) continue
+                if (!store.settings.value.wantsCountries || cache.find(artist) != null) continue
                 val started = System.currentTimeMillis()
                 try {
                     val country = client.country(artist.name)
-                    cache.put(key, country)
+                    cache.putFor(artist, country)
                     save()
                     backoff = 0
                 } catch (e: CancellationException) {

@@ -25,8 +25,13 @@ class FilterUiTest {
         assertEquals(listOf(ItemAction.HideArtist), filterActions(MusicItem.Album("MPREb_1", "X", "Album • Y", null, null, listOf(ArtistRef("Y", "UCy")))))
     }
 
-    @Test fun `Now Playing's artist line gives the channel to the first artist`() =
-        assertEquals(listOf(ArtistRef("A", "UCa"), ArtistRef("B", null)), refsFrom("A & B", "UCa"))
+    @Test fun `Now Playing's artist line is offered whole with the channel, then in pieces`() {
+        assertEquals(
+            listOf(ArtistRef("Simon & Garfunkel", "UCsg"), ArtistRef("Simon", null), ArtistRef("Garfunkel", null)),
+            refsFrom("Simon & Garfunkel", "UCsg"),
+        )
+        assertEquals(listOf(ArtistRef("Kino", "UCk")), refsFrom("Kino", "UCk"))
+    }
 
     @Test fun `the related-artists shelf is the one made of artists`() {
         assertTrue(isRelatedShelf(Shelf("Fans might also like", listOf(MusicItem.Artist("UC1", "X", "", null)))))

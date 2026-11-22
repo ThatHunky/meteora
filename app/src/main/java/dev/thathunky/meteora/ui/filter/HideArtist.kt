@@ -54,7 +54,10 @@ fun hideableArtists(item: MusicItem): List<ArtistRef> = when (item) {
 fun filterActions(item: MusicItem): List<ItemAction> =
     if (hideableArtists(item).isNotEmpty()) listOf(ItemAction.HideArtist) else emptyList()
 
-/** Now Playing's artist line ("A, B & C") as refs; the channel id belongs to the first. */
+/**
+ * Now Playing's artist line as refs: the whole line first, with the channel id (it may be one
+ * name with "&" in it), then its pieces by name when it has several.
+ */
 internal fun refsFrom(artist: String, channelId: String?): List<ArtistRef> =
     subtitleParts(artist).mapIndexed { i, name -> ArtistRef(name, if (i == 0) channelId else null) }
 

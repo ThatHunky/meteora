@@ -125,6 +125,15 @@ class MusicBrainzTest {
         assertEquals("UA", b.lookup("UC2")?.country)
     }
 
+    @Test fun `an answer is found again by id or by name`() {
+        val cache = CountryCache { 0L }
+        cache.putFor(ArtistRef("Кино", "UC1"), "RU")
+        assertEquals("RU", cache.find(ArtistRef("Кино", "UC1"))?.country)
+        // The Test field types a name and has no id.
+        assertEquals("RU", cache.find(ArtistRef("кино", null))?.country)
+        assertNull(cache.find(ArtistRef("Сплин", null)))
+    }
+
     @Test fun `keys are the browse id, else the name`() {
         assertEquals("UC1", CountryCache.key(ArtistRef("Kino", "UC1")))
         assertEquals("name:кино", CountryCache.key(ArtistRef(" Кино ", null)))

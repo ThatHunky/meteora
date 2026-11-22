@@ -72,6 +72,14 @@ class FilterRulesTest {
         assertFalse(decide(s, MusicItem.Artist("UCkino", "Кино", "", null)).allowed)
     }
 
+    @Test fun `a name with an ampersand or comma matches whole and in pieces`() {
+        val album = MusicItem.Album("MPREb_3", "Bookends", "Album • Simon & Garfunkel • 1968", null, null)
+        assertFalse(decide(FilterSettings(artists = listOf(ArtistRule(null, "Simon & Garfunkel", Hide))), album).allowed)
+        assertFalse(decide(FilterSettings(artists = listOf(ArtistRule(null, "Garfunkel", Hide))), album).allowed)
+        val tyler = MusicItem.Album("MPREb_4", "IGOR", "Album • Tyler, The Creator", null, null)
+        assertFalse(decide(FilterSettings(artists = listOf(ArtistRule(null, "Tyler, The Creator", Hide))), tyler).allowed)
+    }
+
     @Test fun `custom rules match title or artist, case ignored`() {
         val s = FilterSettings(custom = listOf(CustomRule("REMIX", Hide)))
         assertEquals(Decision(Hide, Level.Custom, "REMIX"), decide(s, song("Song (Club Remix)", "DJ" to null)))

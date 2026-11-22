@@ -100,9 +100,12 @@ class FiltersViewModel @Inject constructor(private val store: FilterStore, priva
         if (t.isEmpty() || s.custom.any { it.text.equals(t, ignoreCase = true) }) s else s.copy(custom = s.custom + CustomRule(t, Verdict.Hide))
     }
 
-    /** What the filter would do with this title and artist, wherever it applies. */
+    /**
+     * What the filter would do with this title and artist, wherever it applies. The artist line
+     * whole and in pieces ("Simon & Garfunkel", "Simon", "Garfunkel"); countries from the cache only.
+     */
     fun test(title: String, artist: String): Decision =
-        filter.decide(Subject(title, subtitleParts(artist).map { ArtistRef(it, null) }))
+        filter.test(Subject(title, subtitleParts(artist).map { ArtistRef(it, null) }))
 
     private fun <K> Map<K, Verdict>.with(key: K, v: Verdict?): Map<K, Verdict> = if (v == null) this - key else this + (key to v)
 }

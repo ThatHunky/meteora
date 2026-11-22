@@ -42,8 +42,15 @@ fun MusicItem.subject(): Subject = when (this) {
     is MusicItem.Playlist -> Subject(title, emptyList(), subtitleParts(subtitle))
 }
 
-internal fun subtitleParts(subtitle: String): List<String> =
-    subtitle.split(" • ", " · ", ", ", " & ").map { it.trim() }.filter { it.isNotEmpty() }
+/**
+ * Names a subtitle or an artist line may hold: each " • " segment whole ("Simon & Garfunkel",
+ * "Tyler, The Creator"), then its pieces split at ", " and " & ".
+ */
+internal fun subtitleParts(subtitle: String): List<String> {
+    val segments = subtitle.split(" • ", " · ").map { it.trim() }.filter { it.isNotEmpty() }
+    val pieces = segments.flatMap { s -> s.split(", ", " & ").map { it.trim() } }.filter { it.isNotEmpty() }
+    return (segments + pieces).distinct()
+}
 
 /** The one pure function that decides. Precedence: [Level] order; inside a level Always show beats Hide. */
 object FilterRules {
@@ -178,6 +185,9 @@ class ContentFilter @Inject constructor(private val store: FilterStore, private 
     private val countryOf: (ArtistRef) -> String? = { countries.countryOf(it) }
 
     fun decide(subject: Subject): Decision = FilterRules.decide(store.settings.value, subject, countryOf)
+
+    /** For the Test field: like [decide], but countries come from the cache only, so typing asks MusicBrainz nothing. */
+    fun test(subject: Subject): Decision = FilterRules.decide(store.settings.value, subject) { countries.cached(it) }
 
     fun allows(item: MusicItem, place: Place, settings: FilterSettings = store.settings.value): Boolean {
         if (!settings.hasRules || !settings.appliesTo(place)) return true

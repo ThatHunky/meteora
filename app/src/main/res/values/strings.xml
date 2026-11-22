@@ -219,7 +219,7 @@
     <string name="filters_place_radio">Radio and autoplay</string>
     <string name="filters_place_radio_note">On the phone only. The PC builds its own radio.</string>
     <string name="filters_place_artist">Artist pages</string>
-    <string name="filters_place_artist_note">Only the "Fans might also like" row.</string>
+    <string name="filters_place_artist_note">Only the “Fans might also like” row.</string>
     <string name="filters_place_downloads">Smart downloads</string>
     <string name="filters_test">Test</string>
     <string name="filters_test_title">Title</string>

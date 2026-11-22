@@ -472,7 +472,7 @@ Brought onto `main` by cherry-pick, not merge: the history had just been rewritt
 
 ## Content filter: hiding music by language, country or artist (02:00 →)
 
-The user asked whether music could be hidden by language or country of origin, and then that it be "fully customizable". Built from `docs/filter-plan.md` (its later sections override the first bullets) in a worktree, while downloads were being built on another branch, so existing files got only single-line additions.
+The user asked whether music could be hidden by language or country of origin, and then that it be "fully customizable". Built from `docs/filter-plan.md` (its later sections override the first bullets) in a worktree, while downloads were being built on another branch, so existing files got only single-line changes: added lines, plus three modified ones (the continuation fetch in `LocalEngine.maybeExtendRadio`, the action list in the long-press sheet, and the `SettingsCategory` enum line).
 
 ### What was built
 
@@ -484,7 +484,7 @@ The user asked whether music could be hidden by language or country of origin, a
 
 ### Checked
 
-Build, and 185 Kotlin unit tests passing (62 new: the language guess on real-looking Ukrainian, Russian, Belarusian, Bulgarian, Serbian, Kazakh, Latin and other titles; each precedence pair both ways; shelves and queues; the settings codec; album artists from the search fixture; MusicBrainz matching on three real answers, the request it sends, the 503, and the cache). MusicBrainz was asked from the PC with curl to learn the answer's shape (`docs/api-notes.md` › MusicBrainz). **Nothing was run on a phone:** the Filters screen in any look or in Ukrainian, Home and artist pages with rules set, radio and autoplay filtering, Hide artist and its toast and dialog, and lookups from the phone are all unchecked.
+Build, and 187 Kotlin unit tests passing (64 new: the language guess on real-looking Ukrainian, Russian, Belarusian, Bulgarian, Serbian, Kazakh, Latin and other titles; each precedence pair both ways; shelves and queues; the settings codec; album artists from the search fixture; MusicBrainz matching on three real answers, the request it sends, the 503, and the cache). MusicBrainz was asked from the PC with curl to learn the answer's shape (`docs/api-notes.md` › MusicBrainz). **Nothing was run on a phone:** the Filters screen in any look or in Ukrainian, Home and artist pages with rules set, radio and autoplay filtering, Hide artist and its toast and dialog, and lookups from the phone are all unchecked.
 
 ### Known limits
 
