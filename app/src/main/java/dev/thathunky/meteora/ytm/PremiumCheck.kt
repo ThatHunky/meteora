@@ -39,6 +39,16 @@ data class PremiumMarkers(val loggedIn: Boolean?, val subscriber: Boolean?, val 
     /** Fail closed: the page must say subscriber, and the menu must have been read and offer no upgrade. */
     val isPremium: Boolean get() = loggedIn == true && subscriber == true && upgradeOffered == false
 
+    /**
+     * True: Premium. False: a marker said no. Null: the check could not tell (a network error, a
+     * menu that did not load); that is not Premium either, but it must not erase a remembered yes.
+     */
+    val verdict: Boolean? get() = when {
+        isPremium -> true
+        loggedIn == false || subscriber == false || upgradeOffered == true -> false
+        else -> null
+    }
+
     override fun toString() = "loggedIn=$loggedIn subscriber=$subscriber upgradeOffered=$upgradeOffered → premium=$isPremium"
 }
 
@@ -64,10 +74,14 @@ object PremiumParser {
     private fun isUpgradeEndpoint(e: JsonObject): Boolean =
         e.str("browseId") == "SPunlimited" || e.str("canonicalBaseUrl")?.startsWith("/music_premium") == true
 
-    /** For the probe: the menu's icon types and browse ids, which name no person. */
+    /**
+     * For the probe: the menu's icon types and browse ids. Only page ids (`SP…`, `FE…`) are shown;
+     * any other id (the account's own channel is a `UC…` id) is logged as `other`, as it names the account.
+     */
     fun menuShape(menu: JsonElement): String {
         val icons = menu.findAll("icon").mapNotNull { it.str("iconType") }
         val ids = menu.findAll("browseEndpoint").mapNotNull { it.str("browseId") }
+            .map { if (it.startsWith("SP") || it.startsWith("FE")) it else "other" }
         return "icons=$icons browseIds=$ids header=${menu.findAll("activeAccountHeaderRenderer").isNotEmpty()}"
     }
 
@@ -122,6 +136,9 @@ class PremiumCheck @Inject constructor(okHttp: OkHttpClient, private val auth: Y
     }
 
     suspend fun isPremium(): Boolean = markers().isPremium
+
+    /** [PremiumMarkers.verdict]: null when the check could not tell. */
+    suspend fun verdict(): Boolean? = markers().verdict
 
     /** Debug probe: the markers, and the menu's shape (icon types and browse ids only). */
     suspend fun probe() = withContext(Dispatchers.IO) {

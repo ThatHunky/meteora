@@ -94,10 +94,15 @@ class DownloadManager @Inject constructor(
         val now = System.currentTimeMillis()
         when (DownloadsGate.decide(signedIn, settings.premiumAtMs, now, forceCheck)) {
             DownloadsGate.Decision.Allowed -> true
-            DownloadsGate.Decision.SignedOut -> false.also { if (notify) _blocked.tryEmit(Blocked.SignedOut) }
+            DownloadsGate.Decision.SignedOut -> false.also {
+                // The memory is not tied to an account: the next one to sign in must be checked.
+                settings.premiumAtMs = null
+                if (notify) _blocked.tryEmit(Blocked.SignedOut)
+            }
             DownloadsGate.Decision.Check -> {
-                val ok = premium.isPremium()
-                settings.premiumAtMs = DownloadsGate.remember(ok, now)
+                val verdict = premium.verdict()
+                val ok = verdict == true
+                settings.premiumAtMs = DownloadsGate.remember(verdict, settings.premiumAtMs, now)
                 if (!ok && notify) _blocked.tryEmit(Blocked.NotPremium)
                 ok
             }

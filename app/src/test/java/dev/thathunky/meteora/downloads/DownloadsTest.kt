@@ -62,8 +62,14 @@ class DownloadsGateTest {
     }
 
     @Test fun `a negative answer is not remembered`() {
-        assertNull(DownloadsGate.remember(false, 5))
-        assertEquals(5L, DownloadsGate.remember(true, 5))
+        assertNull(DownloadsGate.remember(false, 3, 5))
+        assertEquals(5L, DownloadsGate.remember(true, 3, 5))
+    }
+
+    @Test fun `a check that could not tell keeps the remembered answer`() {
+        // A nightly refresh offline must not erase last week's yes.
+        assertEquals(3L, DownloadsGate.remember(null, 3, 5))
+        assertNull(DownloadsGate.remember(null, null, 5))
     }
 }
 
