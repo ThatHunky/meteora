@@ -633,6 +633,7 @@ private fun TrackMenu(track: Track, links: TrackLinks) {
                     onClick = { open = false; links.openArtist(id) },
                 )
             }
+            dev.thathunky.meteora.ui.filter.HideArtistMenuItem(track.artist, track.artistChannelId) { open = false }
         }
     }
 }

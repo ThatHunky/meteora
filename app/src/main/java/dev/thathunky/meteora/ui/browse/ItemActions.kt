@@ -13,6 +13,7 @@ sealed interface ItemAction {
     data object Share : ItemAction
     data object Download : ItemAction
     data object RemoveDownload : ItemAction
+    data object HideArtist : ItemAction
 }
 
 /** What the long-press sheet offers for [item], in the official app's order. [downloaded]: it is in the downloads. */

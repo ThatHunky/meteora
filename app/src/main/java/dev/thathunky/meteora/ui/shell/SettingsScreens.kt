@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -71,6 +72,7 @@ private fun SettingsCategory.route(): Route = when (this) {
     SettingsCategory.Account -> SettingsAccountRoute
     SettingsCategory.Pc -> SettingsPcRoute
     SettingsCategory.About -> SettingsAboutRoute
+    SettingsCategory.Filters -> SettingsFiltersRoute
 }
 
 private fun SettingsCategory.title(): Int = when (this) {
@@ -79,6 +81,7 @@ private fun SettingsCategory.title(): Int = when (this) {
     SettingsCategory.Account -> R.string.ytm_account
     SettingsCategory.Pc -> R.string.settings_pc
     SettingsCategory.About -> R.string.settings_about
+    SettingsCategory.Filters -> R.string.filters_title
 }
 
 private fun SettingsCategory.icon(): ImageVector = when (this) {
@@ -87,6 +90,7 @@ private fun SettingsCategory.icon(): ImageVector = when (this) {
     SettingsCategory.Account -> Icons.Outlined.AccountCircle
     SettingsCategory.Pc -> Icons.Outlined.Computer
     SettingsCategory.About -> Icons.Outlined.Info
+    SettingsCategory.Filters -> Icons.Outlined.FilterList
 }
 
 /** The top-level list: one row per category with a line about its current state. */
@@ -108,6 +112,7 @@ fun SettingsScreen(vm: ShellViewModel, open: (Route) -> Unit, bottomPadding: Dp)
                 SettingsCategory.Account -> stringResource(if (signedIn) R.string.ytm_signed_in else R.string.ytm_signed_out)
                 SettingsCategory.Pc -> pc?.name ?: stringResource(R.string.not_connected)
                 SettingsCategory.About -> stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)
+                SettingsCategory.Filters -> dev.thathunky.meteora.ui.filter.filtersSummary()
             }
             MRow(
                 headline = stringResource(c.title()),

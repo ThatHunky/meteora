@@ -10,7 +10,7 @@ import org.junit.Test
 
 class SettingsCategoriesTest {
     @Test fun `categories in order`() =
-        assertEquals(listOf(Appearance, Playback, Account, Pc, About), settingsCategories())
+        assertEquals(listOf(Appearance, Playback, SettingsCategory.Filters, Account, Pc, About), settingsCategories())
 
     @Test fun `every category is listed once`() =
         assertEquals(SettingsCategory.entries.toSet(), settingsCategories().toSet().also { assertEquals(it.size, settingsCategories().size) })

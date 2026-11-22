@@ -146,6 +146,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         }
     }
     val longPress: (MusicItem) -> Unit = { sheetFor = it }
+    // Here rather than in the sheet: its "which artist?" dialog outlives the sheet.
+    val hideArtist = dev.thathunky.meteora.ui.filter.rememberHideArtist()
     val goBack: () -> Unit = {
         val s = stacks[tabIndex]
         if (s.size > 1) s.removeAt(s.lastIndex)
@@ -186,6 +188,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
         entry<SettingsAccountRoute> { AccountSettingsScreen(vm, push, goBack, contentBottom) }
         entry<SettingsPcRoute> { PcSettingsScreen(vm, push, goBack, contentBottom) }
         entry<SettingsAboutRoute> { AboutSettingsScreen(goBack, contentBottom) }
+        entry<SettingsFiltersRoute> { dev.thathunky.meteora.ui.filter.FiltersSettingsScreen(goBack, contentBottom) }
         entry<PairingRoute> {
             // Back to where pairing was opened from: Home on first start, Settings → PC on re-pair.
             PairingScreen(
@@ -273,6 +276,7 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
                     ItemAction.RemoveDownload -> actions.removeDownload(item)
                     ItemAction.GoToAlbum -> (item as? MusicItem.Song)?.album?.browseId?.let { push(AlbumRoute(it)) }
                     ItemAction.GoToArtist -> (item as? MusicItem.Song)?.artists?.firstNotNullOfOrNull { it.browseId }?.let { push(ArtistRoute(it)) }
+                    ItemAction.HideArtist -> hideArtist(dev.thathunky.meteora.ui.filter.hideableArtists(item))
                 }
             },
             onDismiss = { sheetFor = null },

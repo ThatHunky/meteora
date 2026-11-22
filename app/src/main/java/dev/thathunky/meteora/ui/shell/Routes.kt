@@ -35,3 +35,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsPcRoute : Route
 
 @Serializable data object SettingsAboutRoute : Route
+
+@Serializable data object SettingsFiltersRoute : Route
