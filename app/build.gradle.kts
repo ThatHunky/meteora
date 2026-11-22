@@ -26,13 +26,30 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
 
+    // The release key lives outside the repository. keystore.properties (git-ignored, in the
+    // project root) says where: storeFile, storePassword, keyAlias, keyPassword. Without that
+    // file a release build is signed with the debug key, so the project still builds anywhere.
+    val keystoreProps = Properties().apply {
+        rootProject.file("keystore.properties").takeIf { it.isFile }?.reader()?.use { load(it) }
+    }
+    val releaseKey = keystoreProps.getProperty("storeFile")?.let { file(it) }?.takeIf { it.isFile }
+    signingConfigs {
+        if (releaseKey != null) {
+            create("release") {
+                storeFile = releaseKey
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Personal sideload builds: sign with the debug key until a release key exists.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKey != null) "release" else "debug")
         }
     }
 
