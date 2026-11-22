@@ -318,7 +318,11 @@ class DownloadManager @Inject constructor(
             true
         } catch (x: CancellationException) {
             // A file finished just before the cancellation is already Done: leave it so.
-            index.update(id) { if (it.state == DownloadState.Downloading) it.copy(state = DownloadState.Queued) else it }
+            var requeued = false
+            index.update(id) { if (it.state == DownloadState.Downloading) it.copy(state = DownloadState.Queued).also { requeued = true } else it }
+            // The run that replaced this one (the Wi-Fi rule changed) may have looked at the queue
+            // before this song was back in it: make sure a run follows.
+            if (requeued) schedule()
             throw x
         } catch (x: IOException) {
             if (!isConnectivity(x)) {
