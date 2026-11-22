@@ -820,13 +820,14 @@ private fun SeekBar(s: PlaybackState, vm: PlayerViewModel) {
 @Composable
 private fun VolumeRow(s: PlaybackState, vm: PlayerViewModel) {
     val override by vm.volumeOverride.collectAsStateWithLifecycle()
+    val volumeLabel = stringResource(R.string.volume)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.VolumeDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Slider(
+        dev.thathunky.meteora.ui.components.MSlider(
             value = (override ?: s.volume).toFloat(),
             onValueChange = { vm.setVolume(it.roundToInt()) },
             valueRange = 0f..100f,
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp).semantics { contentDescription = volumeLabel },
         )
         Icon(Icons.Outlined.VolumeUp, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

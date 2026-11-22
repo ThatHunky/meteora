@@ -33,6 +33,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -123,6 +130,47 @@ private fun BlockProgress(progress: () -> Float, modifier: Modifier) {
     )
 }
 
+/**
+ * A slider (Now Playing's PC volume). The wavy looks keep Material's slider; Terminal, Flat and
+ * Retro draw their own seek bar's track ([MProgress]) so the volume under the seek bar is not a
+ * rounded Material pill. A tap or a drag sets the value; TalkBack sets and steps it as a slider.
+ */
+@Composable
+fun MSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+) {
+    val look = LocalLook.current
+    if (look.progress == ProgressStyle.Wavy || look.progress == ProgressStyle.WavyThick) {
+        androidx.compose.material3.Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, modifier = modifier)
+        return
+    }
+    val change by androidx.compose.runtime.rememberUpdatedState(onValueChange)
+    val shown by androidx.compose.runtime.rememberUpdatedState(value)
+    val start = valueRange.start
+    val span = (valueRange.endInclusive - start).takeIf { it > 0f } ?: 1f
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange)
+                setProgress { v -> change(v.coerceIn(valueRange)); true }
+            }
+            .pointerInput(valueRange) {
+                detectTapGestures { o -> change(start + span * (o.x / size.width).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(valueRange) {
+                detectHorizontalDragGestures { c, _ -> change(start + span * (c.position.x / size.width).coerceIn(0f, 1f)) }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        MProgress(progress = { ((shown - start) / span).coerceIn(0f, 1f) }, amplitude = { 0f })
+    }
+}
+
 /** An indeterminate loader, in the look's form. [modifier] sets the size where the caller needs one. */
 @Composable
 fun MLoading(modifier: Modifier = Modifier, contained: Boolean = false) {
@@ -137,12 +185,14 @@ fun MLoading(modifier: Modifier = Modifier, contained: Boolean = false) {
     }
 }
 
-/** A thin bar for page loads (the sign-in WebView). */
+/** A thin bar for page loads (the sign-in WebView). Terminal's is one line of text, not a headline. */
 @Composable
 fun MLinearLoading(modifier: Modifier = Modifier) {
     when (LocalLook.current.loading) {
         LoadingStyle.Morphing -> LinearWavyProgressIndicator(modifier)
-        LoadingStyle.TextSpinner -> Box(modifier) { TextSpinner() }
+        LoadingStyle.TextSpinner -> Box(modifier.height(20.dp), contentAlignment = Alignment.CenterStart) {
+            TextSpinner(MaterialTheme.typography.labelLarge)
+        }
         else -> LinearProgressIndicator(modifier)
     }
 }
@@ -150,7 +200,7 @@ fun MLinearLoading(modifier: Modifier = Modifier) {
 private const val SPINNER = "|/-\\"
 
 @Composable
-private fun TextSpinner() {
+private fun TextSpinner(style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineSmall) {
     var i by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -158,7 +208,7 @@ private fun TextSpinner() {
             i = (i + 1) % SPINNER.length
         }
     }
-    Text(SPINNER[i].toString(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+    Text(SPINNER[i].toString(), style = style, color = MaterialTheme.colorScheme.primary)
 }
 
 @Composable
