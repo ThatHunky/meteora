@@ -58,7 +58,8 @@ fn boxes(b: &[u8], from: usize, to: usize) -> Result<(Vec<BoxRef>, bool), String
         if size < header as u64 {
             return Err("bad box size".into());
         }
-        let end = at as u64 + size;
+        // A hostile 64-bit size must not wrap around and send `at` backwards.
+        let Some(end) = (at as u64).checked_add(size) else { return Err("bad box size".into()) };
         if end > to as u64 {
             return Ok((out, true));
         }
@@ -201,7 +202,12 @@ fn new_udta(b: &[u8], old: Option<&BoxRef>, ours: &[([u8; 4], Vec<u8>)]) -> Resu
 }
 
 /// True if any `stco` / `co64` under `moov` has entries: absolute offsets that a bigger `moov` would break.
-fn has_chunk_offsets(b: &[u8], from: usize, to: usize) -> Result<bool, String> {
+fn has_chunk_offsets(b: &[u8], from: usize, to: usize, depth: u32) -> Result<bool, String> {
+    // trak/mdia/minf/stbl is four levels; a file nesting far deeper is not one of YouTube's, and
+    // unbounded recursion on a hostile head would overflow the stack, which no unwind catches.
+    if depth > 8 {
+        return Err("boxes nested too deep".into());
+    }
     let (kids, _) = boxes(b, from, to)?;
     for k in kids {
         match &k.kind {
@@ -212,7 +218,7 @@ fn has_chunk_offsets(b: &[u8], from: usize, to: usize) -> Result<bool, String> {
                 }
             }
             b"trak" | b"mdia" | b"minf" | b"stbl" => {
-                if has_chunk_offsets(b, k.start + k.header, k.end)? {
+                if has_chunk_offsets(b, k.start + k.header, k.end, depth + 1)? {
                     return Ok(true);
                 }
             }
@@ -261,7 +267,7 @@ pub fn tag_head(head: &[u8], tail: &[u8], tags: &Tags, cover: Option<&[u8]>) -> 
     if !kids.iter().any(|k| &k.kind == b"mvex") {
         return Err("not a fragmented file".into());
     }
-    if has_chunk_offsets(head, moov.start + moov.header, moov.end)? {
+    if has_chunk_offsets(head, moov.start + moov.header, moov.end, 0)? {
         return Err("moov has chunk offsets".into());
     }
     for x in &top[mi + 1..] {
