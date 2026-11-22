@@ -1,0 +1,96 @@
+{
+ "created": "2026-11-22T00:17:06.305Z",
+ "count": 18,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "064db6e8-fdfb-4acb-a327-fc2de75b37de",
+   "type": "Group",
+   "score": 100,
+   "name": "Кино",
+   "sort-name": "Kino",
+   "country": "RU",
+   "disambiguation": "Soviet rock band active in 1980s",
+   "area": {
+    "type": "Country",
+    "name": "Russia"
+   },
+   "aliases": [
+    {
+     "name": "Абсолютное кино",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Kino",
+     "locale": "en",
+     "type": "Artist name"
+    },
+    {
+     "name": "Кіно",
+     "locale": "uk",
+     "type": null
+    },
+    {
+     "name": "Кино",
+     "locale": "ru",
+     "type": "Artist name"
+    },
+    {
+     "name": "Gruppa Kino",
+     "locale": null,
+     "type": null
+    },
+    {
+     "name": "Êèíî",
+     "locale": null,
+     "type": null
+    }
+   ]
+  },
+  {
+   "id": "e9c9406f-20dc-4c10-a4c7-e7bedc7fc28e",
+   "type": "Group",
+   "score": 71,
+   "name": "Симфоническое Кино",
+   "sort-name": "Simfonicheskoe Kino",
+   "country": "RU",
+   "area": {
+    "type": "Country",
+    "name": "Russia"
+   },
+   "aliases": [
+    {
+     "name": "Simfonicheskoe Kino",
+     "locale": "en",
+     "type": "Artist name"
+    }
+   ]
+  },
+  {
+   "id": "228ebc0c-5294-4c6f-ba73-531479ae10a0",
+   "type": "Group",
+   "score": 69,
+   "name": "Кино ФРГ",
+   "sort-name": "Кино ФРГ"
+  },
+  {
+   "id": "50552751-18f8-47d6-b1c4-15dd516d9ae4",
+   "score": 69,
+   "name": "Чёрное кино",
+   "sort-name": "Чёрное кино"
+  },
+  {
+   "id": "cc1c7695-4db1-44c5-b1e6-a04febb66c4d",
+   "type": "Group",
+   "score": 62,
+   "name": "Музыканты Группы \"Кино\"",
+   "sort-name": "Музыканты Группы \"Кино\"",
+   "country": "RU",
+   "area": {
+    "type": "Country",
+    "name": "Russia"
+   }
+  }
+ ]
+}

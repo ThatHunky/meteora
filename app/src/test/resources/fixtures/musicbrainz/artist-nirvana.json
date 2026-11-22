@@ -1,0 +1,88 @@
+{
+ "created": "2026-11-22T00:17:22.327Z",
+ "count": 95,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "5b11f4ce-a62d-471e-81fc-a69a8278c7da",
+   "type": "Group",
+   "score": 100,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "US",
+   "disambiguation": "1980s–1990s US grunge band",
+   "area": {
+    "type": "Country",
+    "name": "United States"
+   },
+   "aliases": [
+    {
+     "name": "ニルヴァーナ",
+     "locale": "ja",
+     "type": "Artist name"
+    },
+    {
+     "name": "Nirvana",
+     "locale": "en",
+     "type": "Artist name"
+    },
+    {
+     "name": "Nirvana US",
+     "locale": null,
+     "type": null
+    }
+   ]
+  },
+  {
+   "id": "9282c8b4-ca0b-4c6b-b7e3-4f7762dfc4d6",
+   "type": "Group",
+   "score": 81,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "GB",
+   "disambiguation": "60s band from the UK",
+   "area": {
+    "type": "Country",
+    "name": "United Kingdom"
+   }
+  },
+  {
+   "id": "c3a64a25-251b-4d03-afba-1471440245b8",
+   "type": "Group",
+   "score": 75,
+   "name": "Approaching Nirvana",
+   "sort-name": "Approaching Nirvana",
+   "country": "US",
+   "area": {
+    "type": "Country",
+    "name": "United States"
+   }
+  },
+  {
+   "id": "c49d69dc-e008-47cf-b5ff-160fafb1fe1f",
+   "type": "Group",
+   "score": 70,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "FR",
+   "disambiguation": "’70s French band from Martigues",
+   "area": {
+    "type": "Country",
+    "name": "France"
+   }
+  },
+  {
+   "id": "85af0709-95db-4fbc-801a-120e9f4766d0",
+   "type": "Group",
+   "score": 70,
+   "name": "Nirvana",
+   "sort-name": "Nirvana",
+   "country": "FI",
+   "disambiguation": "early 1980s Finnish punk band",
+   "area": {
+    "type": "Country",
+    "name": "Finland"
+   }
+  }
+ ]
+}

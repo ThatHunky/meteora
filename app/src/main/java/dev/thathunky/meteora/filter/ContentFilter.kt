@@ -171,11 +171,11 @@ object FilterApply {
  * downloads, when they come: `allows(song, Place.SmartDownloads)`).
  */
 @Singleton
-class ContentFilter @Inject constructor(private val store: FilterStore) {
+class ContentFilter @Inject constructor(private val store: FilterStore, private val countries: ArtistCountries) {
     val settings: StateFlow<FilterSettings> get() = store.settings
 
-    /** The artist's country when looked up and known; null otherwise. */
-    @Volatile internal var countryOf: (ArtistRef) -> String? = { null }
+    /** The artist's country when looked up and known; null otherwise (and then queued for a lookup). */
+    private val countryOf: (ArtistRef) -> String? = { countries.countryOf(it) }
 
     fun decide(subject: Subject): Decision = FilterRules.decide(store.settings.value, subject, countryOf)
 

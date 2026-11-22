@@ -1,0 +1,61 @@
+{
+ "created": "2026-11-22T00:17:36.328Z",
+ "count": 1,
+ "offset": 0,
+ "artists": [
+  {
+   "id": "87a417d3-f118-43e0-bece-3de1bd90fce0",
+   "type": "Group",
+   "score": 100,
+   "name": "Океан Ельзи",
+   "sort-name": "Okean Elzy",
+   "country": "UA",
+   "area": {
+    "type": "Country",
+    "name": "Ukraine"
+   },
+   "aliases": [
+    {
+     "name": "Океан Эльзы",
+     "locale": "ru",
+     "type": "Artist name"
+    },
+    {
+     "name": "Okean Elsi",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Okean Elzi",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Океан Ельзы",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Океан Эльзи",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Okean Elzy",
+     "locale": "en",
+     "type": "Artist name"
+    },
+    {
+     "name": "ОЕ",
+     "locale": null,
+     "type": "Search hint"
+    },
+    {
+     "name": "Океан Ельзі",
+     "locale": null,
+     "type": "Search hint"
+    }
+   ]
+  }
+ ]
+}
