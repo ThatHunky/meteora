@@ -157,6 +157,8 @@
     <string name="lyrics_not_synced">These lyrics are not synced</string>
     <string name="lyrics_source">Source: %s</string>
     <string name="lyrics_error">Could not load the lyrics</string>
+    <string name="action_lyrics_follow">Back to the current line</string>
+    <string name="action_lyrics_seek">play from this line</string>
     <string name="action_retry">Try again</string>
     <string name="lrclib_title">Find synced lyrics on LRCLIB</string>
     <string name="lrclib_note">Sends the track\'s title, artist, album and length to lrclib.net when YouTube has no synced lyrics.</string>

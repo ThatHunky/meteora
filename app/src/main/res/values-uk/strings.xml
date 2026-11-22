@@ -156,6 +156,8 @@
     <string name="lyrics_not_synced">Цей текст не синхронізований</string>
     <string name="lyrics_source">Джерело: %s</string>
     <string name="lyrics_error">Не вдалося завантажити текст</string>
+    <string name="action_lyrics_follow">До поточного рядка</string>
+    <string name="action_lyrics_seek">грати з цього рядка</string>
     <string name="action_retry">Спробувати ще</string>
     <string name="lrclib_title">Шукати синхронізований текст на LRCLIB</string>
     <string name="lrclib_note">Надсилає назву, виконавця, альбом і тривалість треку на lrclib.net, коли на YouTube немає синхронізованого тексту.</string>
