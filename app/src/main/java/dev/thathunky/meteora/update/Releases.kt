@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
@@ -84,6 +86,34 @@ object Releases {
         if (best.version <= installed) return null
         if (skipped != null && best.version.compareTo(skipped) == 0) return null
         return best
+    }
+
+    /** The offered release, kept across process deaths ([UpdateStore.offered]). */
+    fun encode(r: Release): String = buildJsonObject {
+        put("tag", r.tag)
+        put("pre", r.preRelease)
+        put("notes", r.notes)
+        put("page", r.pageUrl)
+        put("url", r.apkUrl)
+        put("size", r.apkSize)
+        r.sha256?.let { put("sha256", it) }
+    }.toString()
+
+    fun decode(text: String): Release? {
+        val o = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return null
+        val tag = o.str("tag") ?: return null
+        val url = o.str("url")?.takeIf { it.startsWith("https://") } ?: return null
+        val size = o.long("size")?.takeIf { it > 0 } ?: return null
+        return Release(
+            version = Version.parse(tag) ?: return null,
+            tag = tag,
+            preRelease = o.bool("pre") ?: true,
+            notes = o.str("notes").orEmpty(),
+            pageUrl = o.str("page") ?: "${PAGE_PREFIX}releases/tag/$tag",
+            apkUrl = url,
+            apkSize = size,
+            sha256 = o.str("sha256")?.takeIf { HEX64.matches(it) },
+        )
     }
 
     /**

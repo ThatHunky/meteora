@@ -316,7 +316,7 @@
     <string name="update_ready">Version %1$s is ready to install</string>
     <string name="update_install">Install</string>
     <string name="update_installing">Installing…</string>
-    <string name="update_source_note">The first time, Android asks you to allow installs from Meteora. Allow it and come back: the install continues.</string>
+    <string name="update_source_note">The first time, Android asks you to allow installs from Meteora. Allow it and come back; if the install does not go on by itself, tap it again.</string>
     <string name="update_open_page">Open the release page</string>
     <string name="update_failed">The update did not work</string>
     <string name="update_fail_network">Could not reach GitHub. Check the connection and try again.</string>
@@ -341,7 +341,6 @@
     <string name="update_auto_note">Once a day when you open the app. It asks GitHub only for the list of releases; an update downloads only when you tap.</string>
     <string name="update_pre">Include alpha releases</string>
     <string name="update_pre_note">Only alpha releases exist so far.</string>
-    <string name="update_installed">Installed: %1$s</string>
     <string name="update_last_check">Last checked %1$s</string>
     <string name="update_never_checked">Not checked yet</string>
     <string name="update_skipped">Skipped: %1$s</string>

@@ -99,6 +99,14 @@ class ReleasesTest {
         assertEquals("Meteora/0.1.0-alpha.2", r.header("User-Agent"))
     }
 
+    @Test fun `the stored offer round trips`() {
+        val r = Releases.parse(fixture).single()
+        assertEquals(r, Releases.decode(Releases.encode(r)))
+        assertEquals(r.copy(sha256 = null), Releases.decode(Releases.encode(r.copy(sha256 = null))))
+        assertNull(Releases.decode("junk"))
+        assertNull(Releases.decode("""{"tag":"v0.1.0-alpha.2","url":"http://example.com/a.apk","size":1}"""))
+    }
+
     @Test fun `once a day`() {
         val day = UpdateStore.DAY_MS
         assertTrue(UpdateStore.isDue(null, 1_000))

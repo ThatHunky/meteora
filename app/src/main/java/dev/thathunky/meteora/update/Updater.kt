@@ -65,6 +65,12 @@ class Updater @Inject constructor(
     @Volatile private var call: okhttp3.Call? = null
 
     init {
+        // The offer found before the app was killed, if it still is one. A finished download is
+        // not re-fetched: download() finds the complete file and goes straight to verifying it.
+        store.offered?.let { r ->
+            val still = Releases.pick(listOf(r), installed, store.includePreReleases.value, store.skipped.value)
+            if (still != null) _state.value = UpdateState.Available(still) else store.offered = null
+        }
         // Leftovers: a file for the version now installed (the install killed the process before
         // it could clean up) or an older one, or anything that is not ours.
         scope.launch(Dispatchers.IO) {
@@ -105,8 +111,9 @@ class Updater @Inject constructor(
                             val releases = Releases.parse(r.body.string())
                             store.setLastCheckAt(System.currentTimeMillis())
                             val skipped = if (manual) null else store.skipped.value
-                            Releases.pick(releases, installed, store.includePreReleases.value, skipped)
-                                ?.let { UpdateState.Available(it) } ?: UpdateState.UpToDate
+                            val found = Releases.pick(releases, installed, store.includePreReleases.value, skipped)
+                            store.offered = found
+                            found?.let { UpdateState.Available(it) } ?: UpdateState.UpToDate
                         }
                     }
                 }
@@ -116,7 +123,8 @@ class Updater @Inject constructor(
                 Log.w(TAG, "check failed: ${x.javaClass.simpleName}")
                 UpdateState.Failed(Failure.Network, null)
             }
-            _state.value = if (!manual && next is UpdateState.Failed) before else next
+            // A failed check keeps an offer already showing; the automatic one never shows its failure.
+            _state.value = if (next is UpdateState.Failed && (!manual || before.release != null)) before else next
         }
     }
 
@@ -207,6 +215,7 @@ class Updater @Inject constructor(
         val r = _state.value.release ?: return
         if (_state.value is UpdateState.Installing) return
         store.setSkipped(r.version)
+        store.offered = null
         stop {
             fileFor(r).delete()
             _state.value = UpdateState.Idle
@@ -232,6 +241,7 @@ class Updater @Inject constructor(
             }
             PackageInstaller.STATUS_SUCCESS -> {
                 pending = null
+                store.offered = null
                 p.file.delete()
                 notifier.cancel()
                 _state.value = UpdateState.Idle

@@ -15,9 +15,11 @@ import dagger.hilt.components.SingletonComponent
 import java.io.File
 
 /**
- * A [PackageInstaller] session for one verified APK. `USER_ACTION_NOT_REQUIRED` lets Android
- * skip the dialog only when Meteora installed the current version itself; otherwise it asks,
- * which arrives as `STATUS_PENDING_USER_ACTION` in [UpdateStatusReceiver].
+ * A [PackageInstaller] session for one verified APK. Android always asks the user: skipping the
+ * dialog (`USER_ACTION_NOT_REQUIRED`) also needs the `UPDATE_PACKAGES_WITHOUT_USER_ACTION`
+ * permission, which the manifest deliberately does not declare (docs/updater-plan.md: nothing is
+ * installed without the user's tap). The request is set anyway so declaring it later is enough.
+ * The dialog arrives as `STATUS_PENDING_USER_ACTION` in [UpdateStatusReceiver].
  */
 internal object UpdateInstaller {
     const val ACTION = "dev.thathunky.meteora.UPDATE_STATUS"

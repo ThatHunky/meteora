@@ -48,7 +48,18 @@ class UpdateStore @Inject constructor(@ApplicationContext context: Context) {
         prefs.edit().apply { if (v == null) remove(KEY_SKIPPED) else putString(KEY_SKIPPED, v.toString()) }.apply()
     }
 
+    /**
+     * The release last found and not yet installed or skipped, so the offer survives the app
+     * being killed (the check after it is not due until tomorrow).
+     */
+    var offered: Release?
+        get() = prefs.getString(KEY_OFFERED, null)?.let(Releases::decode)
+        set(r) {
+            prefs.edit().apply { if (r == null) remove(KEY_OFFERED) else putString(KEY_OFFERED, Releases.encode(r)) }.apply()
+        }
+
     companion object {
+        private const val KEY_OFFERED = "offered"
         const val DAY_MS = 24L * 60 * 60 * 1000
         private const val KEY_AUTO = "auto"
         private const val KEY_PRE = "pre_releases"

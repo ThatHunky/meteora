@@ -319,7 +319,7 @@
     <string name="update_ready">Версія %1$s готова до встановлення</string>
     <string name="update_install">Встановити</string>
     <string name="update_installing">Встановлення…</string>
-    <string name="update_source_note">Першого разу Android попросить дозволити встановлення з Meteora. Дозвольте й поверніться: встановлення продовжиться.</string>
+    <string name="update_source_note">Першого разу Android попросить дозволити встановлення з Meteora. Дозвольте й поверніться; якщо встановлення не продовжиться саме, натисніть ще раз.</string>
     <string name="update_open_page">Відкрити сторінку випуску</string>
     <string name="update_failed">Оновлення не вдалося</string>
     <string name="update_fail_network">Не вдалося з\'єднатися з GitHub. Перевірте з\'єднання й спробуйте ще раз.</string>
@@ -344,7 +344,6 @@
     <string name="update_auto_note">Раз на день, коли ви відкриваєте застосунок. Запитує в GitHub лише список випусків; оновлення завантажується лише після вашого натискання.</string>
     <string name="update_pre">Включати альфа-версії</string>
     <string name="update_pre_note">Поки що є лише альфа-версії.</string>
-    <string name="update_installed">Встановлено: %1$s</string>
     <string name="update_last_check">Остання перевірка: %1$s</string>
     <string name="update_never_checked">Ще не перевірялося</string>
     <string name="update_skipped">Пропущено: %1$s</string>
