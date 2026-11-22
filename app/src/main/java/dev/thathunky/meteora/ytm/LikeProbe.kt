@@ -14,6 +14,32 @@ import kotlinx.serialization.json.contentOrNull
 object LikeProbe {
     private const val TAG = "LikeProbe"
 
+    /**
+     * What do the item menus on Home (or in a queue) offer? The official app has "Not interested"
+     * and "Don't recommend artist"; this logs each menu entry's renderer, icon and endpoint kinds
+     * with counts. No titles, ids or tokens.
+     */
+    suspend fun menus(ytm: YtmClient, queueOf: String?) {
+        val root = runCatching { if (queueOf != null) ytm.nextRaw(queueOf, null) else ytm.browse("FEmusic_home") }
+            .getOrElse { Log.i(TAG, "menus failed: $it"); return }
+        val kinds = HashMap<String, Int>()
+        for (menu in root.findAll("menuRenderer")) {
+            for (entry in (menu["items"] as? JsonArray).orEmpty()) {
+                val (renderer, body) = (entry as? JsonObject)?.entries?.firstOrNull() ?: continue
+                val o = body as? JsonObject ?: continue
+                val icon = (o["icon"] as? JsonObject)?.str("iconType") ?: (o["defaultIcon"] as? JsonObject)?.str("iconType")
+                val endpoints = listOf("serviceEndpoint", "navigationEndpoint", "defaultServiceEndpoint")
+                    .mapNotNull { o[it] as? JsonObject }
+                    .flatMap { e -> e.keys.filter { it.endsWith("Endpoint") } }
+                kinds.merge("${renderer.removeSuffix("Renderer")} icon=$icon → $endpoints", 1, Int::plus)
+            }
+        }
+        Log.i(TAG, "menus in ${if (queueOf != null) "a queue" else "Home"}: ${kinds.size} kinds")
+        kinds.entries.sortedByDescending { it.value }.forEach { Log.i(TAG, "x${it.value}: ${it.key}") }
+        val tokens = root.findAll("feedbackEndpoint").count { it.str("feedbackToken") != null }
+        Log.i(TAG, "feedbackEndpoint with a token: $tokens")
+    }
+
     suspend fun run(ytm: YtmClient, videoId: String?, playlistId: String?) {
         val root = runCatching { ytm.nextRaw(videoId, playlistId ?: if (videoId == null) "LM" else null) }
             .getOrElse { Log.i(TAG, "failed: $it"); return }

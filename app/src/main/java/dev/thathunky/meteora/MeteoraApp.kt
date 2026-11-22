@@ -53,7 +53,12 @@ class MeteoraApp : Application() {
                 val deps = EntryPointAccessors.fromApplication(this@MeteoraApp, ProbeDeps::class.java)
                 val v = intent.getStringExtra("v")
                 val list = intent.getStringExtra("list")
-                CoroutineScope(Dispatchers.IO).launch { dev.thathunky.meteora.ytm.LikeProbe.run(deps.ytm(), v, list) }
+                CoroutineScope(Dispatchers.IO).launch {
+                    // --es menus home | --es menus <videoId>: what the item menus offer.
+                    val menus = intent.getStringExtra("menus")
+                    if (menus != null) dev.thathunky.meteora.ytm.LikeProbe.menus(deps.ytm(), menus.takeIf { it != "home" })
+                    else dev.thathunky.meteora.ytm.LikeProbe.run(deps.ytm(), v, list)
+                }
             }
         }
         ContextCompat.registerReceiver(this, likes, IntentFilter("dev.thathunky.meteora.PROBE_LIKES"), ContextCompat.RECEIVER_EXPORTED)
