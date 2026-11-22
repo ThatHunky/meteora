@@ -47,7 +47,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -76,7 +76,11 @@ internal fun Modifier.retroBox(shape: Shape, fill: Color, pressed: Boolean = fal
         .border(look.outline, scheme.outline, shape)
 }
 
-/** A Terminal control: text in square brackets, inverted when it is the primary action. */
+/**
+ * A Terminal control: text in square brackets, inverted when it is the primary action. A label
+ * too long for the width wraps instead of ending in an ellipsis that eats the closing bracket;
+ * rows of controls use [ActionRow], which never gives one less than its text needs.
+ */
 @Composable
 private fun TermButton(label: String, onClick: () -> Unit, modifier: Modifier, enabled: Boolean, inverted: Boolean, bracket: Boolean = true) {
     val scheme = MaterialTheme.colorScheme
@@ -94,10 +98,16 @@ private fun TermButton(label: String, onClick: () -> Unit, modifier: Modifier, e
             if (bracket) "[ $text ]" else text,
             style = MaterialTheme.typography.labelLarge,
             color = if (inverted) scheme.surface else scheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
+}
+
+/** Which icon button stands in for a labelled button in its compact form. */
+private fun ButtonKind.iconKind(): IconKind = when (this) {
+    ButtonKind.Filled -> IconKind.Filled
+    ButtonKind.Tonal, ButtonKind.Outlined -> IconKind.Tonal
+    ButtonKind.Text -> IconKind.Standard
 }
 
 @Composable
@@ -126,13 +136,19 @@ private fun RetroButton(label: String, icon: ImageVector?, onClick: () -> Unit, 
                     Icon(icon, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(lookLabel(label), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                // Wraps rather than being cut: spaced capitals are wide, and maxLines = 1 with no
+                // overflow clipped "SIGN OUT OF YOUTUBE MUSIC" at a large font size.
+                Text(lookLabel(label), style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
             }
         }
     }
 }
 
-/** A button with a text label, drawn by the look. Terminal drops the icon and brackets the text. */
+/**
+ * A button with a text label, drawn by the look. Terminal drops the icon and brackets the text.
+ * In the compact form ([LocalControlForm], set by [ActionRow]) a button with an [icon] is an
+ * icon button labelled [text] for TalkBack, at least 56 dp square.
+ */
 @Composable
 fun MButton(
     text: String,
@@ -142,6 +158,10 @@ fun MButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
 ) {
+    if (icon != null && LocalControlForm.current == ControlForm.Compact) {
+        MIconButton(icon, text, onClick, modifier.defaultMinSize(56.dp, 56.dp), kind = kind.iconKind(), enabled = enabled)
+        return
+    }
     val look = LocalLook.current
     val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
         if (icon != null) {
@@ -199,7 +219,8 @@ fun MIconButton(
             IconKind.Filled -> FilledIconButton(onClick = onClick, shapes = IconButtonDefaults.shapes(), modifier = modifier, enabled = enabled, content = iconContent)
             IconKind.Tonal -> FilledTonalIconButton(onClick = onClick, shapes = IconButtonDefaults.shapes(), modifier = modifier, enabled = enabled, content = iconContent)
         }
-        LookId.Terminal -> if (text != null) {
+        // The text form unless an ActionRow found no room for it.
+        LookId.Terminal -> if (text != null && LocalControlForm.current == ControlForm.Full) {
             TermButton(
                 text, onClick,
                 modifier.semantics { if (contentDescription != null) this.contentDescription = contentDescription },
@@ -209,6 +230,8 @@ fun MIconButton(
             Box(
                 modifier
                     .defaultMinSize(48.dp, 48.dp)
+                    // Disabled shows, as it does on the text form (the lyrics' follow button).
+                    .alpha(if (enabled) 1f else 0.38f)
                     .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                     .then(
                         when (kind) {
@@ -231,6 +254,7 @@ fun MIconButton(
             Box(
                 modifier
                     .defaultMinSize(48.dp, 48.dp)
+                    .alpha(if (enabled) 1f else 0.38f)
                     .retroBox(RoundedCornerShape(look.cornerSmall), fill, pressed)
                     .clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
                 contentAlignment = Alignment.Center,
@@ -263,7 +287,7 @@ fun MIconToggle(
     text: String? = null,
 ) {
     val look = LocalLook.current
-    if (look.id == LookId.Terminal && text != null) {
+    if (look.id == LookId.Terminal && text != null && LocalControlForm.current == ControlForm.Full) {
         val scheme = MaterialTheme.colorScheme
         Box(
             modifier
