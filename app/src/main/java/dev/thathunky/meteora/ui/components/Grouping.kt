@@ -256,10 +256,9 @@ fun <T> MenuChoice(
 
 /** The row of group, sort and filter menus above a grouped list. Scrolls sideways when narrow. */
 @Composable
-fun SortGroupBar(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val look = LocalLook.current
+fun SortGroupBar(modifier: Modifier = Modifier, edgePadding: Dp = LocalLook.current.screenPadding, content: @Composable () -> Unit) {
     Row(
-        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = look.screenPadding, vertical = 4.dp),
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = edgePadding, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) { content() }
