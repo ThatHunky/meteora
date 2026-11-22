@@ -32,7 +32,6 @@ import dev.thathunky.meteora.ytm.PremiumCheck
 import dev.thathunky.meteora.ytm.YtmAuthProvider
 import dev.thathunky.meteora.ytm.YtmClient
 import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -194,20 +193,23 @@ class DownloadManager @Inject constructor(
     /** Settings → "Remove all downloads". */
     fun removeAll() = scope.launch(Dispatchers.IO) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK)
-        index.songs.value.values.forEach { e ->
-            e.uri?.let(downloader::delete)
-            index.delete(e.videoId)
-        }
+        index.songs.value.keys.forEach(::forget)
         index.collections.value.keys.forEach(index::deleteCollection)
     }
 
     internal fun apply(r: DownloadRules.Release) {
         // Only the reasons to keep it change: the state may have moved on since the snapshot.
         r.keep.forEach { k -> index.update(k.videoId) { it.copy(single = k.single, smart = k.smart, collections = k.collections) } }
-        r.delete.forEach { e ->
-            e.uri?.let(downloader::delete)
-            index.delete(e.videoId)
-        }
+        r.delete.forEach { forget(it.videoId) }
+    }
+
+    /**
+     * Drops a song from the index and deletes its file as the index has it now (not as an older
+     * snapshot had it: a download may have finished since), with any temporary part.
+     */
+    private fun forget(videoId: String) {
+        index.remove(videoId)?.uri?.let(downloader::delete)
+        downloader.discard(videoId)
     }
 
     /** The player found the file gone: forget it, so the track streams. */
@@ -232,7 +234,8 @@ class DownloadManager @Inject constructor(
      */
     fun localQueue(playlistId: String?, videoId: String?): Pair<List<LocalSong>, Int>? {
         val songs = index.songs.value
-        val ids = playlistId?.let { index.collections.value[it]?.videoIds } ?: listOfNotNull(videoId)
+        // collectionFor also finds a playlist asked for by its page id ("VL…") rather than its playlist id.
+        val ids = playlistId?.let { index.collectionFor(it, null)?.videoIds } ?: listOfNotNull(videoId)
         val done = ids.mapNotNull { songs[it]?.takeIf { e -> e.state == DownloadState.Done } }
         if (done.isEmpty()) return null
         val start = done.indexOfFirst { it.videoId == videoId }.coerceAtLeast(0)
@@ -264,7 +267,10 @@ class DownloadManager @Inject constructor(
     /** The worker's body. False: stopped by a network failure, to be retried when the network is back. */
     internal suspend fun runQueue(foreground: suspend (ForegroundInfo) -> Unit): Boolean {
         index.ensureLoaded()
-        val covers = ConcurrentHashMap<String, ByteArray>()
+        // Covers of the last few albums only: a 500-song smart run over 400 albums would hold them all.
+        val covers = java.util.Collections.synchronizedMap(object : LinkedHashMap<String, ByteArray>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>) = size > COVERS_KEPT
+        })
         var done = 0
         var failedInARow = 0
         while (true) {
@@ -292,41 +298,42 @@ class DownloadManager @Inject constructor(
 
     /** False on a network failure (the song goes back to the queue). */
     private suspend fun one(queued: DownloadEntry, covers: MutableMap<String, ByteArray>): Boolean {
-        index.update(queued.videoId) { it.copy(state = DownloadState.Downloading) }
-        index.setProgress(queued.videoId, 0f)
-        val e = withAlbum(queued)
+        val id = queued.videoId
+        index.update(id) { it.copy(state = DownloadState.Downloading) }
+        index.setProgress(id, 0f)
         return try {
+            // Inside the try: a cancellation during the album lookup must not leave the row Downloading.
+            val e = withAlbum(queued)
             val cover = e.artworkUrl?.let { url ->
                 val key = "${e.albumArtist ?: e.artist}/${e.album ?: url}"
                 covers[key] ?: fetchCover(url)?.also { covers[key] = it }
             }
-            val w = downloader.download(e, settings.quality.value, cover) { index.setProgress(e.videoId, it) }
-            // Removed while it was downloading: the file goes too.
-            if (index.get(e.videoId)?.wanted != true) {
-                downloader.delete(w.uri.toString())
-            } else {
-                index.update(e.videoId) { it.copy(state = DownloadState.Done, uri = w.uri.toString(), itag = w.itag, bytes = w.bytes) }
+            downloader.download(e, settings.quality.value, cover, { index.setProgress(id, it) }) { w ->
+                val kept = index.update(id) { it.copy(state = DownloadState.Done, uri = w.uri.toString(), itag = w.itag, bytes = w.bytes) }
+                // Removed while it was downloading: the file goes too.
+                if (!kept) downloader.delete(w.uri.toString())
             }
             true
         } catch (x: CancellationException) {
-            index.update(e.videoId) { it.copy(state = DownloadState.Queued) }
+            // A file finished just before the cancellation is already Done: leave it so.
+            index.update(id) { if (it.state == DownloadState.Downloading) it.copy(state = DownloadState.Queued) else it }
             throw x
         } catch (x: IOException) {
             if (!isConnectivity(x)) {
                 // A refused URL, MediaStore or a full disk: this song fails, the queue goes on.
-                Log.w(TAG, "download failed for ${e.videoId}: ${x.javaClass.simpleName} ${x.message}")
-                index.update(e.videoId) { it.copy(state = DownloadState.Failed) }
+                Log.w(TAG, "download failed for $id: ${x.javaClass.simpleName} ${x.message}")
+                index.update(id) { it.copy(state = DownloadState.Failed) }
                 return true
             }
-            Log.w(TAG, "network failure on ${e.videoId}: ${x.javaClass.simpleName}")
-            index.update(e.videoId) { it.copy(state = DownloadState.Queued) }
+            Log.w(TAG, "network failure on $id: ${x.javaClass.simpleName}")
+            index.update(id) { it.copy(state = DownloadState.Queued) }
             false
         } catch (x: Exception) {
-            Log.w(TAG, "download failed for ${e.videoId}: ${x.message}")
-            index.update(e.videoId) { it.copy(state = DownloadState.Failed) }
+            Log.w(TAG, "download failed for $id: ${x.message}")
+            index.update(id) { it.copy(state = DownloadState.Failed) }
             true
         } finally {
-            index.setProgress(e.videoId, null)
+            index.setProgress(id, null)
         }
     }
 
@@ -422,6 +429,7 @@ class DownloadManager @Inject constructor(
         private const val MAX_FAILED_IN_A_ROW = 6
         const val MIN_FREE_BYTES = 500L * 1024 * 1024
         private const val MAX_COVER_BYTES = 4 * 1024 * 1024
+        private const val COVERS_KEPT = 8
     }
 }
 
