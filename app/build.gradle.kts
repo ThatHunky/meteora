@@ -18,9 +18,10 @@ android {
         applicationId = "dev.thathunky.meteora"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        // Must stay valid semver: YTMDesktop validates appVersion at pairing.
-        versionName = "0.1.0"
+        // One more for every published build: the updater installs only a higher versionCode.
+        versionCode = 2
+        // Must stay valid semver: YTMDesktop validates appVersion at pairing. The release tag is v + this.
+        versionName = "0.1.0-alpha.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The bundled Python is ~15 MB per ABI; the OP7T and current phones are arm64.
         ndk { abiFilters += "arm64-v8a" }
