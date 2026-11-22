@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,13 +150,7 @@ fun GroupHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (expanded != null) {
-                if (look.textControls) {
-                    Text(if (expanded) "[-]" else "[+]", style = type.labelLarge, color = color)
-                } else {
-                    Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, tint = color)
-                }
-            }
+            if (expanded != null) ExpandMark(expanded, color)
         }
         when (look.header) {
             HeaderStyle.SerifRule -> Box(Modifier.padding(horizontal = p).fillMaxWidth().height(2.dp).background(scheme.onSurface))
@@ -160,6 +158,56 @@ fun GroupHeader(
             else -> Unit
         }
     }
+}
+
+/** Open or closed, for a folding header or group row. Terminal: `[-]` / `[+]`. Decorative: the row says it. */
+@Composable
+fun ExpandMark(expanded: Boolean, color: androidx.compose.ui.graphics.Color = androidx.compose.material3.LocalContentColor.current) {
+    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        if (LocalLook.current.textControls) {
+            Text(if (expanded) "[-]" else "[+]", style = MaterialTheme.typography.labelLarge, color = color)
+        } else {
+            Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null, tint = color)
+        }
+    }
+}
+
+/**
+ * A folded artist or album in a grouped list: artwork, name, a supporting line (count, size)
+ * and the open/closed mark. While selecting, the artwork becomes a check box for the whole
+ * group. Tap: [onClick] (fold, or select while selecting); long-press: [onLongClick].
+ */
+@Composable
+fun GroupRow(
+    title: String,
+    supporting: String,
+    artwork: Any?,
+    artKind: ArtKind,
+    expanded: Boolean,
+    selecting: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val look = LocalLook.current
+    MRow(
+        headline = title,
+        supporting = supporting,
+        leading = {
+            if (selecting) SelectionMark(selected, look.rowArt)
+            else ArtworkFrame(artwork, artKind, Modifier.size(look.rowArt))
+        },
+        trailing = { if (!selecting) ExpandMark(expanded) },
+        modifier = modifier
+            .combinedClickable(
+                onClickLabel = if (selecting) null else stringResource(if (expanded) R.string.lib_collapse else R.string.lib_expand),
+                onLongClickLabel = stringResource(R.string.lib_select),
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .semantics { if (selecting) this.selected = selected },
+    )
 }
 
 /** A choice in a [MenuChoice] or a row's overflow menu. */
@@ -234,7 +282,7 @@ fun <T> MenuChoice(
                     look.pills -> CircleShape
                     else -> RoundedCornerShape(look.cornerSmall)
                 },
-                modifier = Modifier.heightIn(min = 48.dp).semantics { this.contentDescription = text },
+                modifier = Modifier.semantics { this.contentDescription = text },
             )
         }
         LookMenu(open, { open = false }) {
@@ -382,7 +430,10 @@ fun IndexScroller(
     val n = letters.size
     val indexLabel = stringResource(R.string.lib_index)
     val hint = stringResource(R.string.lib_index_hint)
-    val shown = if (dragging) touched else current().coerceIn(0, n - 1)
+    // The gesture handlers outlive a recomposition: they must call the latest jump, whose rows
+    // may have moved (a group opened) while the letters stayed the same.
+    val jump by rememberUpdatedState(onJump)
+    val shown = (if (dragging) touched else current()).coerceIn(0, n - 1)
     BoxWithConstraints(
         modifier
             .width(IndexScrollerWidth)
@@ -392,7 +443,7 @@ fun IndexScroller(
                 stateDescription = letters[shown]
                 progressBarRangeInfo = ProgressBarRangeInfo(shown.toFloat(), 0f..(n - 1).toFloat(), steps = (n - 2).coerceAtLeast(0))
                 setProgress { v ->
-                    onJump(v.roundToInt().coerceIn(0, n - 1))
+                    jump(v.roundToInt().coerceIn(0, n - 1))
                     true
                 }
             },
@@ -406,13 +457,13 @@ fun IndexScroller(
                 .fillMaxHeight()
                 .align(Alignment.CenterEnd)
                 .width(IndexScrollerWidth)
-                .pointerInput(letters) {
-                    detectTapGestures { o -> onJump(at(o.y)) }
+                .pointerInput(n, heightPx) {
+                    detectTapGestures { o -> jump(at(o.y)) }
                 }
-                .pointerInput(letters) {
+                .pointerInput(n, heightPx) {
                     detectVerticalDragGestures(
                         onDragStart = { o ->
-                            dragging = true; touchY = o.y; touched = at(o.y); onJump(touched)
+                            dragging = true; touchY = o.y; touched = at(o.y); jump(touched)
                         },
                         onDragEnd = { dragging = false },
                         onDragCancel = { dragging = false },
@@ -421,7 +472,7 @@ fun IndexScroller(
                         val i = at(change.position.y)
                         if (i != touched) {
                             touched = i
-                            onJump(i)
+                            jump(i)
                         }
                     }
                 }
@@ -429,8 +480,9 @@ fun IndexScroller(
             horizontalAlignment = Alignment.End,
         ) {
             for (i in 0 until n step step) {
-                val on = shown in i until i + step
-                Box(Modifier.weight(step.toFloat()).width(IndexScrollerWidth / 2).align(Alignment.End), contentAlignment = Alignment.Center) {
+                val span = minOf(step, n - i)
+                val on = shown in i until i + span
+                Box(Modifier.weight(span.toFloat()).width(IndexScrollerWidth / 2).align(Alignment.End), contentAlignment = Alignment.Center) {
                     Text(
                         if (look.textControls) letters[i].lowercase(LocalConfiguration.current.locales[0]) else letters[i],
                         style = type.labelSmall,
@@ -448,12 +500,12 @@ fun IndexScroller(
                 Modifier
                     .align(Alignment.TopEnd)
                     .offset { IntOffset(-(IndexScrollerWidth + 8.dp).roundToPx(), y.roundToInt()) }
-                    .size(bubble)
+                    .requiredSize(bubble)
                     .clearAndSetSemantics { },
                 tone = Tone.Primary,
             ) {
                 Box(Modifier.size(bubble), contentAlignment = Alignment.Center) {
-                    Text(letters[touched], style = type.headlineMedium, color = surfaceContentColor(Tone.Primary))
+                    Text(letters[touched.coerceIn(0, n - 1)], style = type.headlineMedium, color = surfaceContentColor(Tone.Primary))
                 }
             }
         }

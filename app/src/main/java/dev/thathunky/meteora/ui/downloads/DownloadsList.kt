@@ -61,6 +61,7 @@ import dev.thathunky.meteora.library.smartOnly
 import dev.thathunky.meteora.ui.components.ArtKind
 import dev.thathunky.meteora.ui.components.ArtworkFrame
 import dev.thathunky.meteora.ui.components.GroupHeader
+import dev.thathunky.meteora.ui.components.GroupRow
 import dev.thathunky.meteora.ui.components.IndexScroller
 import dev.thathunky.meteora.ui.components.ListSearchField
 import dev.thathunky.meteora.ui.components.MRow
@@ -241,9 +242,13 @@ internal fun DownloadsList(
                         }
                         is DownloadRow.Group -> item(key = row.key, contentType = "group") {
                             val allSelected by remember(row.songIds) { derivedStateOf { row.songIds.all { it in selection } } }
+                            val count = pluralStringResource(R.plurals.downloads_song_count, row.songIds.size, row.songIds.size)
                             GroupRow(
-                                row,
-                                isAlbum = group == DownloadGroup.Albums,
+                                title = row.title,
+                                supporting = listOfNotNull(row.subtitle, count, sizeText(row.bytes)).joinToString(" · "),
+                                artwork = row.artwork,
+                                artKind = if (group == DownloadGroup.Albums) ArtKind.Album else ArtKind.Artist,
+                                expanded = row.expanded,
                                 selecting = selecting,
                                 selected = allSelected,
                                 onClick = {
@@ -335,47 +340,6 @@ private fun CollectionRow(c: DownloadCollection, songs: Map<String, DownloadEntr
         leading = { ArtworkFrame(c.thumbnail, ArtKind.Small, Modifier.size(look.rowArt)) },
         trailing = { OverflowMenu(listOf(MenuAction(stringResource(R.string.action_remove_download), onRemove))) },
         modifier = Modifier.combinedClickable(enabled = done > 0, onClick = { vm.actions.playDownloaded(c.id, null) }),
-    )
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun GroupRow(
-    row: DownloadRow.Group,
-    isAlbum: Boolean,
-    selecting: Boolean,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-) {
-    val look = LocalLook.current
-    val count = pluralStringResource(R.plurals.downloads_song_count, row.songIds.size, row.songIds.size)
-    MRow(
-        headline = row.title,
-        supporting = listOfNotNull(row.subtitle, count, sizeText(row.bytes)).joinToString(" · "),
-        leading = {
-            if (selecting) SelectionMark(selected, look.rowArt)
-            else ArtworkFrame(row.artwork, if (isAlbum) ArtKind.Album else ArtKind.Artist, Modifier.size(look.rowArt))
-        },
-        trailing = {
-            if (!selecting) {
-                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    if (look.textControls) Text(if (row.expanded) "[-]" else "[+]", style = MaterialTheme.typography.labelLarge)
-                    else Icon(
-                        if (row.expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                        null,
-                    )
-                }
-            }
-        },
-        modifier = Modifier
-            .combinedClickable(
-                onClickLabel = if (selecting) null else stringResource(if (row.expanded) R.string.lib_collapse else R.string.lib_expand),
-                onLongClickLabel = stringResource(R.string.lib_select),
-                onClick = onClick,
-                onLongClick = onLongClick,
-            )
-            .semantics { if (selecting) this.selected = selected },
     )
 }
 

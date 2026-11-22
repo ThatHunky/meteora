@@ -18,7 +18,7 @@ Written 2026‑11‑22. The owner's screenshot of Library → Downloads showed "
 - **`GroupRow`** is a collapsed artist or album: artwork, name, then "12 songs · 84 MB". Tapping it expands or collapses the group in place. I chose this over a drill-down page, which would need new routes in the shell.
 - **`SortGroupBar`** holds menu buttons such as "Group: Artists" and "Sort: Name". Each look draws them its own way, and Terminal shows `[ group: artists ]`. The choices are remembered per screen in `LibraryPrefs` (SharedPreferences, with pure parsers).
 - **`IndexScroller`** is a strip on the right edge, 48 dp wide to touch, listing the letters present. Tapping or dragging jumps to that letter, and a bubble shows the letter under the finger. TalkBack reads it as one adjustable control: the state is the current letter, and swiping up or down moves one letter. It appears only for an alphabetical order, at least 40 rows and at least 5 letters. The list's end padding leaves room for it, so it never sits over a row's overflow button.
-- **`SelectionBar`** replaces the sort bar while anything is selected. It holds close, "3 selected" (a polite live region), Select all and Remove. Back leaves selection.
+- **`SelectionBar`** appears pinned above the list while anything is selected (the sort bar stays in the list under it). It holds close, "3 selected" (a polite live region), Select all and Remove. Back leaves selection.
 - **Letter rules.** A letter is the first letter of the sort key, upper-cased in the app's locale. A leading "The " is ignored, since it is the one English article that is safe to skip. "A" and "An" are not ignored ("A‑ha"), and no other language's articles are. Latin accents fold (É → E). Cyrillic letters are kept as they are, because Й, Ї, Є and Ґ are letters of their own. Digits and symbols go under "#", which comes last. Scripts never interleave: the app language's script comes first (Cyrillic in Ukrainian, Latin otherwise), then the other script, then "#". Cyrillic is always compared with the Ukrainian collator, because an English collator puts "Іній" after "Яр". Equal keys fall back to the id, so the order is stable.
 - **Buckets.** Songs with no album go into "No album", which comes last. A blank artist, "Various Artists" or "Різні виконавці" goes into "Various artists", also last. Recently added uses Today, Yesterday, This week, This month, then one bucket per month ("October 2026"), with unknown dates under "Earlier".
 
@@ -31,7 +31,7 @@ Written 2026‑11‑22. The owner's screenshot of Library → Downloads showed "
 - **Group: Artists** groups by the folder artist, `albumArtist ?: artist`, because the raw artist string ("A & B") would split groups. Artists show as collapsed `GroupRow`s under sticky letter headers, which holds up both when most artists have one song and when one artist has 60. Sort: Name, Most songs or Size. Inside a group, songs are ordered by album, then track number, then title.
 - **Group: Albums** works the same way, with "album, artist" on the row. Sort: Title, Artist or Size. Inside, songs go by track number.
 - **Group: Recently added** has date headers, newest first, and no sort.
-- **Downloaded albums and playlists** keep their own collapsible group at the top in every mode, because that group is what the user asked for by name.
+- **Downloaded albums and playlists** keep their own collapsible group at the top in every mode, because that group is what the user asked for by name. Show: Smart only hides it, since collections are never smart downloads.
 - **Rows.** The delete icon on every row is gone, replaced by one ⋮ overflow menu: Select, Remove download (or a note that the song is kept for its album or playlist), and Try again when the download failed. Smart downloads (`smart && !manual`) say "Smart" in the supporting line. Tapping a song plays the list as shown, from that song. Long-press selects it. Long-press on an artist or album row selects the whole group.
 - **Bulk Remove** asks first, then removes the selected songs. Songs that belong to a downloaded album or playlist are skipped and counted: "2 kept for their album or playlist".
 
@@ -46,7 +46,7 @@ Written 2026‑11‑22. The owner's screenshot of Library → Downloads showed "
 
 ## Smoothness and accessibility
 
-- The rows are built off the main thread, in pure code: headers, items and a map from each letter to its row index. Composition only reads that result.
+- The rows are built in pure code: headers, items and a map from each letter to its row index. Downloads builds them off the main thread. Liked songs, one page of about a hundred, builds them in `remember`. Composition only reads that result.
 - Every item has a key and a `contentType`.
 - Each song row still reads only its own status flow, and selection is read per row through `derivedStateOf`.
 - Headers are headings, so TalkBack can move between them.
