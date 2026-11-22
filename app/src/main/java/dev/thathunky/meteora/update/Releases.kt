@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
+import okhttp3.Request
 
 /** One GitHub release that carries an APK, as far as the updater cares. */
 data class Release(
@@ -84,6 +85,19 @@ object Releases {
         if (skipped != null && best.version.compareTo(skipped) == 0) return null
         return best
     }
+
+    /**
+     * The check: anonymous, JSON, with a plain User-Agent. No cookies, no token, nothing about
+     * the user; the client it is sent with has no cookie jar and TLS only.
+     */
+    fun request(versionName: String): Request = Request.Builder()
+        .url(URL)
+        .header("Accept", "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .header("User-Agent", userAgent(versionName))
+        .build()
+
+    fun userAgent(versionName: String) = "Meteora/$versionName"
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
     private fun JsonObject.bool(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull

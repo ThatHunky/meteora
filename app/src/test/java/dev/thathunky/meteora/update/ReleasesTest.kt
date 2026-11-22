@@ -91,6 +91,14 @@ class ReleasesTest {
         assertTrue(Releases.parse("<html>").isEmpty())
     }
 
+    @Test fun `the check request carries nothing about the user`() {
+        val r = Releases.request("0.1.0-alpha.2")
+        assertEquals("https://api.github.com/repos/ThatHunky/meteora/releases?per_page=10", r.url.toString())
+        assertEquals("GET", r.method)
+        assertEquals(setOf("Accept", "X-GitHub-Api-Version", "User-Agent"), r.headers.names())
+        assertEquals("Meteora/0.1.0-alpha.2", r.header("User-Agent"))
+    }
+
     @Test fun `once a day`() {
         val day = UpdateStore.DAY_MS
         assertTrue(UpdateStore.isDue(null, 1_000))
