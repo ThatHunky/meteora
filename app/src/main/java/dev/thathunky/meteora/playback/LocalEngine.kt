@@ -291,6 +291,7 @@ class LocalEngine @Inject constructor(
             val audio = default.createMediaSource(mediaItem)
             if (mediaItem.localConfiguration?.uri?.getQueryParameter(Q_VIDEO) == null) return audio
             val plan = mediaItem.toLocalSong().videoPlan ?: return audio
+            Log.i(TAG, "video source for ${mediaItem.mediaId}: picture ${plan.videoId}, starts ${plan.offsetMs} ms in, ends at ${plan.endMs}")
             var picture: MediaSource = videoFactory.createMediaSource(MediaItem.fromUri("$VIDEO_SCHEME://${plan.videoId}"))
             if (plan.offsetMs > 0 || plan.endMs != null) {
                 picture = ClippingMediaSource.Builder(picture)
@@ -299,7 +300,11 @@ class LocalEngine @Inject constructor(
                     .build()
             }
             // Audio first: the item's timeline and metadata are the song's.
-            return MergingMediaSource(audio, picture)
+            // adjustPeriodTimeOffsets: a clipped source keeps its own period times and only its
+            // timeline says where it starts. Merging takes the first source's timeline, so without
+            // this the clip's start was ignored and the picture ran from the video's own 0:00,
+            // late by the whole offset (measured on the phone: 0.45 s on a 490 ms pair).
+            return MergingMediaSource(/* adjustPeriodTimeOffsets = */ true, /* clipDurations = */ false, audio, picture)
         }
     }
 

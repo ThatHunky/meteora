@@ -617,3 +617,12 @@ The owner's screenshot of Library → Downloads showed the header "Songs · 133"
 - Collections are not part of bulk selection.
 
 - **Grouping on the OP7T (03:25):** merged with conflicts only where two branches appended (strings, this log). Liked songs → Sort: Artist gave letter headers with the sticky one on top, "The Cardigans" filed under C next to Childish Gambino, and the index on the right running A–Y then Б–Х and #. Downloads shows "1 song · 8.6 MB", the Group and Sort menus, a letter header and one ⋮ per row instead of a delete icon. This phone has one download, so the 133-song case the owner reported, the folding artist and album groups, selection and bulk removal, search, and the other four looks are unchecked here.
+
+## "The videos are out of sync" (03:15 → 03:40)
+
+Measured instead of guessed. A probe (`PROBE_LIKES --es video <id>`) showed what a signed-in queue says about each song and its music video: the segment field names the parser had assumed are right, and most pairs have one segment with the video starting later than the song, by 0.5 s to 78 s in one radio queue. So a song borrowing its video's picture must start that far into the video.
+
+- **The measurement:** pause in Video mode, read the exact audio position from the media session, screenshot the frame, and find that frame in a 240p copy of the real video (yt-dlp, ffmpeg, a pixel difference per frame). For a pair with a 490 ms offset, paused at audio 33.839 s, the phone showed the video's frame for 33.876 s: the offset was not applied at all.
+- **Cause:** the picture is a `ClippingMediaSource` (start at the offset) merged with the song's audio. A clipped source keeps its own period times and only its timeline says where it starts; `MergingMediaSource` uses the first source's timeline, so the clip's start was ignored and the video ran from its own 0:00. Songs with a 6 s or 78 s intro in their video were off by all of it.
+- **Fix:** `MergingMediaSource(adjustPeriodTimeOffsets = true, …)`, one line. Measured again on the same pair: paused at 17.766 s, the frame shown is the video's 18.25–18.29 s, which is the song's position plus 0.49 s.
+- **Not checked:** a pair with a large offset (the search helper kept landing on other tracks), seeking and switching modes mid-track after the fix, and videos that play their own sound (no offset involved, so they should never have been off). Pairs whose video has several segments with different offsets still play as audio only.

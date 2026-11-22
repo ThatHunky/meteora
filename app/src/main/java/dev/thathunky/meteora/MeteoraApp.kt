@@ -56,7 +56,10 @@ class MeteoraApp : Application() {
                 CoroutineScope(Dispatchers.IO).launch {
                     // --es menus home | --es menus <videoId>: what the item menus offer.
                     val menus = intent.getStringExtra("menus")
-                    if (menus != null) dev.thathunky.meteora.ytm.LikeProbe.menus(deps.ytm(), menus.takeIf { it != "home" })
+                    // --es video <videoId>: how the queue pairs songs with their videos.
+                    val video = intent.getStringExtra("video")
+                    if (video != null) dev.thathunky.meteora.ytm.LikeProbe.video(deps.ytm(), video)
+                    else if (menus != null) dev.thathunky.meteora.ytm.LikeProbe.menus(deps.ytm(), menus.takeIf { it != "home" })
                     else dev.thathunky.meteora.ytm.LikeProbe.run(deps.ytm(), v, list)
                 }
             }

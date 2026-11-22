@@ -48,6 +48,33 @@ object LikeProbe {
         Log.i(TAG, "feedbackEndpoint with a token: $tokens")
     }
 
+    /**
+     * How does a signed-in queue pair songs with their music videos? Logs, per wrapped item, the
+     * kinds of the two versions, the raw shape of the segment map (key names and the first few
+     * numbers) and what the parser made of it. Ids are cut to four characters.
+     */
+    suspend fun video(ytm: YtmClient, videoId: String) {
+        val root = runCatching { ytm.nextRaw(videoId, null) }.getOrElse { Log.i(TAG, "video failed: $it"); return }
+        val wrappers = root.findAll("playlistPanelVideoWrapperRenderer")
+        Log.i(TAG, "video: ${root.queueItems().size} queue items, ${wrappers.size} wrapped with a counterpart")
+        fun kind(r: JsonObject?) = r?.findAll("watchEndpointMusicConfig")?.firstOrNull()?.str("musicVideoType")?.removePrefix("MUSIC_VIDEO_TYPE_")
+        for (w in wrappers.take(40)) {
+            val primary = (w["primaryRenderer"] as? JsonObject)?.get("playlistPanelVideoRenderer") as? JsonObject
+            val c = (w["counterpart"] as? JsonArray)?.firstOrNull() as? JsonObject
+            val other = (c?.get("counterpartRenderer") as? JsonObject)?.get("playlistPanelVideoRenderer") as? JsonObject
+            val map = c?.get("segmentMap") as? JsonObject
+            val segs = map?.values?.firstOrNull { it is JsonArray } as? JsonArray
+            Log.i(TAG, "pair \"${primary?.get("title").runsText().take(40)}\" ${primary?.str("videoId")} ${kind(primary)} len=${primary?.get("lengthText").runsText()} ↔ ${other?.str("videoId")} ${kind(other)} len=${other?.get("lengthText").runsText()}")
+            Log.i(TAG, "  counterpart keys=${c?.keys} segmentMap keys=${map?.keys} segments=${segs?.size}")
+            segs?.take(4)?.forEach { Log.i(TAG, "  segment $it") }
+        }
+        val parsed = YtmParser.watchQueue(root)
+        for (s in parsed.songs.filter { it.videoCounterpartId != null }.take(40)) {
+            val offsets = s.segments.map { it.videoStartMs - it.audioStartMs }
+            Log.i(TAG, "parsed ${s.videoId.take(4)}… isVideo=${s.isVideo} segments=${s.segments.size} offsets(video-audio)=$offsets durations=${s.segments.map { it.durationMs }}")
+        }
+    }
+
     suspend fun run(ytm: YtmClient, videoId: String?, playlistId: String?) {
         val root = runCatching { ytm.nextRaw(videoId, playlistId ?: if (videoId == null) "LM" else null) }
             .getOrElse { Log.i(TAG, "failed: $it"); return }
