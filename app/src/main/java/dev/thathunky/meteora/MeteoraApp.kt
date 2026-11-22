@@ -17,10 +17,26 @@ import dev.thathunky.meteora.ytm.YtmAuthProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import coil3.request.crossfade
 import okhttp3.OkHttpClient
 
 @HiltAndroidApp
-class MeteoraApp : Application() {
+class MeteoraApp : Application(), coil3.SingletonImageLoader.Factory {
+
+    /**
+     * Covers: a short fade-in, and a log line when one fails (tag `Artwork`: the host and the
+     * error's kind, never the whole URL), since a failed image is otherwise silent.
+     */
+    override fun newImageLoader(context: coil3.PlatformContext): coil3.ImageLoader =
+        coil3.ImageLoader.Builder(context)
+            .crossfade(200)
+            .eventListener(object : coil3.EventListener() {
+                override fun onError(request: coil3.request.ImageRequest, result: coil3.request.ErrorResult) {
+                    val host = runCatching { android.net.Uri.parse(request.data.toString()).host }.getOrNull()
+                    android.util.Log.w("Artwork", "failed from $host: ${result.throwable.javaClass.simpleName} ${result.throwable.message?.take(60)?.substringBefore("http")}")
+                }
+            })
+            .build()
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)

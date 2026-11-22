@@ -665,3 +665,11 @@ The owner created the release key (kept outside the repository, read through the
 
 - **Checked:** `apksigner verify --print-certs` shows the owner's certificate on the release APK and "Android Debug" on the debug one. On the OP7T the signed build would not install over the debug-signed one (as expected: a different key), so the app was uninstalled and installed fresh. It opened at the pairing screen as version 0.1.0-alpha.2 (code 2), "Use without a PC" went to the signed-out Home, and a searched song played 0.9 s after the tap.
 - **Not checked in the signed build:** signing in, the PC target, downloads, video, and the updater's real path, which needs alpha 3.
+
+### Blank covers, and a loading state (09:45)
+
+The owner's screenshots of Home on his phone: three of four Quick picks rows and one playlist card with no cover and nothing in their place, the same ones in two screenshots. "I'd like some sort of throbber animation when loading covers (and maybe there's a problem loading them?)"
+
+- **What was there:** a bare `AsyncImage`. No placeholder, no failed state, and Coil does not retry: one dropped request leaves a cover blank until the screen is rebuilt. Nothing was logged, so a failure could not be told from slowness.
+- **Now, in `ArtworkFrame` (every cover in the app):** a pulsing fill in the cover's own shape while it loads; a note icon on the fill if it failed; up to three retries, 1.5, 3 and 6 s apart; a 200 ms fade-in. Failures go to logcat under `Artwork` with the host and the error's kind, never the URL. The pulse runs only while a cover is loading.
+- **On the OP7T:** after clearing the app's data, Home's covers were all there within the first 0.7 s on this Wi-Fi and `Artwork` logged nothing, so neither the pulse nor a failure was seen here. The cause of the blanks on the owner's phone is not found; if they return, the icon will show which covers failed and the log will say why.

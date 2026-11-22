@@ -17,6 +17,25 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import kotlinx.coroutines.delay
 import dev.thathunky.meteora.ui.player.MorphShape
 import dev.thathunky.meteora.ui.theme.ArtworkShape
 import dev.thathunky.meteora.ui.theme.LocalArtworkShape
@@ -110,11 +129,62 @@ fun ArtworkFrame(
     } else {
         modifier.clip(shape)
     }
-    AsyncImage(
-        model = model,
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Crop,
-        // Inside the clip and the layer, so the outline scales with the art and stays in bounds.
-        modifier = if (outline > 0.dp) framed.border(outline, outlineColor, shape) else framed,
-    )
+    // 0 loading, 1 shown, 2 failed. A cover that fails is asked for again a few times: Coil does
+    // not retry by itself, and one dropped request left the cover blank until the screen was rebuilt.
+    var state by remember(model) { mutableIntStateOf(if (model == null) FAILED else LOADING) }
+    var attempt by remember(model) { mutableIntStateOf(0) }
+    LaunchedEffect(model, state, attempt) {
+        if (model != null && state == FAILED && attempt < ART_RETRIES) {
+            delay(ART_RETRY_MS shl attempt)
+            state = LOADING
+            attempt++
+        }
+    }
+    val scheme = MaterialTheme.colorScheme
+    val fill = scheme.surfaceContainerHighest
+    val markTint = scheme.onSurfaceVariant
+    val mark = rememberVectorPainter(Icons.Outlined.MusicNote)
+    // Only while loading, so a screen of loaded covers animates nothing. Read in the draw block.
+    val pulse = if (state == LOADING) {
+        rememberInfiniteTransition(label = "art").animateFloat(
+            0.35f, 0.9f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "artPulse",
+        )
+    } else null
+    val placeholder = Modifier.drawBehind {
+        when (state) {
+            LOADING -> drawRect(fill, alpha = pulse?.value ?: 0.6f)
+            FAILED -> {
+                drawRect(fill)
+                val side = size.minDimension * 0.4f
+                translate((size.width - side) / 2, (size.height - side) / 2) {
+                    with(mark) { draw(Size(side, side), alpha = 0.5f, colorFilter = ColorFilter.tint(markTint)) }
+                }
+            }
+            else -> Unit
+        }
+    }
+    val base = if (outline > 0.dp) framed.border(outline, outlineColor, shape) else framed
+    key(attempt) {
+        AsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            onState = {
+                state = when (it) {
+                    is AsyncImagePainter.State.Success -> SHOWN
+                    is AsyncImagePainter.State.Error -> FAILED
+                    is AsyncImagePainter.State.Loading -> LOADING
+                    is AsyncImagePainter.State.Empty -> if (model == null) FAILED else LOADING
+                }
+            },
+            // Inside the clip and the layer, so the outline scales with the art and stays in bounds.
+            modifier = base.then(placeholder),
+        )
+    }
 }
+
+private const val LOADING = 0
+private const val SHOWN = 1
+private const val FAILED = 2
+private const val ART_RETRIES = 3
+private const val ART_RETRY_MS = 1_500L
