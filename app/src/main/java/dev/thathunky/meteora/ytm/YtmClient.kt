@@ -115,7 +115,7 @@ class YtmClient(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            runCatching { android.util.Log.i(FEEDBACK_TAG, "feedback failed: ${e.javaClass.simpleName}") }
+            runCatching { android.util.Log.i(FEEDBACK_TAG, "feedback failed: ${e.javaClass.simpleName}${(e as? YtmException)?.let { " HTTP ${it.status}" }.orEmpty()}") }
             return false
         }
         runCatching { android.util.Log.i(FEEDBACK_TAG, "feedback isProcessed=$ok") }

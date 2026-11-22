@@ -1,5 +1,6 @@
 package dev.thathunky.meteora.ui.filter
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -55,9 +56,13 @@ class HideArtistViewModel @Inject constructor(
     private val ytm: YtmClient,
     private val dismissals: Dismissals,
 ) : ViewModel() {
-    fun hide(artist: ArtistRef, token: String?, onOutcome: (HideOutcome) -> Unit) {
+    /** [offered]: how many artists Hide artist had to offer; with more than one no token is passed. */
+    fun hide(artist: ArtistRef, token: String?, offered: Int, onOutcome: (HideOutcome) -> Unit) {
+        val tell = store.settings.value.tellYouTube
+        // Booleans and counts only, so a phone check can tell why nothing was sent.
+        runCatching { Log.i(YtmClient.FEEDBACK_TAG, "hide artist: token=${token != null} artists=$offered tellYouTube=$tell") }
         viewModelScope.launch {
-            onOutcome(YouTubeFeedback.hideArtist(artist, token, store.settings.value.tellYouTube, { store.setArtist(it, Verdict.Hide) }, ytm::feedback))
+            onOutcome(YouTubeFeedback.hideArtist(artist, token, tell, { store.setArtist(it, Verdict.Hide) }, ytm::feedback))
         }
     }
 
@@ -123,9 +128,9 @@ fun rememberHideArtist(onFinished: () -> Unit = {}, vm: HideArtistViewModel = hi
     var choosing by remember { mutableStateOf<List<ArtistRef>?>(null) }
     val context = LocalContext.current.applicationContext
     val finished by rememberUpdatedState(onFinished)
-    val hideOne: (ArtistRef, String?) -> Unit = remember(vm, context) {
-        { a, token ->
-            vm.hide(a, token) { outcome ->
+    val hideOne: (ArtistRef, String?, Int) -> Unit = remember(vm, context) {
+        { a, token, offered ->
+            vm.hide(a, token, offered) { outcome ->
                 val text = when (outcome) {
                     HideOutcome.Local -> R.string.filters_hidden_toast
                     HideOutcome.Told -> R.string.filters_hidden_told_toast
@@ -146,7 +151,7 @@ fun rememberHideArtist(onFinished: () -> Unit = {}, vm: HideArtistViewModel = hi
                         Text(
                             a.name,
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.fillMaxWidth().clickable { hideOne(a, null); close() }.heightIn(min = 48.dp).padding(vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { hideOne(a, null, list.size); close() }.heightIn(min = 48.dp).padding(vertical = 12.dp),
                         )
                     }
                 }
@@ -159,7 +164,7 @@ fun rememberHideArtist(onFinished: () -> Unit = {}, vm: HideArtistViewModel = hi
         HideArtist { refs, token ->
             when (refs.size) {
                 0 -> finished()
-                1 -> { hideOne(refs[0], YouTubeFeedback.tokenFor(refs, token)); finished() }
+                1 -> { hideOne(refs[0], YouTubeFeedback.tokenFor(refs, token), 1); finished() }
                 else -> choosing = refs
             }
         }
