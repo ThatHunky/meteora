@@ -54,6 +54,7 @@
     <string name="dislike">Не подобається</string>
     <string name="shuffle">Перемішати</string>
     <string name="repeat">Повтор</string>
+    <string name="volume">Гучність</string>
     <string name="search_hint">Пісні, альбоми, виконавці</string>
     <string name="top_result">Найкращий результат</string>
     <string name="load_failed">Не вдалося завантажити. Перевірте з’єднання і спробуйте ще.</string>

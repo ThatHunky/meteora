@@ -55,6 +55,7 @@
     <string name="dislike">Dislike</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat">Repeat</string>
+    <string name="volume">Volume</string>
     <string name="search_hint">Songs, albums, artists</string>
     <string name="top_result">Top result</string>
     <string name="load_failed">Couldn’t load this. Check your connection and try again.</string>

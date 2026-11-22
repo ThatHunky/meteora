@@ -22,6 +22,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,7 +129,7 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                 when (look.nav) {
                     NavStyle.Tabs -> Column(cell, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
                         Icon(item.icon, null, tint = tint)
-                        Text(item.label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        NavLabel(item.label, tint)
                         // A short line under the label, not a filled pill.
                         Box(Modifier.padding(top = 3.dp).size(16.dp, 3.dp).clip(CircleShape).background(if (on) scheme.primary else Color.Transparent))
                     }
@@ -135,7 +139,7 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                             contentAlignment = Alignment.Center,
                         ) { Icon(item.icon, null, tint = if (on) scheme.onSecondaryContainer else scheme.onSurfaceVariant) }
                         Spacer(Modifier.height(4.dp))
-                        Text(item.label, style = MaterialTheme.typography.labelMedium, color = if (on) scheme.onSurface else scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        NavLabel(item.label, if (on) scheme.onSurface else scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                     }
                     // Icons only, so each carries its label for TalkBack; a 2 dp line above the selected one.
                     NavStyle.IconsLine -> Box(cell.semantics { contentDescription = item.label }, contentAlignment = Alignment.Center) {
@@ -156,12 +160,12 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
                             // Text only: with an icon beside it "НАЛАШТУВАННЯ" had about 49 dp on a 360 dp
                             // screen and was cut. The box and the capitals carry the look.
                             // Capitals without the extra letter spacing, and a slight shrink before any cut.
-                            NavLabel(lookLabel(item.label), c, tight = true)
+                            NavLabel(lookLabel(item.label), c, tight = true, wrap = true)
                         }
                     }
                     // tmux-like: "1:home", the selected one inverted. No icons.
                     NavStyle.StatusLine -> Box(cell.then(if (on) Modifier.background(scheme.onSurface) else Modifier), contentAlignment = Alignment.Center) {
-                        NavLabel("${i + 1}:${lookLabel(item.label)}", if (on) scheme.surface else scheme.onSurfaceVariant, Modifier.padding(horizontal = 2.dp))
+                        NavLabel("${i + 1}:${lookLabel(item.label)}", if (on) scheme.surface else scheme.onSurfaceVariant, Modifier.padding(horizontal = 2.dp), wrap = true)
                     }
                 }
             }
@@ -170,19 +174,28 @@ fun MeteoraNavBar(items: List<NavItem>, selected: Int, onSelect: (Int) -> Unit, 
 }
 
 /**
- * A tab label that shrinks a little before it ellipsizes: Terminal's mono "4:налаштування"
- * is about 92 dp at full size, a little more than a quarter of a 360 dp screen.
+ * A tab label that shrinks a little before it is cut: Terminal's mono "4:налаштування" is about
+ * 92 dp at full size, a little more than a quarter of a 360 dp screen, and "Налаштування" under
+ * an icon ran out at font scale 1.3 in the tab looks too. Where the tab has room for a second
+ * line (the status line and Retro's boxes, [wrap]) a label that still does not fit wraps.
  */
 @Composable
-private fun NavLabel(text: String, color: Color, modifier: Modifier = Modifier, tight: Boolean = false) {
-    val style = MaterialTheme.typography.labelSmall.let { if (tight) it.copy(letterSpacing = 0.sp) else it }
-    Text(
+private fun NavLabel(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    tight: Boolean = false,
+    wrap: Boolean = false,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelSmall,
+) {
+    var twoLines by remember(text) { mutableStateOf(false) }
+    ShrinkLabel(
         text,
-        style = style,
-        color = color,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        autoSize = TextAutoSize.StepBased(minFontSize = if (tight) 8.sp else 9.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
-        modifier = modifier,
+        if (tight) style.copy(letterSpacing = 0.sp) else style,
+        color,
+        modifier,
+        minFontSize = if (tight) 8.sp else 9.sp,
+        twoLines = twoLines,
+        onOverflow = { if (wrap) twoLines = true },
     )
 }

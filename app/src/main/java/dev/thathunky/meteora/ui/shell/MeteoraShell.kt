@@ -290,7 +290,8 @@ fun MeteoraShell(vm: ShellViewModel = hiltViewModel(), actionsVm: ActionsViewMod
 private fun ConnectionBanner(connection: ConnectionState, onRetry: () -> Unit) {
     dev.thathunky.meteora.ui.components.MSurface(
         tone = dev.thathunky.meteora.ui.components.Tone.Error,
-        modifier = Modifier.padding(16.dp),
+        // On the page's own margin (12 dp in Terminal, 20 in Soft), as the title under it is.
+        modifier = Modifier.padding(horizontal = LocalLook.current.screenPadding, vertical = 16.dp),
     ) {
         androidx.compose.foundation.layout.Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(

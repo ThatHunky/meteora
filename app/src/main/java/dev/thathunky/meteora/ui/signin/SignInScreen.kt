@@ -29,7 +29,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.thathunky.meteora.R
+import androidx.compose.ui.draw.alpha
 import dev.thathunky.meteora.ui.components.MLinearLoading
+import dev.thathunky.meteora.ui.components.screenTitleStyle
+import dev.thathunky.meteora.ui.theme.LocalLook
 import dev.thathunky.meteora.ytm.YtmAuthStore
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -50,21 +53,22 @@ fun SignInScreen(onDone: () -> Unit, vm: SignInViewModel = hiltViewModel()) {
     var loading by remember { mutableStateOf(true) }
     var finished by remember { mutableStateOf(false) }
 
+    val pad = LocalLook.current.screenPadding
     Column(Modifier.fillMaxSize()) {
         Text(
             stringResource(R.string.signin_title),
-            style = MaterialTheme.typography.titleLargeEmphasized,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+            style = screenTitleStyle(),
+            modifier = Modifier.padding(start = pad, top = 16.dp, end = pad),
         )
         Text(
             stringResource(R.string.disclaimer),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 12.dp),
+            modifier = Modifier.padding(start = pad, top = 4.dp, end = pad, bottom = 12.dp),
         )
-        Box(Modifier.fillMaxWidth()) {
-            if (loading) MLinearLoading(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-        }
+        // Always laid out and only hidden, so the page under it does not jump at every page load
+        // (by about 30 dp in Terminal, whose loader is a line of text).
+        MLinearLoading(Modifier.fillMaxWidth().padding(horizontal = pad).alpha(if (loading) 1f else 0f))
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->

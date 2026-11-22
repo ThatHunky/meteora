@@ -188,7 +188,9 @@ fun QueueSheet(s: PlaybackState, vm: PlayerViewModel, onDismiss: () -> Unit) {
                     MRow(
                         headline = e.title,
                         supporting = e.artist,
-                        leading = { ArtworkFrame(e.artworkUrl, ArtKind.Small, Modifier.size(40.dp)) },
+                        // The queue rows' size above: a fixed 40 dp was smaller than Soft's 60 dp
+                        // queue art and larger than Terminal's 36.
+                        leading = { ArtworkFrame(e.artworkUrl, ArtKind.Small, Modifier.size(if (look.id == LookId.Expressive) 48.dp else look.rowArt)) },
                         highlight = MaterialTheme.colorScheme.surfaceContainerLow,
                     )
                 }

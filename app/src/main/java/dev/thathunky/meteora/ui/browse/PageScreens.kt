@@ -58,8 +58,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.thathunky.meteora.ui.components.ActionRow
 import dev.thathunky.meteora.ui.components.ArtKind
 import dev.thathunky.meteora.ui.components.ArtworkFrame
+import dev.thathunky.meteora.ui.components.RowAction
 import dev.thathunky.meteora.ui.components.ButtonKind
 import dev.thathunky.meteora.ui.components.IconKind
 import dev.thathunky.meteora.ui.components.MButton
@@ -139,31 +141,41 @@ fun CollectionScreen(
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.title, p.subtitle, p.secondSubtitle, round = false)
-                Row(
+                // Laid out by measured width: four text buttons do not fit one line in Terminal or
+                // in Ukrainian, and Row's weights cut Shuffle even when the four did fit.
+                ActionRow(
+                    listOf(
+                        RowAction(priority = 0, weight = 1.4f) {
+                            MButton(
+                                stringResource(R.string.action_play),
+                                onClick = { pid?.let { actions.playCollectionTrack(it, p.tracks.firstOrNull()?.videoId ?: return@let) } },
+                                enabled = pid != null && p.tracks.isNotEmpty(),
+                                icon = Icons.Filled.PlayArrow,
+                                modifier = Modifier.height(56.dp),
+                            )
+                        },
+                        RowAction(priority = 1, weight = 1f) {
+                            MButton(
+                                stringResource(R.string.shuffle),
+                                onClick = { pid?.let { actions.shuffleCollection(it, p.tracks.map { t -> t.videoId }) } },
+                                enabled = pid != null && p.tracks.isNotEmpty(),
+                                kind = ButtonKind.Tonal,
+                                icon = Icons.Outlined.Shuffle,
+                                modifier = Modifier.height(56.dp),
+                            )
+                        },
+                        RowAction(priority = 2) {
+                            dev.thathunky.meteora.ui.downloads.CollectionDownloadButton(p, pid ?: id, if (isAlbum) id else "VL${id.removePrefix("VL")}", isAlbum)
+                        },
+                        RowAction(priority = 3) {
+                            ShareButton {
+                                if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
+                                else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))
+                            }
+                        },
+                    ),
                     Modifier.fillMaxWidth().padding(horizontal = LocalLook.current.screenPadding, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    MButton(
-                        stringResource(R.string.action_play),
-                        onClick = { pid?.let { actions.playCollectionTrack(it, p.tracks.firstOrNull()?.videoId ?: return@let) } },
-                        enabled = pid != null && p.tracks.isNotEmpty(),
-                        icon = Icons.Filled.PlayArrow,
-                        modifier = Modifier.weight(1.4f).height(56.dp),
-                    )
-                    MButton(
-                        stringResource(R.string.shuffle),
-                        onClick = { pid?.let { actions.shuffleCollection(it, p.tracks.map { t -> t.videoId }) } },
-                        enabled = pid != null && p.tracks.isNotEmpty(),
-                        kind = ButtonKind.Tonal,
-                        icon = Icons.Outlined.Shuffle,
-                        modifier = Modifier.weight(1f).height(56.dp),
-                    )
-                    dev.thathunky.meteora.ui.downloads.CollectionDownloadButton(p, pid ?: id, if (isAlbum) id else "VL${id.removePrefix("VL")}", isAlbum)
-                    ShareButton {
-                        if (isAlbum) MusicItem.Album(id, p.title, p.subtitle, p.thumbnail, p.playlistId)
-                        else MusicItem.Playlist("VL${id.removePrefix("VL")}", p.title, p.subtitle, p.thumbnail, id.removePrefix("VL"))
-                    }
-                }
+                )
             }
             if (p.tracks.isEmpty()) {
                 item(key = "empty") {
@@ -218,29 +230,34 @@ fun ArtistScreen(
         LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
             item {
                 Hero(p.thumbnail, p.name, null, null, round = true)
-                Row(
+                // "[ увімкнути радіо ]" alone is about 160 dp in Terminal: measured, not weighted.
+                ActionRow(
+                    listOfNotNull(
+                        p.shufflePlaylistId?.let { pid ->
+                            RowAction(priority = 0, weight = 1.2f) {
+                                MButton(
+                                    stringResource(R.string.shuffle),
+                                    onClick = { actionsVm.actions.play(MusicItem.Playlist("VL$pid", p.name, "", null, pid)) },
+                                    icon = Icons.Outlined.Shuffle,
+                                    modifier = Modifier.height(56.dp),
+                                )
+                            }
+                        },
+                        p.radioPlaylistId?.let { pid ->
+                            RowAction(priority = 1, weight = 1f) {
+                                MButton(
+                                    stringResource(R.string.action_radio),
+                                    onClick = { actionsVm.actions.play(MusicItem.Playlist("VL$pid", p.name, "", null, pid)) },
+                                    kind = ButtonKind.Tonal,
+                                    icon = Icons.Outlined.Radio,
+                                    modifier = Modifier.height(56.dp),
+                                )
+                            }
+                        },
+                        RowAction(priority = 2) { ShareButton { MusicItem.Artist(browseId, p.name, "", p.thumbnail) } },
+                    ),
                     Modifier.fillMaxWidth().padding(horizontal = LocalLook.current.screenPadding, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    p.shufflePlaylistId?.let { pid ->
-                        MButton(
-                            stringResource(R.string.shuffle),
-                            onClick = { actionsVm.actions.play(MusicItem.Playlist("VL$pid", p.name, "", null, pid)) },
-                            icon = Icons.Outlined.Shuffle,
-                            modifier = Modifier.weight(1.2f).height(56.dp),
-                        )
-                    }
-                    p.radioPlaylistId?.let { pid ->
-                        MButton(
-                            stringResource(R.string.action_radio),
-                            onClick = { actionsVm.actions.play(MusicItem.Playlist("VL$pid", p.name, "", null, pid)) },
-                            kind = ButtonKind.Tonal,
-                            icon = Icons.Outlined.Radio,
-                            modifier = Modifier.weight(1f).height(56.dp),
-                        )
-                    }
-                    ShareButton { MusicItem.Artist(browseId, p.name, "", p.thumbnail) }
-                }
+                )
             }
             p.shelves.forEachIndexed { si, shelf ->
                 item(key = "h$si") { SectionHeader(shelf.title) }
