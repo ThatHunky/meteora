@@ -356,4 +356,54 @@
     <string name="update_notif_ready">Meteora %1$s is ready to install</string>
     <string name="update_notif_ready_text">Open Meteora to continue.</string>
     <string name="update_notif_failed">The Meteora update did not work</string>
+    <!-- Library -->
+    <string name="lib_group">Group</string>
+    <string name="lib_sort">Sort</string>
+    <string name="lib_show">Show</string>
+    <string name="lib_group_songs">Songs</string>
+    <string name="lib_group_artists">Artists</string>
+    <string name="lib_group_albums">Albums</string>
+    <string name="lib_group_recent">Recently added</string>
+    <string name="lib_sort_youtube">YouTube order</string>
+    <string name="lib_sort_liked">Recently liked</string>
+    <string name="lib_sort_title">Title</string>
+    <string name="lib_sort_name">Name</string>
+    <string name="lib_sort_artist">Artist</string>
+    <string name="lib_sort_album">Album</string>
+    <string name="lib_sort_count">Most songs</string>
+    <string name="lib_sort_size">Largest</string>
+    <string name="lib_filter_all">All</string>
+    <string name="lib_filter_mine">Mine</string>
+    <string name="lib_filter_smart">Smart only</string>
+    <string name="lib_smart_marker">Smart</string>
+    <string name="lib_today">Today</string>
+    <string name="lib_yesterday">Yesterday</string>
+    <string name="lib_this_week">This week</string>
+    <string name="lib_this_month">This month</string>
+    <string name="lib_earlier">Earlier</string>
+    <string name="lib_no_album">No album</string>
+    <string name="lib_various">Various artists</string>
+    <string name="lib_search_downloads">Search downloads</string>
+    <string name="lib_search_clear">Clear search</string>
+    <string name="lib_no_matches">Nothing matches “%1$s”</string>
+    <string name="lib_select">Select</string>
+    <string name="lib_select_all">Select all</string>
+    <string name="lib_cancel_selection">Cancel selection</string>
+    <string name="lib_remove">Remove</string>
+    <string name="lib_expand">Show songs</string>
+    <string name="lib_collapse">Hide songs</string>
+    <string name="lib_index">Alphabet index</string>
+    <string name="lib_index_hint">Swipe up or down to jump to a letter</string>
+    <plurals name="lib_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="lib_remove_title">
+        <item quantity="one">Remove %d download?</item>
+        <item quantity="other">Remove %d downloads?</item>
+    </plurals>
+    <plurals name="lib_kept">
+        <item quantity="one">%d song stays for its album or playlist.</item>
+        <item quantity="other">%d songs stay for their album or playlist.</item>
+    </plurals>
 </resources>

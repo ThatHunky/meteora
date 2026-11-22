@@ -225,28 +225,8 @@ fun LibraryScreen(
                     MessageState(stringResource(R.string.empty_liked), bottomPadding = bottomPadding)
                     return@Loaded
                 }
-                LazyColumn(contentPadding = PaddingValues(bottom = bottomPadding)) {
-                    item {
-                        Row(Modifier.fillMaxWidth().padding(LocalLook.current.screenPadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MButton(
-                                stringResource(R.string.action_play),
-                                onClick = { onPlayLiked(false, page.tracks.map { it.videoId }) },
-                                icon = Icons.Filled.PlayArrow,
-                                modifier = Modifier.weight(1.4f).height(56.dp),
-                            )
-                            MButton(
-                                stringResource(R.string.shuffle),
-                                onClick = { onPlayLiked(true, page.tracks.map { it.videoId }) },
-                                kind = ButtonKind.Tonal,
-                                icon = Icons.Outlined.Shuffle,
-                                modifier = Modifier.weight(1f).height(56.dp),
-                            )
-                        }
-                    }
-                    itemsIndexed(page.tracks, key = { i, t -> "$i:${t.videoId}" }) { _, t ->
-                        MusicRow(t, { opener.open(t) }, { onLongPress(t) })
-                    }
-                }
+                // Sorting and sticky headers: docs/library-design.md.
+                dev.thathunky.meteora.ui.library.LikedList(page, opener, onLongPress, onPlayLiked, bottomPadding)
             }
             2 -> dev.thathunky.meteora.ui.downloads.DownloadsTab(bottomPadding)
             else -> Loaded(playlists, onRetry = vm::reload, bottomPadding = bottomPadding) { items ->
@@ -254,16 +234,7 @@ fun LibraryScreen(
                     MessageState(stringResource(R.string.empty_playlists), bottomPadding = bottomPadding)
                     return@Loaded
                 }
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(152.dp),
-                    contentPadding = PaddingValues(start = LocalLook.current.screenPadding, end = LocalLook.current.screenPadding, top = 16.dp, bottom = bottomPadding),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    gridItems(items.distinctBy { it.key() }, key = { it.key() }) { item ->
-                        MusicCard(item, { opener.open(item) }, { onLongPress(item) })
-                    }
-                }
+                dev.thathunky.meteora.ui.library.PlaylistsGrid(items, opener, onLongPress, bottomPadding)
             }
         }
     }

@@ -556,3 +556,62 @@ Build, and the unit tests: Version (6), Releases with the real fixture, the pick
 **Nothing was run on a phone.** Unchecked: the card and the About section in any look or in Ukrainian; the download, its resume after a kill, its notification; whether `getPackageArchiveInfo` returns signing certificates for the downloaded file (if it does not, every update is refused as "different key"); the installer session, "Allow from this source", the confirmation dialog, a cancelled dialog, and the app coming back after updating itself. The download is not a foreground service: if Android kills the app mid-download, the next try resumes from the partial file, but nothing restarts it by itself.
 
 - **Updater on the OP7T (03:20):** Settings → About shows "Version 0.1.0-alpha.2", and Check for updates answered "You have the latest version" with "Last checked 0 minutes ago" (the only published release is alpha 1). The real path, an offer, the download, verification of the signing certificate and the install, cannot be tried until a newer release than the installed build exists: that is alpha 3 after alpha 2 is installed by hand.
+
+## Library: grouping, sorting and selection for the long lists (docs/library-design.md)
+
+The owner's screenshot of Library → Downloads showed the header "Songs · 133" over 133 identical rows, each with its own delete icon: "this gotta have grouping". The design came first. I read Material's subheader guidance, the Compose lists guide, and the docs, forums and press on Symfonium, YouTube Music, Spotify, Apple Music, Poweramp and Plexamp. Both m3.material.io pages returned only their titles, so the doc credits no rule to M3. The design doc was committed before any code.
+
+- **Pure logic, in `library/`, tested on the JVM.** `LibraryCollation` sorts and assigns index letters.
+  - Scripts never interleave: the app language's script comes first, then the other script, then "#".
+  - Cyrillic is always compared with a Cyrillic collator. With an English collator, "Іній" came after "Яр".
+  - A leading "The " is ignored. "A" and "An" are not.
+  - Accents on Latin letters fold, so É files under E. Й, Ї, Є and Ґ stay letters of their own.
+  - "Various artists" and songs with no album go last.
+  - `DownloadsLibrary.build` makes the flat rows and the letter → row map in one pass, so the index cannot point at the wrong header. Poweramp users complain about exactly that bug.
+  - `SectionedList` does the same for Liked songs and Playlists.
+  - `LibraryPrefs` remembers each list's group, sort (per group) and filter.
+- **Components (`ui/components/Grouping.kt`), drawn per look:**
+  - `GroupHeader` is opaque so it can be sticky, and is a heading for TalkBack.
+  - `MenuChoice` is a button that shows its current value, "Group: Artists". In Terminal it is `[ group: artists ]`.
+  - `SortGroupBar` holds the menus.
+  - `OverflowMenu` is the per-row ⋮ menu.
+  - `SelectionMark` stands in for a row's artwork while selecting. In Terminal it is `[x]`.
+  - `SelectionBar` shows the selection count in a live region.
+  - `ListSearchField` filters the list in place.
+  - `IndexScroller` is one adjustable control for TalkBack. Its state is the letter, and a swipe moves one letter. It is 48 dp wide to touch, and lists leave that much room at their end edge.
+- **Downloads:**
+  - At the top: a summary ("133 songs · 1.4 GB"), a search field once there are more than 30 songs, and the Group (Songs / Artists / Albums / Recently added), Sort and Show (All / Mine / Smart only) menus. Show appears only when there are smart-only downloads.
+  - Artists and albums fold into rows with their song count and size.
+  - The headers (letters, dates, No album, Various artists) are sticky.
+  - Downloaded albums and playlists keep their own group at the top, and it folds.
+  - The delete icon is gone. Each row now has ⋮ (Select, Try again, Remove download).
+  - Long-press selects. Remove asks first and skips songs that are kept for an album or playlist, saying how many.
+  - Smart-only songs say "Smart".
+  - A tap plays the list as shown, from that song (`MusicActions.playDownloadedList`). On the PC it plays the song and its radio.
+- **Liked songs:** YouTube's order by default, or Title, Artist or Album with sticky headers and the letter index. Row keys are the video id plus an occurrence number; they used to be positions.
+- **Playlists:** YouTube's order or by title. No groups.
+- **Not grouped:**
+  - Album pages: YouTube sends no disc numbers to separate by.
+  - Playlist and artist pages: their headers work as they are.
+  - Search and the queue.
+
+### Checked
+
+- The APK builds, and all 272 unit tests pass, 24 of them new. The new tests cover Ukrainian order in Ukrainian and English apps, mixed scripts, the article rule, index letters, the various/no-album buckets, date buckets, each grouping mode, search, the filters, counts and sizes, bulk removal, stable order and keys, and 500 songs in every mode in under 2 s.
+- The JVM's Collator is not Android's ICU collator, so the order on the phone is **not verified**. The order between scripts is set by our own code, not by either collator.
+
+### Not checked
+
+**Nothing was run on a phone:**
+- any of the screens, in any of the five looks or in Ukrainian;
+- sticky headers in Terminal (no fills) and in Soft (rows drawn as padded cards);
+- the index scroller with a finger or with TalkBack;
+- selection and Back;
+- the menus' outline in Terminal and Retro;
+- how smooth the list is with 133 songs or more.
+
+### Known limits
+
+- Liked songs is the first page that `likedSongs()` returns (one browse, no continuation), so the sorts cover only what is loaded.
+- Which artist and album groups are open is forgotten when you leave the screen. Group, sort and filter are remembered.
+- Collections are not part of bulk selection.

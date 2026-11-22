@@ -359,4 +359,60 @@
     <string name="update_notif_ready">Meteora %1$s готова до встановлення</string>
     <string name="update_notif_ready_text">Відкрийте Meteora, щоб продовжити.</string>
     <string name="update_notif_failed">Оновлення Meteora не вдалося</string>
+    <!-- Library -->
+    <string name="lib_group">Групувати</string>
+    <string name="lib_sort">Сортувати</string>
+    <string name="lib_show">Показати</string>
+    <string name="lib_group_songs">Пісні</string>
+    <string name="lib_group_artists">Виконавці</string>
+    <string name="lib_group_albums">Альбоми</string>
+    <string name="lib_group_recent">Нещодавно додані</string>
+    <string name="lib_sort_youtube">Як у YouTube</string>
+    <string name="lib_sort_liked">Нещодавно вподобані</string>
+    <string name="lib_sort_title">Назва</string>
+    <string name="lib_sort_name">Ім’я</string>
+    <string name="lib_sort_artist">Виконавець</string>
+    <string name="lib_sort_album">Альбом</string>
+    <string name="lib_sort_count">Найбільше пісень</string>
+    <string name="lib_sort_size">Найбільші</string>
+    <string name="lib_filter_all">Усі</string>
+    <string name="lib_filter_mine">Мої</string>
+    <string name="lib_filter_smart">Лише розумні</string>
+    <string name="lib_smart_marker">Розумне</string>
+    <string name="lib_today">Сьогодні</string>
+    <string name="lib_yesterday">Учора</string>
+    <string name="lib_this_week">Цього тижня</string>
+    <string name="lib_this_month">Цього місяця</string>
+    <string name="lib_earlier">Раніше</string>
+    <string name="lib_no_album">Без альбому</string>
+    <string name="lib_various">Різні виконавці</string>
+    <string name="lib_search_downloads">Пошук у завантаженнях</string>
+    <string name="lib_search_clear">Очистити пошук</string>
+    <string name="lib_no_matches">Нічого не знайдено за запитом «%1$s»</string>
+    <string name="lib_select">Вибрати</string>
+    <string name="lib_select_all">Вибрати все</string>
+    <string name="lib_cancel_selection">Скасувати вибір</string>
+    <string name="lib_remove">Видалити</string>
+    <string name="lib_expand">Показати пісні</string>
+    <string name="lib_collapse">Сховати пісні</string>
+    <string name="lib_index">Абетковий покажчик</string>
+    <string name="lib_index_hint">Проведіть угору чи вниз, щоб перейти до літери</string>
+    <plurals name="lib_selected">
+        <item quantity="one">Вибрано %d</item>
+        <item quantity="few">Вибрано %d</item>
+        <item quantity="many">Вибрано %d</item>
+        <item quantity="other">Вибрано %d</item>
+    </plurals>
+    <plurals name="lib_remove_title">
+        <item quantity="one">Видалити %d завантаження?</item>
+        <item quantity="few">Видалити %d завантаження?</item>
+        <item quantity="many">Видалити %d завантажень?</item>
+        <item quantity="other">Видалити %d завантаження?</item>
+    </plurals>
+    <plurals name="lib_kept">
+        <item quantity="one">%d пісня залишиться для свого альбому чи плейлиста.</item>
+        <item quantity="few">%d пісні залишаться для свого альбому чи плейлиста.</item>
+        <item quantity="many">%d пісень залишаться для свого альбому чи плейлиста.</item>
+        <item quantity="other">%d пісні залишаться для свого альбому чи плейлиста.</item>
+    </plurals>
 </resources>
