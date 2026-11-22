@@ -10,12 +10,15 @@ enum class LyricsProvider { YouTube, LrcLib }
  * A track's lyrics. [synced]: every line has a start time, in order. [source] is the sentence
  * YouTube sends, shown as it is: "Source: Musixmatch", "Джерело: Musixmatch" with `hl=uk`
  * (probed). Null for LRCLIB, whose line the UI writes itself.
+ * [stopgap]: YouTube's plain text, taken because the call that can bring timed lyrics failed.
+ * Not the track's real answer, so it is not kept and is asked again next time.
  */
 data class Lyrics(
     val lines: List<LyricLine>,
     val synced: Boolean,
     val source: String?,
     val provider: LyricsProvider = LyricsProvider.YouTube,
+    val stopgap: Boolean = false,
 )
 
 /**

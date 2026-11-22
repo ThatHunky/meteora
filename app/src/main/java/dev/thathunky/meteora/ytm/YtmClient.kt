@@ -107,8 +107,9 @@ class YtmClient(
 
     /**
      * Lyrics behind a [lyricsId]. Timed ones only come to the Android music client, asked signed
-     * out (docs/api-notes.md › Lyrics); if that call fails, the web client's plain text.
-     * Null: the track has no lyrics. Throws when neither call gets an answer.
+     * out (docs/api-notes.md › Lyrics); if that call fails, the web client's plain text, marked
+     * [Lyrics.stopgap] so it is not taken as the track's answer. Null: the track has no lyrics.
+     * Throws when neither call gets an answer.
      */
     suspend fun lyrics(browseId: String): Lyrics? {
         val body = buildJsonObject { put("browseId", browseId) }
@@ -119,7 +120,8 @@ class YtmClient(
         } catch (_: Exception) {
             null
         }
-        return YtmParser.lyrics(android ?: post("browse", body))
+        if (android != null) return YtmParser.lyrics(android)
+        return YtmParser.lyrics(post("browse", body))?.copy(stopgap = true)
     }
 
     private suspend fun post(endpoint: String, body: JsonObject, android: Boolean = false): JsonElement {

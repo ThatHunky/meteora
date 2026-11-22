@@ -156,6 +156,8 @@
     <string name="lyrics_not_synced">Цей текст не синхронізований</string>
     <string name="lyrics_source">Джерело: %s</string>
     <string name="lyrics_error">Не вдалося завантажити текст</string>
+    <string name="action_lyrics_follow">До поточного рядка</string>
+    <string name="action_lyrics_seek">грати з цього рядка</string>
     <string name="action_retry">Спробувати ще</string>
     <string name="lrclib_title">Шукати синхронізований текст на LRCLIB</string>
     <string name="lrclib_note">Надсилає назву, виконавця, альбом і тривалість треку на lrclib.net, коли на YouTube немає синхронізованого тексту.</string>
@@ -168,6 +170,14 @@
     <string name="download_progress">Завантаження, %1$d%%</string>
     <string name="download_done">Завантажено</string>
     <string name="download_failed">Не вдалося завантажити. Торкніться, щоб повторити</string>
+    <string name="download_short_queued">У черзі</string>
+    <string name="download_short_done">Збережено</string>
+    <string name="download_short_failed">Повторити</string>
+    <string name="download_stop_title">Зупинити це завантаження?</string>
+    <string name="action_stop_download">Зупинити</string>
+    <string name="download_remove_text">Файл буде видалено з телефона.</string>
+    <string name="download_remove_collection_text">Його пісні буде видалено з телефона, крім тих, які ви завантажили окремо або з іншим альбомом чи плейлистом.</string>
+    <string name="download_kept_by_collection">Завантажено разом з альбомом чи плейлистом. Щоб видалити цю пісню, видаліть те завантаження.</string>
     <string name="premium_title">Для завантажень потрібен YouTube Music Premium</string>
     <string name="premium_text">Meteora завантажує музику лише для облікових записів із YouTube Music Premium, як і офіційний застосунок. Уже завантажені пісні залишаються на телефоні.</string>
     <string name="premium_signed_out">Увійдіть в обліковий запис із YouTube Music Premium, щоб завантажувати музику.</string>
@@ -175,6 +185,13 @@
     <string name="action_cancel">Скасувати</string>
     <string name="library_downloads">Завантаження</string>
     <string name="downloads_empty">Ще нічого не завантажено</string>
+    <string name="downloads_empty_hint">Торкніться кнопки завантаження на пісні, альбомі чи плейлисті, щоб зберегти їх на цьому телефоні.</string>
+    <plurals name="downloads_song_count">
+        <item quantity="one">%d пісня</item>
+        <item quantity="few">%d пісні</item>
+        <item quantity="many">%d пісень</item>
+        <item quantity="other">%d пісні</item>
+    </plurals>
     <string name="downloads_songs">Пісні</string>
     <string name="downloads_collections">Альбоми та плейлисти</string>
     <string name="offline_title">Немає з’єднання з інтернетом</string>
@@ -286,4 +303,6 @@
     <string name="filters_script_kana">Кана (японська)</string>
     <string name="filters_script_hangul">Хангиль (корейська)</string>
     <string name="filters_script_thai">Тайське</string>
+    <string name="listen_clear_confirm">Розумні завантаження почнуть вчитися з нуля. Уже завантажені пісні залишаться.</string>
+    <string name="action_clear">Очистити</string>
 </resources>

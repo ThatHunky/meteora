@@ -9,6 +9,7 @@ import dev.thathunky.meteora.lyrics.LyricsRepository
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,10 +33,15 @@ class LyricsViewModel @Inject constructor(private val repository: LyricsReposito
     private var job: Job? = null
     private var lastKey: String? = null
 
-    /** Asks again only for another track, after a failure, or when the LRCLIB setting changed. */
+    /**
+     * Asks again only for another track, after a failure or a stopgap answer ([Lyrics.stopgap]:
+     * reopening the page tries for the timed lyrics again), or when the LRCLIB setting changed.
+     */
     fun load(track: Track, force: Boolean = false) {
         val key = repository.answerKey(track)
-        if (!force && key == lastKey && _ui.value?.second != LyricsUi.Failed) return
+        val shown = _ui.value?.second
+        val settled = shown != LyricsUi.Failed && !(shown is LyricsUi.Found && shown.lyrics.stopgap)
+        if (!force && key == lastKey && settled) return
         lastKey = key
         job?.cancel()
         // Asking again for the same track (the setting or the length changed): keep what is shown meanwhile.
@@ -48,6 +54,8 @@ class LyricsViewModel @Inject constructor(private val repository: LyricsReposito
             } catch (_: Exception) {
                 LyricsUi.Failed
             }
+            // An answer that arrives after another track was asked for is dropped, not shown.
+            ensureActive()
             _ui.value = track.videoId to result
         }
     }

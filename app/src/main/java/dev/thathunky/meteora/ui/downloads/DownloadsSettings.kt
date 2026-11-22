@@ -2,17 +2,10 @@ package dev.thathunky.meteora.ui.downloads
 
 import android.text.format.DateUtils
 import android.text.format.Formatter
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.Slider
-import dev.thathunky.meteora.downloads.DownloadSettings
-import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,21 +15,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.thathunky.meteora.R
+import dev.thathunky.meteora.downloads.DownloadSettings
+import dev.thathunky.meteora.downloads.DownloadState
 import dev.thathunky.meteora.stream.StreamQuality
 import dev.thathunky.meteora.ui.components.ButtonKind
 import dev.thathunky.meteora.ui.components.Choice
 import dev.thathunky.meteora.ui.components.MButton
 import dev.thathunky.meteora.ui.components.SegmentedChoice
+import dev.thathunky.meteora.ui.settings.SettingsGroupTitle
+import dev.thathunky.meteora.ui.settings.SettingsNote
+import dev.thathunky.meteora.ui.settings.SettingsSwitchRow
+import kotlin.math.roundToInt
+
+/** The smart downloads slider: at least one step, so "on" always keeps something. */
+internal const val SMART_STEP = 10
+internal val SMART_RANGE = SMART_STEP.toFloat()..DownloadSettings.SMART_MAX.toFloat()
+/** Slider steps between the ends, one per [SMART_STEP]. */
+internal val SMART_STEPS = (DownloadSettings.SMART_MAX - SMART_STEP) / SMART_STEP - 1
 
 /**
  * Settings → Playback, after the video quality: download quality, Wi-Fi only, space used and
  * free, "Remove all downloads", and smart downloads. One line in `PlaybackSettingsScreen`.
+ * Built from the page's own settings rows, so it lines up with the rest of the page.
  */
 @Composable
 fun DownloadsSettingsSection(vm: DownloadsViewModel = hiltViewModel()) {
@@ -48,7 +55,7 @@ fun DownloadsSettingsSection(vm: DownloadsViewModel = hiltViewModel()) {
     val songs by d.index.songs.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
 
-    Text(stringResource(R.string.settings_downloads), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+    SettingsGroupTitle(stringResource(R.string.settings_downloads))
     Text(stringResource(R.string.download_quality), style = MaterialTheme.typography.labelLarge)
     SegmentedChoice(
         listOf(
@@ -59,24 +66,22 @@ fun DownloadsSettingsSection(vm: DownloadsViewModel = hiltViewModel()) {
         s::setQuality,
         Modifier.fillMaxWidth(),
     )
-    Text(
-        stringResource(if (quality == StreamQuality.High) R.string.download_quality_high else R.string.download_quality_normal),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.download_wifi_only)) },
-        trailingContent = { Switch(checked = wifiOnly, onCheckedChange = null) },
-        modifier = Modifier.toggleable(value = wifiOnly, role = Role.Switch, onValueChange = {
+    SettingsNote(stringResource(if (quality == StreamQuality.High) R.string.download_quality_high else R.string.download_quality_normal))
+    SettingsSwitchRow(
+        stringResource(R.string.download_wifi_only),
+        wifiOnly,
+        {
             s.setWifiOnly(it)
             // Queued work picks up the new network rule.
-            if (d.index.queued().isNotEmpty() || d.index.songs.value.values.any { e -> e.state == dev.thathunky.meteora.downloads.DownloadState.Downloading }) d.schedule(replace = true)
-        }),
+            if (d.index.queued().isNotEmpty() || d.index.songs.value.values.any { e -> e.state == DownloadState.Downloading }) d.schedule(replace = true)
+        },
     )
+    val doneCount = remember(songs) { songs.values.count { it.state == DownloadState.Done } }
     val used = remember(songs) { d.usedBytes() }
     val free = remember(songs) { d.freeBytes() }
     Text(
-        stringResource(R.string.download_space, Formatter.formatShortFileSize(context, used), Formatter.formatShortFileSize(context, free)),
+        pluralStringResource(R.plurals.downloads_song_count, doneCount, doneCount) + " · " +
+            stringResource(R.string.download_space, Formatter.formatShortFileSize(context, used), Formatter.formatShortFileSize(context, free)),
         style = MaterialTheme.typography.bodyMedium,
     )
     MButton(stringResource(R.string.download_remove_all), { confirm = true }, kind = ButtonKind.Tonal, enabled = songs.isNotEmpty())
@@ -99,29 +104,36 @@ private fun SmartDownloadsSettings(vm: DownloadsViewModel) {
     val on by s.smartEnabled.collectAsStateWithLifecycle()
     val size by s.smartSize.collectAsStateWithLifecycle()
     val last by s.lastRefresh.collectAsStateWithLifecycle()
-    var dragging by remember(size) { mutableStateOf(size.toFloat()) }
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.smart_title)) },
-        supportingContent = { Text(stringResource(R.string.smart_text, dragging.roundToInt())) },
-        trailingContent = { Switch(checked = on, onCheckedChange = null) },
-        modifier = Modifier.toggleable(value = on, role = Role.Switch, onValueChange = vm.smart::setEnabled),
-    )
-    if (!on) return
-    Slider(
-        value = dragging,
-        onValueChange = { dragging = it },
-        onValueChangeFinished = { s.setSmartSize(dragging.roundToInt()) },
-        valueRange = 0f..DownloadSettings.SMART_MAX.toFloat(),
-        steps = DownloadSettings.SMART_MAX / 10 - 1,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Text(lastRefreshText(last), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    MButton(stringResource(R.string.smart_refresh), vm.smart::refreshNow, kind = ButtonKind.Tonal)
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.listen_clear)) },
-        supportingContent = { Text(stringResource(R.string.listen_clear_text)) },
-        modifier = Modifier.clickable { vm.downloads.listens.clear() },
-    )
+    var dragging by remember(size) { mutableStateOf(size.toFloat().coerceIn(SMART_RANGE)) }
+    var clearing by remember { mutableStateOf(false) }
+    val shown = dragging.roundToInt()
+    SettingsSwitchRow(stringResource(R.string.smart_title), on, vm.smart::setEnabled, supporting = stringResource(R.string.smart_text, shown))
+    if (on) {
+        val sizeLabel = pluralStringResource(R.plurals.downloads_song_count, shown, shown)
+        Slider(
+            value = dragging,
+            onValueChange = { dragging = it },
+            onValueChangeFinished = { s.setSmartSize(dragging.roundToInt()) },
+            valueRange = SMART_RANGE,
+            steps = SMART_STEPS,
+            modifier = Modifier.fillMaxWidth().semantics { stateDescription = sizeLabel },
+        )
+        SettingsNote(lastRefreshText(last))
+        MButton(stringResource(R.string.smart_refresh), vm.smart::refreshNow, kind = ButtonKind.Tonal)
+    }
+    // Shown with smart downloads off too: the history is kept either way and is the user's to clear.
+    Text(stringResource(R.string.listen_clear), style = MaterialTheme.typography.bodyLarge)
+    SettingsNote(stringResource(R.string.listen_clear_text))
+    MButton(stringResource(R.string.action_clear), { clearing = true }, kind = ButtonKind.Outlined)
+    if (clearing) {
+        AlertDialog(
+            onDismissRequest = { clearing = false },
+            title = { Text(stringResource(R.string.listen_clear)) },
+            text = { Text(stringResource(R.string.listen_clear_confirm)) },
+            confirmButton = { TextButton({ clearing = false; vm.downloads.listens.clear() }) { Text(stringResource(R.string.action_clear)) } },
+            dismissButton = { TextButton({ clearing = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
 }
 
 @Composable

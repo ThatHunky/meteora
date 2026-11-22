@@ -32,7 +32,8 @@ class YouTubeLyrics @Inject constructor(private val ytm: YtmClient) : LyricsSour
  * [lrclibEnabled] and YouTube has no timed lyrics, and its answer is taken only when timed.
  * Each source's answers, "none" included, are kept for the last [CACHE_SIZE] tracks so a track is
  * not asked twice, and turning LRCLIB on still asks it for a track YouTube already answered.
- * A failure is not kept, so an offline open is tried again next time.
+ * A failure is not kept, so an offline open is tried again next time; nor is a stopgap answer
+ * ([Lyrics.stopgap]), which also does not send the track to LRCLIB: YouTube may well have it timed.
  */
 class LyricsRepository(
     private val youtube: LyricsSource,
@@ -61,7 +62,7 @@ class LyricsRepository(
     suspend fun lyrics(track: Track): Lyrics? {
         val yt = cached(fromYoutube, track) { youtube.find(track) }
         // An unknown length (0 right after a track starts) is not an LRCLIB "none": ask once it is known.
-        if (yt?.synced == true || lrclib == null || !lrclibEnabled() || track.durationSec <= 0) return yt
+        if (yt?.synced == true || yt?.stopgap == true || lrclib == null || !lrclibEnabled() || track.durationSec <= 0) return yt
         val other = try {
             cached(fromLrclib, track) { lrclib.find(track) }
         } catch (e: CancellationException) {
@@ -76,7 +77,7 @@ class LyricsRepository(
         val key = track.videoId
         synchronized(cache) { cache[key] }?.let { return it.lyrics }
         val found = fetch()
-        synchronized(cache) { cache[key] = Entry(found) }
+        if (found?.stopgap != true) synchronized(cache) { cache[key] = Entry(found) }
         return found
     }
 

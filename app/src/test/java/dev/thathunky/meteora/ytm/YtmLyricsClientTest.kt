@@ -41,6 +41,7 @@ class YtmLyricsClientTest {
     @Test fun `android client is asked without the account's headers`() = runTest {
         val l = client { HttpStatusCode.OK to fixture("lyrics-timed.json") }.lyrics("MPLYt_test")
         assertTrue(l!!.synced)
+        assertFalse(l.stopgap)
         val req = requests.single()
         assertTrue(req.isAndroid())
         assertTrue(req.bodyText().contains("\"browseId\":\"MPLYt_test\""))
@@ -52,6 +53,7 @@ class YtmLyricsClientTest {
     @Test fun `a refused android call falls back to the web client's plain text`() = runTest {
         val l = client { HttpStatusCode.BadRequest to "{}" }.lyrics("MPLYt_test")
         assertFalse(l!!.synced)
+        assertTrue(l.stopgap) // not the track's real answer: asked again next time
         assertEquals(2, requests.size)
         assertFalse(requests[1].isAndroid())
         assertEquals("SID=test", requests[1].headers[HttpHeaders.Cookie]) // the web client is the account's
