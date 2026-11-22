@@ -4,6 +4,7 @@ import androidx.media3.common.util.UnstableApi
 import dev.thathunky.meteora.companion.Command
 import dev.thathunky.meteora.di.AppScope
 import dev.thathunky.meteora.domain.PlayIntent
+import dev.thathunky.meteora.downloads.toLocalSong
 import dev.thathunky.meteora.playback.toLocal
 import dev.thathunky.meteora.ytm.ArtistPage
 import dev.thathunky.meteora.ytm.MusicItem
@@ -46,6 +47,21 @@ class MusicActions @Inject constructor(
         val (songs, start) = downloads.localQueue(playlistId, videoId) ?: return
         if (router.isPhone) router.local.setQueue(songs, start, source = playlistId)
         else if (playlistId != null) router.play(PlayIntent.Collection(playlistId, videoId)) else videoId?.let { router.play(PlayIntent.SongRadio(it)) }
+    }
+
+    /**
+     * The Downloads list: its complete songs in the order shown, from [startVideoId]. On the PC,
+     * which cannot play the phone's files, the song and its radio.
+     */
+    fun playDownloadedList(videoIds: List<String>, startVideoId: String) {
+        val songs = downloads.index.songs.value
+        val done = videoIds.mapNotNull { id -> songs[id]?.takeIf { it.state == dev.thathunky.meteora.downloads.DownloadState.Done } }
+        if (done.isEmpty()) return
+        if (router.isPhone) {
+            router.local.setQueue(done.map { it.toLocalSong() }, done.indexOfFirst { it.videoId == startVideoId }.coerceAtLeast(0))
+        } else {
+            router.play(PlayIntent.SongRadio(startVideoId))
+        }
     }
 
     /** The long-press sheet's Download. */

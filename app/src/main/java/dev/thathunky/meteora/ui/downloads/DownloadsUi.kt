@@ -83,6 +83,7 @@ class DownloadsViewModel @Inject constructor(
     val downloads: DownloadManager,
     val actions: MusicActions,
     val smart: dev.thathunky.meteora.downloads.SmartDownloads,
+    val prefs: dev.thathunky.meteora.library.LibraryPrefs,
 ) : ViewModel()
 
 /** Asks the shell to open the Downloads page (from Home's offline note). */
@@ -192,7 +193,7 @@ fun DownloadButton(
 }
 
 @Composable
-private fun RemoveDialog(title: String, text: String?, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun RemoveDialog(title: String, text: String?, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -299,98 +300,27 @@ fun DownloadsScreen(bottomPadding: Dp) {
     }
 }
 
-/** What the Downloads list asks the user to confirm. */
-private sealed interface Removal {
-    data class Song(val e: DownloadEntry) : Removal
-    data class Collection(val c: DownloadCollection) : Removal
-}
-
 /**
- * Library's Downloads tab: collections, then songs, from the index. Tap plays from the files; a
- * failed song's tap tries again. Removing asks first. Each row reads its own song's progress, so
- * a download in progress redraws its row, not the list.
+ * Library's Downloads tab: the grouped list ([DownloadsList]) from the index, or a note when
+ * nothing is downloaded. Each row reads its own song's progress, so a download in progress
+ * redraws its row, not the list.
  */
 @Composable
 fun DownloadsTab(bottomPadding: Dp, vm: DownloadsViewModel = hiltViewModel()) {
     val d = vm.downloads
     val songs by d.index.songs.collectAsStateWithLifecycle()
     val collections by d.index.collections.collectAsStateWithLifecycle()
-    val look = LocalLook.current
-    val locale = LocalConfiguration.current.locales[0]
-    var removing by remember { mutableStateOf<Removal?>(null) }
     if (songs.isEmpty() && collections.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(24.dp).padding(bottom = bottomPadding), contentAlignment = Alignment.Center) {
             EmptyState(Icons.Outlined.Download, stringResource(R.string.downloads_empty), stringResource(R.string.downloads_empty_hint))
         }
         return
     }
-    val sortedCollections = remember(collections) { collections.values.sortedByDescending { it.addedAtMs } }
-    val sortedSongs = remember(songs, locale) { sortedSongs(songs.values, locale) }
-    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = bottomPadding)) {
-        if (sortedCollections.isNotEmpty()) {
-            item(key = "h:c") { SectionHeader(stringResource(R.string.downloads_collections)) }
-            items(sortedCollections, key = { "c:${it.id}" }) { c ->
-                val tracks = c.videoIds.mapNotNull { songs[it] }
-                val status = DownloadStatus.ofCollection(tracks)
-                val done = tracks.count { it.state == DownloadState.Done }
-                MRow(
-                    headline = c.title,
-                    supporting = if (status == DownloadStatus.Done) pluralStringResource(R.plurals.downloads_song_count, done, done) else statusText(status),
-                    leading = { ArtworkFrame(c.thumbnail, ArtKind.Small, Modifier.size(look.rowArt)) },
-                    trailing = { MIconButton(Icons.Outlined.Delete, stringResource(R.string.action_remove_download), { removing = Removal.Collection(c) }) },
-                    modifier = Modifier.clickable(enabled = done > 0) { vm.actions.playDownloaded(c.id, null) },
-                )
-            }
-        }
-        if (sortedSongs.isNotEmpty()) {
-            item(key = "h:s") { SectionHeader(stringResource(R.string.downloads_songs) + " · " + sortedSongs.size) }
-            items(sortedSongs, key = { "s:${it.videoId}" }) { e -> SongRow(e, vm, onRemove = { removing = Removal.Song(e) }) }
-        }
-    }
-    when (val r = removing) {
-        is Removal.Song -> RemoveDialog(
-            title = stringResource(R.string.action_remove_download),
-            text = r.e.title + "\n" + stringResource(R.string.download_remove_text),
-            confirm = stringResource(R.string.action_delete),
-            onConfirm = { d.removeSong(r.e.videoId) },
-            onDismiss = { removing = null },
-        )
-        is Removal.Collection -> RemoveDialog(
-            title = stringResource(R.string.action_remove_download),
-            text = r.c.title + "\n" + stringResource(R.string.download_remove_collection_text),
-            confirm = stringResource(R.string.action_delete),
-            onConfirm = { d.removeCollection(r.c.id) },
-            onDismiss = { removing = null },
-        )
-        null -> Unit
-    }
+    DownloadsList(songs, collections, vm, bottomPadding)
 }
 
 @Composable
-private fun SongRow(e: DownloadEntry, vm: DownloadsViewModel, onRemove: () -> Unit) {
-    val d = vm.downloads
-    val look = LocalLook.current
-    // This row's progress only; the list above does not read it.
-    val status by remember(e.videoId) { d.index.status(e.videoId) }.collectAsStateWithLifecycle(DownloadStatus.of(e, null))
-    MRow(
-        headline = e.title,
-        supporting = listOfNotNull(e.artist.ifBlank { null }, statusText(status).takeIf { status != DownloadStatus.Done }).joinToString(" · "),
-        leading = { ArtworkFrame(e.artworkUrl, ArtKind.Small, Modifier.size(look.rowArt)) },
-        trailing = {
-            if (removableFromList(e)) MIconButton(Icons.Outlined.Delete, stringResource(R.string.action_remove_download), onRemove)
-        },
-        modifier = Modifier.clickable(enabled = e.state == DownloadState.Done || e.state == DownloadState.Failed) {
-            when (e.state) {
-                DownloadState.Done -> vm.actions.playDownloaded(null, e.videoId)
-                DownloadState.Failed -> d.retry(e.videoId)
-                else -> Unit
-            }
-        },
-    )
-}
-
-@Composable
-private fun statusText(s: DownloadStatus): String = when (s) {
+internal fun statusText(s: DownloadStatus): String = when (s) {
     DownloadStatus.None -> ""
     DownloadStatus.Queued -> stringResource(R.string.download_queued)
     is DownloadStatus.Downloading -> stringResource(R.string.download_progress, (s.fraction * 100).toInt())
