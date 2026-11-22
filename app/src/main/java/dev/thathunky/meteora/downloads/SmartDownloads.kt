@@ -132,6 +132,8 @@ class SmartDownloads @Inject constructor(
         val room = ((downloads.freeBytes() - DownloadManager.MIN_FREE_BYTES) / perSong).coerceAtLeast(0)
         if (plan.add.size > room) plan = plan.copy(add = plan.add.take(room.toInt()))
         downloads.apply(DownloadRules.removeSmart(entries, plan.remove.toSet()))
+        // A kept song whose download failed gets another try.
+        plan.keep.forEach { id -> index.update(id) { if (it.state == DownloadState.Failed) it.copy(state = DownloadState.Queued) else it } }
         entries.filter { it.smart && it.manual }.forEach { e -> index.update(e.videoId) { it.copy(smart = false) } }
         downloads.enqueueSmart(plan.add.map { it.entry() })
         settings.setLastRefresh(plan.keep.size, plan.add.size, plan.remove.size, now)

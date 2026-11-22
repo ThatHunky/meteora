@@ -197,7 +197,8 @@ class DownloadManager @Inject constructor(
     }
 
     internal fun apply(r: DownloadRules.Release) {
-        r.keep.forEach(index::put)
+        // Only the reasons to keep it change: the state may have moved on since the snapshot.
+        r.keep.forEach { k -> index.update(k.videoId) { it.copy(single = k.single, smart = k.smart, collections = k.collections) } }
         r.delete.forEach { e ->
             e.uri?.let(downloader::delete)
             index.delete(e.videoId)
@@ -242,13 +243,17 @@ class DownloadManager @Inject constructor(
 
     // ---- running ----
 
-    fun schedule() {
+    /**
+     * Appended, so songs queued while a run is ending are picked up by the next one. [replace]:
+     * the network rule changed, so the run (and its constraint) is replaced; a cut-off song is
+     * queued again and resumes from its temporary file.
+     */
+    fun schedule(replace: Boolean = false) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(if (settings.wifiOnly.value) NetworkType.UNMETERED else NetworkType.CONNECTED)
             .build()
         val work = OneTimeWorkRequestBuilder<DownloadWorker>().setConstraints(constraints).build()
-        // Appended, so songs queued while a run is ending are picked up by the next one.
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.APPEND_OR_REPLACE, work)
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK, if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE, work)
     }
 
     /** The worker's body. False: stopped by a network failure, to be retried when the network is back. */
@@ -301,6 +306,12 @@ class DownloadManager @Inject constructor(
             index.update(e.videoId) { it.copy(state = DownloadState.Queued) }
             throw x
         } catch (x: IOException) {
+            if (!isConnectivity(x)) {
+                // A refused URL, MediaStore or a full disk: this song fails, the queue goes on.
+                Log.w(TAG, "download failed for ${e.videoId}: ${x.javaClass.simpleName} ${x.message}")
+                index.update(e.videoId) { it.copy(state = DownloadState.Failed) }
+                return true
+            }
             Log.w(TAG, "network failure on ${e.videoId}: ${x.javaClass.simpleName}")
             index.update(e.videoId) { it.copy(state = DownloadState.Queued) }
             false
@@ -311,6 +322,11 @@ class DownloadManager @Inject constructor(
         } finally {
             index.setProgress(e.videoId, null)
         }
+    }
+
+    /** The same set LocalEngine treats as "offline": only these wait for the network instead of failing the song. */
+    private fun isConnectivity(x: Throwable): Boolean = generateSequence(x) { it.cause }.any {
+        it is java.net.UnknownHostException || it is java.net.ConnectException || it is java.net.SocketTimeoutException || it is java.net.NoRouteToHostException
     }
 
     private suspend fun fetchCover(url: String): ByteArray? = withContext(Dispatchers.IO) {

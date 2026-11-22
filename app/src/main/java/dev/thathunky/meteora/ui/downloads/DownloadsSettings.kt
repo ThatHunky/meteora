@@ -70,7 +70,7 @@ fun DownloadsSettingsSection(vm: DownloadsViewModel = hiltViewModel()) {
         modifier = Modifier.toggleable(value = wifiOnly, role = Role.Switch, onValueChange = {
             s.setWifiOnly(it)
             // Queued work picks up the new network rule.
-            if (d.index.queued().isNotEmpty()) d.schedule()
+            if (d.index.queued().isNotEmpty() || d.index.songs.value.values.any { e -> e.state == dev.thathunky.meteora.downloads.DownloadState.Downloading }) d.schedule(replace = true)
         }),
     )
     val used = remember(songs) { d.usedBytes() }
